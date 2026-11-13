@@ -39,7 +39,7 @@ class MainActivity : Activity() {
         root.addView(title,LinearLayout.LayoutParams(-1,-2))
         val languageButton = actionButton("ع | EN",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()) {
             language=if(language=="ar")"en" else "ar";prefs.edit().putString("language",language).apply();syncLauncherAlias()
-            runCatching { startService(Intent(this,RallyOverlayService::class.java).setAction(RallyOverlayService.ACTION_LANGUAGE_CHANGED)) }
+            runCatching { sendBroadcast(Intent(RallyOverlayService.ACTION_LANGUAGE_CHANGED).setPackage(packageName)) }
             recreate()
         }
         root.addView(languageButton,LinearLayout.LayoutParams(dp(76),dp(34)).apply { bottomMargin=dp(18) })
