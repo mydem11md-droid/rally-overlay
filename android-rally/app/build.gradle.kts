@@ -1,6 +1,6 @@
-plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
-
 import java.util.Properties
+
+plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 
 val versionProperties = Properties().apply {
     rootProject.file("version.properties").inputStream().use(::load)
