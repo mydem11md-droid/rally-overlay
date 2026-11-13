@@ -157,7 +157,7 @@ class RallyOverlayService : Service() {
         statusInsetPx=dp(24); navInsetPx=dp(24)
         val screenW=(resources.displayMetrics.widthPixels/density).toInt()
         val screenH=(resources.displayMetrics.heightPixels/density).toInt()
-        bubbleX=bubbleX.coerceIn(0,(screenW-50).coerceAtLeast(0)); bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(screenH-55).coerceAtLeast(((statusInsetPx+dp(50))/density).roundToInt()))
+        bubbleX=bubbleX.coerceIn(0,(screenW-104).coerceAtLeast(0)); bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(screenH-55).coerceAtLeast(((statusInsetPx+dp(50))/density).roundToInt()))
         val frame=FrameLayout(uiContext).apply { clipChildren=false; clipToPadding=false; direction(this) }
         root=frame
         val p=WindowManager.LayoutParams(dp(58),WindowManager.LayoutParams.WRAP_CONTENT,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -193,13 +193,13 @@ class RallyOverlayService : Service() {
         f.addView(close,FrameLayout.LayoutParams(dp(36),dp(36),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{leftMargin=dp(6);topMargin=dp(16)})
         if(menuOpen) {
             val width=dp(280); val sw=resources.displayMetrics.widthPixels
-            val desired=dp(bubbleX+29)
+            val desired=dp(bubbleX+52)
             val expandedLeft=(desired-width/2).coerceIn(0,(sw-width).coerceAtLeast(0))
             val shift=(desired-(expandedLeft+width/2)).toFloat()
             capsule.translationX=shift; orb.translationX=shift; close.translationX=shift
         }
         orb.setOnClickListener { menuOpen=!menuOpen;persist();if(menuOpen)showMenu()else collapse() }
-        val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true};MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt();if(abs(dx)+abs(dy)>5)dragged=true;if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-50);bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-55);applyLayout();persist()};true};MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true};else->true} }
+        val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true};MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt();if(abs(dx)+abs(dy)>5)dragged=true;if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-104);bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-55);applyLayout();persist()};true};MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true};else->true} }
         orb.setOnTouchListener(drag);f.setOnTouchListener(drag)
     }
     private fun buildCollapsed() { val f=root?:return;f.removeAllViews();f.clipChildren=false;f.clipToPadding=false;addPinnedControls(f);updateClock();applyLayout() }
@@ -247,9 +247,9 @@ class RallyOverlayService : Service() {
     }
     private fun applyLayout() {
         val r=root?:return;val p=params?:return;val sw=resources.displayMetrics.widthPixels
-        val width=if(menuOpen&&menuView!=null)dp(280) else dp(58)
+        val width=if(menuOpen&&menuView!=null)dp(280) else dp(104)
         p.width=width;p.height=WindowManager.LayoutParams.WRAP_CONTENT
-        p.x=if(menuOpen&&menuView!=null)(dp(bubbleX+29)-width/2).coerceIn(0,(sw-width).coerceAtLeast(0))else dp(bubbleX)
+        p.x=if(menuOpen&&menuView!=null)(dp(bubbleX+52)-width/2).coerceIn(0,(sw-width).coerceAtLeast(0))else dp(bubbleX)
         p.y=dp(bubbleY.coerceAtLeast(((statusInsetPx+dp(50))/density).roundToInt()))
         p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
         val cap=(availableOverlayHeight()-dp(88+34+17+38+12)).coerceAtLeast(dp(72))
