@@ -56,9 +56,16 @@ class RallyOverlayService : Service() {
     private fun changeLanguage() {
         language = if (language == "ar") "en" else "ar"
         prefs.edit().putString("language", language).apply()
+        syncLauncherAlias()
         uiContext = localizedContext()
         persist()
         if (root != null) { if (menuOpen) showMenu() else buildCollapsed(); startForeground(27, notification()) }
+    }
+    private fun syncLauncherAlias() {
+        val selected=if(language=="ar")ComponentName(this,packageName+".LauncherArabic")else ComponentName(this,packageName+".LauncherEnglish")
+        val other=if(language=="ar")ComponentName(this,packageName+".LauncherEnglish")else ComponentName(this,packageName+".LauncherArabic")
+        packageManager.setComponentEnabledSetting(selected,android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,android.content.pm.PackageManager.DONT_KILL_APP)
+        packageManager.setComponentEnabledSetting(other,android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,android.content.pm.PackageManager.DONT_KILL_APP)
     }
     private fun direction(view: View) {
         view.layoutDirection = if (ar()) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
@@ -154,8 +161,8 @@ class RallyOverlayService : Service() {
     }.apply { contentDescription=t("الوقت","Clock") }
     private fun addPinnedControls(f: FrameLayout) {
         val capsule=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),10f);setPadding(dp(12),dp(5),dp(12),dp(5));minimumWidth=dp(104);direction(this) }
-        val clock=TextView(uiContext).apply { tag="utc_time";text="00:00:00";textSize=15f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
-        val utc=TextView(uiContext).apply { text="UTC";textSize=11f;setTextColor(0xFFA5C4AA.toInt());includeFontPadding=false;isSingleLine=true;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR }
+        val clock=TextView(uiContext).apply { tag="utc_time";text="00:00:00";textSize=15f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
+        val utc=TextView(uiContext).apply { text="UTC";textSize=11f;setTextColor(0xFFA5C4AA.toInt());includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR }
         capsule.addView(clock);capsule.addView(utc,LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(4)})
         f.addView(capsule,FrameLayout.LayoutParams(-2,-2,Gravity.TOP or Gravity.CENTER_HORIZONTAL))
         val orb=FrameLayout(uiContext).apply { background=bg(0xFF2E7D32.toInt(),50f);addView(iconCircle(),FrameLayout.LayoutParams(dp(24),dp(24),Gravity.CENTER)) }
