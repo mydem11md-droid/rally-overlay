@@ -168,8 +168,8 @@ class RallyOverlayService : Service() {
     }
     private fun applyLayout() {
         val r=root?:return;val p=params?:return;val sw=resources.displayMetrics.widthPixels
-        if(menuOpen&&menuView!=null){p.width=min(dp(300),sw-dp(16));p.x=(dp(bubbleX+23)-p.width/2).coerceIn(0,sw-p.width);p.y=dp(bubbleY);p.height=WindowManager.LayoutParams.MATCH_PARENT}
-        else {p.width=max(dp(104),dp(46));p.height=dp(80);p.x=dp(bubbleX);p.y=dp(bubbleY)}
+        if(menuOpen&&menuView!=null){p.width=min(dp(300),sw-dp(16));p.x=(dp(bubbleX+23)-p.width/2).coerceIn(0,sw-p.width);p.y=dp(bubbleY);p.height=(resources.displayMetrics.heightPixels-p.y).coerceAtLeast(dp(200))}
+        else {val cap=r.getChildAt(0);cap.measure(View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));p.width=max(dp(46),cap.measuredWidth);p.height=dp(80);p.x=dp(bubbleX);p.y=dp(bubbleY)}
         p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
         runCatching{wm.updateViewLayout(r,p);Log.d(TAG,"updateViewLayout completed; menuOpen=$menuOpen; focusable=$focusable")}.onFailure{Log.e(TAG,"updateViewLayout failed",it)}
     }
@@ -223,7 +223,9 @@ class RallyOverlayService : Service() {
                 if (rebuilt != s?.toString()) { formatting=true; field.setText(rebuilt); field.setSelection(rebuilt.length); formatting=false }
                 changed(rebuilt)
             }
-        })
+        })        val initial=RallyTime.preview(field.text.toString())
+        if(initial!=field.text.toString()){field.setText(initial);field.setSelection(initial.length)}
+        changed(initial)
         field.setOnFocusChangeListener { v,has ->
             if(has) { setFocus(true); scroll?.post { val sv=scroll?:return@post; val rect=Rect(); v.getDrawingRect(rect); sv.offsetDescendantRectToMyCoords(v,rect); val targetY=(rect.bottom-sv.height+dp(18)).coerceAtLeast(0); if(targetY>sv.scrollY)sv.smoothScrollTo(0,targetY) } }
             else finalizeTimeInput(field,changed)
@@ -245,9 +247,9 @@ class RallyOverlayService : Service() {
         targetInput?.let { bindTimeInput(it) { value -> target=value; persist() } }
         label(c,t("المشاركون","Participants")+" · ${people.size}")
         people.forEachIndexed{index,p->
-            val row=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(0,dp(5),0,dp(5))}
+            val row=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;setPadding(0,dp(5),0,dp(5))}
             row.addView(text(t("مشارك","Participant")+" ${index+1}",11f,0xFFA5C4AA.toInt(),true))
-            val fields=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
+            val fields=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
             val name=input(t("اسم اللاعب","Player name"),p.name)
             val duration=input("MM:SS",p.duration,true)
             name.addTextChangedListener(SimpleWatcher{p.name=it;persist()})
@@ -256,12 +258,12 @@ class RallyOverlayService : Service() {
             fields.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
             fields.addView(duration,LinearLayout.LayoutParams(dp(82),dp(38)))
             row.addView(fields)
-            val actions=LinearLayout(this).apply{gravity=if(ar())Gravity.END else Gravity.START}
+            val actions=LinearLayout(uiContext).apply{gravity=if(ar())Gravity.END else Gravity.START}
             actions.addView(button(t("تعديل","Edit"),0xFF2A3A2F.toInt(),Color.WHITE){name.requestFocus();name.setSelection(name.text.length);setFocus(true)})
-            actions.addView(Space(this),LinearLayout.LayoutParams(dp(5),1))
+            actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
             actions.addView(button(t("حذف","Delete"),0xFFE57373.toInt(),Color.WHITE){people.removeAll{it.id==p.id};if(people.isEmpty())people.add(Person(nextId++,"",""));persist();renderMenu()})
             row.addView(actions);c.addView(row)
-            if(index<people.lastIndex)c.addView(View(this).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
+            if(index<people.lastIndex)c.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
         }
         c.addView(button(t("+ إضافة مشارك","+ Add participant"),0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){people.add(Person(nextId++,"",""));persist();renderMenu();scroll?.post{scroll?.fullScroll(View.FOCUS_DOWN)}})
         errors.forEach{c.addView(text(it,11f,0xFFE57373.toInt()))}
@@ -269,7 +271,7 @@ class RallyOverlayService : Service() {
     private fun buildResults(c:LinearLayout) {
         label(c,t("وقت الوصول المستهدف","Target arrival time")+" · "+format(parse(target)?:0))
         results.forEach { r ->
-            val row=LinearLayout(this).apply{gravity=Gravity.CENTER_VERTICAL}
+            val row=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL}
             row.addView(text(r.name,12f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(38),1f))
             row.addView(text(if(r.launch<0)"—" else format(r.launch),14f,0xFF4CAF50.toInt(),true))
             row.addView(button(t("نسخ","Copy"),0xFF2A3A2F.toInt(),Color.WHITE){copy("${r.name} — ${if(r.launch<0) "−"+format(-r.launch) else format(r.launch)}")})
@@ -308,11 +310,11 @@ class RallyOverlayService : Service() {
     }
     private fun showConfirm() {
         if(confirming)return;confirming=true
-        val dialog=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(16),dp(12),dp(16),dp(12))}
+        val dialog=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(16),dp(12),dp(16),dp(12))}
         dialog.addView(text(t("هل تريد إغلاق الأداة؟","Close the tool?"),13f,Color.WHITE,true))
-        val actions=LinearLayout(this).apply{gravity=Gravity.CENTER}
+        val actions=LinearLayout(uiContext).apply{gravity=Gravity.CENTER}
         actions.addView(button(t("نعم","Yes"),0xFF4CAF50.toInt(),Color.WHITE){confirming=false;stopSelf()})
-        actions.addView(Space(this),LinearLayout.LayoutParams(dp(8),1))
+        actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(8),1))
         actions.addView(button(t("لا","No"),0xFFE57373.toInt(),Color.WHITE){confirming=false;buildCollapsed();applyLayout()})
         dialog.addView(actions)
         val r=root?:return;r.removeAllViews();r.addView(dialog,FrameLayout.LayoutParams(dp(220),dp(100),Gravity.CENTER))
