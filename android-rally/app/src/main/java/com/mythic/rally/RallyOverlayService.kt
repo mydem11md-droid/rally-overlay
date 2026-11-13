@@ -365,6 +365,7 @@ class RallyOverlayService : Service() {
         if(settingsMode) {
             label(c,t("الإعدادات","Settings"))
             c.addView(button(if(vibrationEnabled)t("الاهتزاز: تشغيل","Vibration: On")else t("الاهتزاز: إيقاف","Vibration: Off"),0xFF2A3A2F.toInt(),Color.WHITE){vibrationEnabled=!vibrationEnabled;persist();renderMenu()})
+            c.addView(button(t("رجوع","Back"),0xFF4CAF50.toInt(),0xFF102014.toInt()){settingsMode=false;persist();renderMenu()})
             return
         }
         val modes=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;direction(this)}
