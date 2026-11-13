@@ -138,14 +138,15 @@ class AppUpdater(private val activity: MainActivity) {
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun validateApk(file: File) {
         val archiveFlags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
         val archive = activity.packageManager.getPackageArchiveInfo(file.absolutePath, archiveFlags)
             ?: throw IllegalStateException(activity.getString(R.string.update_invalid_apk))
         if (archive.packageName != activity.packageName) throw IllegalStateException(activity.getString(R.string.update_wrong_package))
         val current = activity.packageManager.getPackageInfo(activity.packageName, archiveFlags)
-        val oldSigners = if (Build.VERSION.SDK_INT >= 28) current.signingInfo?.apkContentsSigners else @Suppress("DEPRECATION") current.signatures
-        val newSigners = if (Build.VERSION.SDK_INT >= 28) archive.signingInfo?.apkContentsSigners else @Suppress("DEPRECATION") archive.signatures
+        val oldSigners = if (Build.VERSION.SDK_INT >= 28) current.signingInfo?.apkContentsSigners else current.signatures
+        val newSigners = if (Build.VERSION.SDK_INT >= 28) archive.signingInfo?.apkContentsSigners else archive.signatures
         val oldSet = oldSigners?.map { it.toCharsString() }?.toSet()
         val newSet = newSigners?.map { it.toCharsString() }?.toSet()
         if (oldSet.isNullOrEmpty() || oldSet != newSet) throw IllegalStateException(activity.getString(R.string.update_signature_mismatch))
