@@ -6,7 +6,7 @@
 
 يمكنك إصدار نسخة جديدة بإحدى الطريقتين:
 
-- من الطرفية: `git tag v3.0.1 && git push --tags` (استبدل رقم الإصدار).
+- من الطرفية: `git tag v1.0.1 && git push --tags` (استبدل رقم الإصدار بالإصدار التالي).
 - من GitHub: Actions → Rally Overlay Release → Run workflow، ثم أدخل رقم الإصدار بصيغة `x.y.z`.
 
 مع كل إصدار ناجح، يزيد workflow قيمة `versionCode` تلقائياً ويحدّث `versionName` في `android-rally/version.properties`. ينشئ الإصدار ملفي `rally-overlay.apk` و`version.json` داخل GitHub Release. ملاحظات الإصدار تُجمع من آخر 10 commits.
