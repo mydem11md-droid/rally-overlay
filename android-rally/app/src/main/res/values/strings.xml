@@ -86,4 +86,5 @@
     <string name="update_invalid_apk">The downloaded file is not a valid APK.</string>
     <string name="update_wrong_package">This APK belongs to a different application.</string>
     <string name="update_signature_mismatch">The APK signature does not match this installed app. Installation was blocked.</string>
+    <string name="update_no_internet">No internet connection. Connect and try again.</string>
 </resources>
