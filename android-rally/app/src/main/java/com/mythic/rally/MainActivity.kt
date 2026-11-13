@@ -28,7 +28,7 @@ class MainActivity : Activity() {
         config.setLocale(locale); config.setLayoutDirection(locale)
         super.attachBaseContext(newBase.createConfigurationContext(config))
     }
-    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); language = prefs.getString("language", null) ?: if (Locale.getDefault().language.equals("ar", true)) "ar" else "en"; render() }
+    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); language = prefs.getString("language", null) ?: if (Locale.getDefault().language.equals("ar", true)) "ar" else "en"; syncLauncherAlias(); render() }
     override fun onResume() { super.onResume(); refreshPermissionStatus() }
     private fun render() {
         val rtl = language == "ar"
