@@ -421,7 +421,7 @@ class RallyOverlayService : Service() {
                 row.addView(durations)
                 val custom=input(getString(R.string.minutes),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))p.rallyMinutes.toString() else "",true)
                 custom.visibility=View.GONE
-                val customToggle=button(getString(R.string.custom_minutes),0xFF2A3A2F.toInt(),Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE}
+                val customToggle=button(getString(R.string.custom_minutes),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))0xFF102014.toInt() else Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE}
                 row.addView(customToggle,LinearLayout.LayoutParams(-1,dp(26)).apply{topMargin=dp(3)})
                 custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it in 1..180}?.let{p.rallyMinutes=it;persist()}})
                 row.addView(custom,LinearLayout.LayoutParams(-1,dp(32)).apply{topMargin=dp(3)})
