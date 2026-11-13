@@ -31,6 +31,15 @@ class RallyOverlayService : Service() {
     private var confirming = false
     private var focusable = false
     private var target = ""
+    private var targetHour = ""
+    private var calculationMode = "now"
+    private var prepSeconds = 10
+    private var vibrationEnabled = true
+    private var targetHourInput: EditText? = null
+    private var resultCountdowns = mutableMapOf<Int,TextView>()
+    private var resultRowsViews = mutableMapOf<Int,View>()
+    private var resultZeroAt = mutableMapOf<Int,Long>()
+    private var vibratedIds = mutableSetOf<Int>()
     private var people = mutableListOf<Person>()
     private var results = mutableListOf<ResultRow>()
     private var errors = mutableListOf<String>()
@@ -93,15 +102,15 @@ class RallyOverlayService : Service() {
     private fun button(value: String, color: Int, fg: Int, action: () -> Unit) =
         TextView(uiContext).apply { text=value; textSize=13f; gravity=Gravity.CENTER; setTextColor(fg); direction(this)
             background=bg(color,9f); setPadding(dp(10),dp(7),dp(10),dp(7)); setOnClickListener { action() } }
-    private data class Person(val id:Int,var name:String,var duration:String)
-    private data class ResultRow(val id:Int,val name:String,val launch:Int)
+    private data class Person(val id:Int,var name:String,var duration:String,var kind:String="solo",var rallyMinutes:Int=5)
+    private data class ResultRow(val id:Int,val name:String,val isRally:Boolean,val rallySeconds:Int,val marchSeconds:Int,val actionAt:Long,val departAt:Long,val arrivalAt:Long)
     private val localeReceiver = object: BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             uiContext=localizedContext()
             if(root!=null){if(menuOpen)showMenu()else buildCollapsed();startForeground(27,notification())}
         }
     }
-    private val clockTick = object: Runnable { override fun run() { updateClock(); handler.postDelayed(this,1000) } }
+    private val clockTick = object: Runnable { override fun run() { updateClock(); updateResultCountdowns(); handler.postDelayed(this,1000) } }
 
     override fun onCreate() {
         super.onCreate()
@@ -122,23 +131,27 @@ class RallyOverlayService : Service() {
 
     private fun restore() {
         target=prefs.getString("target","") ?: ""
+        targetHour=prefs.getString("target_hour","") ?: ""
+        calculationMode=prefs.getString("calculation_mode","now") ?: "now"
+        prepSeconds=prefs.getInt("prep_seconds",10)
+        vibrationEnabled=prefs.getBoolean("vibration_enabled",true)
         bubbleX=prefs.getInt("x",24); bubbleY=prefs.getInt("y",180)
         menuOpen=prefs.getBoolean("open",false); resultsMode=prefs.getBoolean("results",false); settingsMode=prefs.getBoolean("settings",false)
         nextId=prefs.getInt("next",1)
         runCatching {
             val a=JSONArray(prefs.getString("people","[]"))
-            for(i in 0 until a.length()){val o=a.getJSONObject(i);people.add(Person(o.getInt("id"),o.optString("name"),o.optString("duration")))}
+            for(i in 0 until a.length()){val o=a.getJSONObject(i);people.add(Person(o.getInt("id"),o.optString("name"),o.optString("duration"),o.optString("kind","solo"),o.optInt("rally_minutes",5)))}
         }
         if(people.isEmpty()) people.add(Person(nextId++,"",""))
         runCatching {
             val a=JSONArray(prefs.getString("result_rows","[]"))
-            for(i in 0 until a.length()){val o=a.getJSONObject(i);results.add(ResultRow(o.getInt("id"),o.optString("name"),o.getInt("launch")))}
+            for(i in 0 until a.length()){val o=a.getJSONObject(i);results.add(ResultRow(o.getInt("id"),o.optString("name"),o.optBoolean("is_rally"),o.optInt("rally_seconds"),o.optInt("march_seconds"),o.optLong("action_at"),o.optLong("depart_at"),o.optLong("arrival_at")))}
         }
     }
     private fun persist() {
-        val a=JSONArray(); people.forEach { a.put(JSONObject().put("id",it.id).put("name",it.name).put("duration",it.duration)) }
-        val r=JSONArray(); results.forEach { r.put(JSONObject().put("id",it.id).put("name",it.name).put("launch",it.launch)) }
-        prefs.edit().putString("target",target).putString("people",a.toString()).putString("result_rows",r.toString())
+        val a=JSONArray(); people.forEach { a.put(JSONObject().put("id",it.id).put("name",it.name).put("duration",it.duration).put("kind",it.kind).put("rally_minutes",it.rallyMinutes)) }
+        val r=JSONArray(); results.forEach { r.put(JSONObject().put("id",it.id).put("name",it.name).put("is_rally",it.isRally).put("rally_seconds",it.rallySeconds).put("march_seconds",it.marchSeconds).put("action_at",it.actionAt).put("depart_at",it.departAt).put("arrival_at",it.arrivalAt)) }
+        prefs.edit().putString("target",target).putString("target_hour",targetHour).putString("calculation_mode",calculationMode).putInt("prep_seconds",prepSeconds).putBoolean("vibration_enabled",vibrationEnabled).putString("people",a.toString()).putString("result_rows",r.toString())
             .putInt("next",nextId).putInt("x",bubbleX).putInt("y",bubbleY)
             .putBoolean("open",menuOpen).putBoolean("results",resultsMode).putBoolean("settings",settingsMode).apply()
     }
