@@ -15,7 +15,7 @@ class RallyPlannerTest {
     @Test fun fifteenMinuteRallyStartsAtBaseAndSoloFollowsByFourteenFiftyThree() {
         val p=RallyPlanner.planNow(ms(7,20,0),10,listOf(RallyInput(1,"Rally",43,900),RallyInput(2,"Solo",50)))
         assertEquals(ms(7,20,10),p.rows.first{it.id==1}.actionAtMillis)
-        assertEquals(ms(7,35,53),p.rows.first{it.id==2}.actionAtMillis)
+        assertEquals(ms(7,35,3),p.rows.first{it.id==2}.actionAtMillis)
     }
     @Test fun twoRalliesHaveNineFortyActionGap() {
         val p=RallyPlanner.planNow(ms(7,20,0),10,listOf(RallyInput(1,"Five",40,300),RallyInput(2,"Fifteen",20,900)))
