@@ -39,6 +39,7 @@ class RallyOverlayService : Service() {
     private var targetInput: EditText? = null
     private val density get() = resources.displayMetrics.density
     private fun dp(v: Int) = (v * density).roundToInt()
+    private fun dp(v: Float) = (v * density).roundToInt()
     private fun ar() = !Locale.getDefault().language.equals("en", true)
     private fun t(a: String, e: String) = if (ar()) a else e
     private fun bg(color: Int, radius: Float): GradientDrawable =
