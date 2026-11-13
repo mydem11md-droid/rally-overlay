@@ -416,7 +416,7 @@ class RallyOverlayService : Service() {
                 label(row,getString(R.string.rally_duration))
                 val durations=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
                 listOf(1,3,5,10,15,30,60).forEach { mins ->
-                    durations.addView(button("${mins}د",if(p.rallyMinutes==mins)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes==mins)0xFF102014.toInt() else Color.WHITE){p.rallyMinutes=mins;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(27),1f))
+                    durations.addView(button(if(ar())"${mins}د" else "${mins}m",if(p.rallyMinutes==mins)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes==mins)0xFF102014.toInt() else Color.WHITE){p.rallyMinutes=mins;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(27),1f))
                 }
                 row.addView(durations)
                 val custom=input(getString(R.string.minutes),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))p.rallyMinutes.toString() else "",true)
