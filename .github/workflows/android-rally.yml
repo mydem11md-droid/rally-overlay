@@ -42,6 +42,7 @@ jobs:
           gradle-version: '8.7'
 
       - name: Test and assemble debug APK
+        id: build
         working-directory: android-rally
         shell: bash
         run: |
@@ -60,7 +61,7 @@ jobs:
           retention-days: 30
 
       - name: Upload debug APK
-        if: success()
+        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: mythic-rally-overlay-debug-apk
@@ -70,6 +71,7 @@ jobs:
 
       - name: Publish pre-release APK
         if: success() && github.event_name == 'pull_request'
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
