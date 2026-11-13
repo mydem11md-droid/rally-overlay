@@ -68,7 +68,8 @@ class AppUpdater(private val activity: MainActivity) {
                 if (metaConnection.responseCode !in 200..299) throw IllegalStateException(activity.getString(R.string.update_metadata_missing))
                 val meta = JSONObject(metaConnection.inputStream.bufferedReader().use { it.readText() })
                 val remoteCode = meta.getInt("versionCode")
-                val update = if (remoteCode > BuildConfig.VERSION_CODE) AvailableUpdate(
+                val installedVersionCode = activity.packageManager.getPackageInfo(activity.packageName, 0).let { if (Build.VERSION.SDK_INT >= 28) it.longVersionCode.toInt() else @Suppress("DEPRECATION") it.versionCode }
+                val update = if (remoteCode > installedVersionCode) AvailableUpdate(
                     remoteCode, meta.getString("versionName"), meta.optString("notes", release.optString("body")), apkUrl
                 ) else null
                 main.post { callback(update) }
