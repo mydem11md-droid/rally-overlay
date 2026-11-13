@@ -251,7 +251,7 @@ class RallyOverlayService : Service() {
         p.width=width;p.height=WindowManager.LayoutParams.WRAP_CONTENT
         p.x=if(menuOpen&&menuView!=null)(dp(bubbleX+52)-width/2).coerceIn(0,(sw-width).coerceAtLeast(0))else dp(bubbleX)
         p.y=dp(bubbleY.coerceAtLeast(((statusInsetPx+dp(50))/density).roundToInt()))
-        p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+        p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
         val cap=(availableOverlayHeight()-dp(88+34+17+38+12)).coerceAtLeast(dp(72))
         (scroll as? CappedScrollView)?.maxHeightPx=if(resultsMode)(availableOverlayHeight()-dp(88+34+17)).coerceAtLeast(dp(72))else cap
         r.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(availableOverlayHeight(),View.MeasureSpec.AT_MOST))
