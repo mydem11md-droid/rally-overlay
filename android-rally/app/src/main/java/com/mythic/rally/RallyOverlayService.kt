@@ -362,6 +362,11 @@ class RallyOverlayService : Service() {
         else changed(RallyTime.preview(raw))
     }
     private fun buildEditor(c:LinearLayout) {
+        if(settingsMode) {
+            label(c,t("الإعدادات","Settings"))
+            c.addView(button(if(vibrationEnabled)t("الاهتزاز: تشغيل","Vibration: On")else t("الاهتزاز: إيقاف","Vibration: Off"),0xFF2A3A2F.toInt(),Color.WHITE){vibrationEnabled=!vibrationEnabled;persist();renderMenu()})
+            return
+        }
         val modes=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;direction(this)}
         modes.addView(button(t("الآن","Now"),if(calculationMode=="now")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(calculationMode=="now")0xFF102014.toInt() else Color.WHITE){calculationMode="now";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
         modes.addView(Space(uiContext),LinearLayout.LayoutParams(dp(6),1))
@@ -406,14 +411,17 @@ class RallyOverlayService : Service() {
             kindRow.addView(button(t("حشد","Rally"),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(28),1f))
             row.addView(kindRow,LinearLayout.LayoutParams(-1,dp(30)).apply{topMargin=dp(4)})
             if(p.kind=="rally") {
-                duration.hint=t("وصول مسيرة الحشد","Rally march arrival")
+                duration.hint=t("وصول مسيرة الحشد","Rally march arrival");duration.contentDescription=t("وصول مسيرة الحشد","Rally march arrival")
                 label(row,t("مدة الحشد","Rally duration"))
                 val durations=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
                 listOf(1,3,5,10,15,30,60).forEach { mins ->
                     durations.addView(button("${mins}د",if(p.rallyMinutes==mins)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes==mins)0xFF102014.toInt() else Color.WHITE){p.rallyMinutes=mins;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(27),1f))
                 }
                 row.addView(durations)
-                val custom=input(t("مخصص · دقائق","Custom · minutes"),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))p.rallyMinutes.toString() else "",true)
+                val customToggle=button(t("مخصص","Custom"),0xFF2A3A2F.toInt(),Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE}
+                row.addView(customToggle,LinearLayout.LayoutParams(-1,dp(26)).apply{topMargin=dp(3)})
+                val custom=input(t("دقائق","Minutes"),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))p.rallyMinutes.toString() else "",true)
+                custom.visibility=View.GONE
                 custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it in 1..180}?.let{p.rallyMinutes=it;persist()}})
                 row.addView(custom,LinearLayout.LayoutParams(-1,dp(32)).apply{topMargin=dp(3)})
             }
@@ -490,11 +498,12 @@ class RallyOverlayService : Service() {
                 c.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
             }
         }
+        errors.forEach{c.addView(text(it,10f,0xFFE57373.toInt()))}
         results.firstOrNull()?.let { r ->
             c.addView(text(t("وصول الجميع ","Everyone arrives ")+utcTime(r.arrivalAt)+" UTC",11f,0xFF4CAF50.toInt(),true))
         }
         c.addView(button(t("نسخ الكل","Copy all"),0xFF2A3A2F.toInt(),Color.WHITE){copy(results.joinToString("\n"){r->"${r.name} — ${if(r.isRally)t("ابدأ الحشد","Start rally")else t("أرسل","Send")} ${utcTime(r.actionAt)} UTC"})})
-        c.addView(button(t("حساب من جديد","Recalculate now"),0xFF4CAF50.toInt(),0xFF102014.toInt()){resultsMode=false;calculate()})
+        c.addView(button(t("حساب من جديد","Recalculate now"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()})
         c.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()})
         updateResultCountdowns()
     }
