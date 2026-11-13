@@ -201,7 +201,7 @@ class RallyOverlayService : Service() {
     }
     private fun availableOverlayHeight(): Int {
         val full = if (Build.VERSION.SDK_INT >= 30) wm.currentWindowMetrics.bounds.height() else resources.displayMetrics.heightPixels
-        return (full - statusInsetPx - navInsetPx - imeHeightPx - dp(16)).coerceAtLeast(dp(120))
+        return (full - max(statusInsetPx,dp(bubbleY)) - navInsetPx - imeHeightPx - dp(16)).coerceAtLeast(dp(120))
     }
     private fun installInsetsTracking(view: View) {
         statusInsetPx=dp(24); navInsetPx=dp(24)
@@ -239,7 +239,7 @@ class RallyOverlayService : Service() {
         val r=root?:return;val p=params?:return;val sw=resources.displayMetrics.widthPixels
         val width=if(menuOpen&&menuView!=null)dp(280) else dp(58)
         p.width=width;p.height=WindowManager.LayoutParams.WRAP_CONTENT
-        p.x=if(menuOpen&&menuView!=null)(dp(bubbleX+23)-width/2).coerceIn(0,(sw-width).coerceAtLeast(0))else dp(bubbleX)
+        p.x=if(menuOpen&&menuView!=null)(dp(bubbleX+29)-width/2).coerceIn(0,(sw-width).coerceAtLeast(0))else dp(bubbleX)
         p.y=dp(bubbleY.coerceAtLeast(((statusInsetPx+dp(50))/density).roundToInt()))
         p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
         val cap=(availableOverlayHeight()-dp(88+34+17+38+12)).coerceAtLeast(dp(72))
@@ -251,7 +251,14 @@ class RallyOverlayService : Service() {
             Log.d("RallyLayout","windowHeight=${r.measuredHeight}px availableHeight=${availableOverlayHeight()}px keyboardHeight=${imeHeightPx}px scrollMode=$mode")
         }.onFailure{Log.e("RallyLayout","update failed",it)}
     }
-    private fun collapse(){menuOpen=false;persist();buildCollapsed();applyLayout()}
+    private fun collapse(){
+        val panel=menuView
+        if(panel!=null) {
+            panel.animate().alpha(0f).setDuration(150).withEndAction {
+                menuOpen=false;persist();menuView=null;buildCollapsed();applyLayout()
+            }.start()
+        } else { menuOpen=false;persist();buildCollapsed();applyLayout() }
+    }
     private fun showMenu() {
         val f=root?:return;f.removeAllViews();f.clipChildren=false;f.clipToPadding=false;addPinnedControls(f)
         val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(10),dp(8),dp(10),dp(9));clipChildren=false;clipToPadding=false;direction(this)}
@@ -327,7 +334,7 @@ class RallyOverlayService : Service() {
     }
     private fun buildEditor(c:LinearLayout) {
         label(c,t("الوقت المستهدف","Target time"))
-        targetInput=input("MM:SS",target,true)
+        targetInput=input("MM:SS",target,true).apply{contentDescription=t("الوقت المستهدف","Target time")}
         c.addView(targetInput,LinearLayout.LayoutParams(-1,dp(38)))
         targetInput?.let { bindTimeInput(it) { value -> target=value; persist() } }
         label(c,t("المشاركون","Participants")+" · ${people.size}")
