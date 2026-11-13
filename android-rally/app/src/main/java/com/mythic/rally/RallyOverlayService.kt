@@ -423,7 +423,7 @@ class RallyOverlayService : Service() {
                 custom.visibility=View.GONE
                 val customToggle=button(getString(R.string.custom_minutes),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))0xFF102014.toInt() else Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE}
                 row.addView(customToggle,LinearLayout.LayoutParams(-1,dp(26)).apply{topMargin=dp(3)})
-                custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it in 1..180}?.let{p.rallyMinutes=it;persist()}})
+                custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it in 1..180}?.let{p.rallyMinutes=it;persist();customToggle.setBackground(bg(0xFF4CAF50.toInt(),9f));customToggle.setTextColor(0xFF102014.toInt())}})
                 row.addView(custom,LinearLayout.LayoutParams(-1,dp(32)).apply{topMargin=dp(3)})
             }
             val actions=LinearLayout(uiContext).apply{gravity=if(ar())Gravity.END else Gravity.START}
