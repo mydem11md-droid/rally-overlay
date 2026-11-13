@@ -2,6 +2,7 @@ package com.mythic.rally
 
 import android.app.Activity
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
@@ -37,7 +38,7 @@ class MainActivity : Activity() {
         val title = TextView(this).apply { text=getString(R.string.app_name);textSize=21f;setTextColor(-1);setTypeface(typeface,android.graphics.Typeface.BOLD);gravity=Gravity.CENTER;setPadding(0,dp(12),0,dp(16)) }
         root.addView(title,LinearLayout.LayoutParams(-1,-2))
         val languageButton = actionButton("ع | EN",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()) {
-            language=if(language=="ar")"en" else "ar";prefs.edit().putString("language",language).apply()
+            language=if(language=="ar")"en" else "ar";prefs.edit().putString("language",language).apply();syncLauncherAlias()
             runCatching { startService(Intent(this,RallyOverlayService::class.java).setAction(RallyOverlayService.ACTION_LANGUAGE_CHANGED)) }
             recreate()
         }
@@ -50,6 +51,12 @@ class MainActivity : Activity() {
         },LinearLayout.LayoutParams(-1,dp(46)))
         root.addView(actionButton(getString(R.string.stop),0xFF2A3A2F.toInt(),-1) { stopService(Intent(this,RallyOverlayService::class.java));Toast.makeText(this,R.string.stopped,Toast.LENGTH_SHORT).show() },LinearLayout.LayoutParams(-1,dp(46)).apply { topMargin=dp(10) })
         setContentView(root);refreshPermissionStatus()
+    }
+    private fun syncLauncherAlias() {
+        val selected = if(language=="ar") ComponentName(this,packageName+".LauncherArabic") else ComponentName(this,packageName+".LauncherEnglish")
+        val other = if(language=="ar") ComponentName(this,packageName+".LauncherEnglish") else ComponentName(this,packageName+".LauncherArabic")
+        packageManager.setComponentEnabledSetting(selected,android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,android.content.pm.PackageManager.DONT_KILL_APP)
+        packageManager.setComponentEnabledSetting(other,android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,android.content.pm.PackageManager.DONT_KILL_APP)
     }
     private fun refreshPermissionStatus() {
         val status=findViewById<TextView>(android.R.id.content)?.findViewWithTag("permission_status") as? TextView ?: return
