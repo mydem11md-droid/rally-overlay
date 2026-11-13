@@ -362,10 +362,29 @@ class RallyOverlayService : Service() {
         else changed(RallyTime.preview(raw))
     }
     private fun buildEditor(c:LinearLayout) {
-        label(c,t("الوقت المستهدف","Target time"))
-        targetInput=input("MM:SS",target,true).apply{contentDescription=t("الوقت المستهدف","Target time")}
-        c.addView(targetInput,LinearLayout.LayoutParams(-1,dp(38)))
-        targetInput?.let { bindTimeInput(it) { value -> target=value; persist() } }
+        val modes=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;direction(this)}
+        modes.addView(button(t("الآن","Now"),if(calculationMode=="now")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(calculationMode=="now")0xFF102014.toInt() else Color.WHITE){calculationMode="now";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
+        modes.addView(Space(uiContext),LinearLayout.LayoutParams(dp(6),1))
+        modes.addView(button(t("وقت وصول محدد","Target arrival"),if(calculationMode=="target")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(calculationMode=="target")0xFF102014.toInt() else Color.WHITE){calculationMode="target";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
+        c.addView(modes)
+        if(calculationMode=="now") {
+            label(c,t("مهلة التجهيز · ثوانٍ","Preparation delay · seconds"))
+            val delays=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
+            listOf(5,10,20,30).forEach { value ->
+                delays.addView(button(value.toString(),if(prepSeconds==value)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(prepSeconds==value)0xFF102014.toInt() else Color.WHITE){prepSeconds=value;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(30),1f))
+                if(value!=30)delays.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
+            }
+            c.addView(delays)
+        } else {
+            label(c,t("الوقت المستهدف · MM:SS","Target time · MM:SS"))
+            targetInput=input("MM:SS",target,true).apply{contentDescription=t("الوقت المستهدف","Target time")}
+            c.addView(targetInput,LinearLayout.LayoutParams(-1,dp(38)))
+            targetInput?.let { bindTimeInput(it) { value -> target=value; persist() } }
+            label(c,t("ساعة UTC (اختياري)","UTC hour (optional)"))
+            targetHourInput=input("HH",targetHour,true)
+            c.addView(targetHourInput,LinearLayout.LayoutParams(-1,dp(34)))
+            targetHourInput?.addTextChangedListener(SimpleWatcher{targetHour=it.filter{ch->ch.isDigit()}.take(2);persist()})
+        }
         label(c,t("المشاركون","Participants")+" · ${people.size}")
         people.forEachIndexed{index,p->
             val row=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;setPadding(0,dp(5),0,dp(5))}
@@ -381,6 +400,23 @@ class RallyOverlayService : Service() {
             fields.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
             fields.addView(duration,LinearLayout.LayoutParams(dp(82),dp(38)))
             row.addView(fields)
+            val kindRow=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
+            kindRow.addView(button(t("فردي","Solo"),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(28),1f))
+            kindRow.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
+            kindRow.addView(button(t("حشد","Rally"),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(28),1f))
+            row.addView(kindRow,LinearLayout.LayoutParams(-1,dp(30)).apply{topMargin=dp(4)})
+            if(p.kind=="rally") {
+                duration.hint=t("وصول مسيرة الحشد","Rally march arrival")
+                label(row,t("مدة الحشد","Rally duration"))
+                val durations=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
+                listOf(1,3,5,10,15,30,60).forEach { mins ->
+                    durations.addView(button("${mins}د",if(p.rallyMinutes==mins)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes==mins)0xFF102014.toInt() else Color.WHITE){p.rallyMinutes=mins;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(27),1f))
+                }
+                row.addView(durations)
+                val custom=input(t("مخصص · دقائق","Custom · minutes"),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))p.rallyMinutes.toString() else "",true)
+                custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it in 1..180}?.let{p.rallyMinutes=it;persist()}})
+                row.addView(custom,LinearLayout.LayoutParams(-1,dp(32)).apply{topMargin=dp(3)})
+            }
             val actions=LinearLayout(uiContext).apply{gravity=if(ar())Gravity.END else Gravity.START}
             actions.addView(button(t("تعديل","Edit"),0xFF2A3A2F.toInt(),Color.WHITE){name.requestFocus();name.setSelection(name.text.length);setFocus(true)})
             actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
