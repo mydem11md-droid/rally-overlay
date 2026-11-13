@@ -5,6 +5,7 @@ import android.content.*
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
 import android.os.*
+import android.util.Log
 import android.provider.Settings
 import android.view.*
 import android.view.inputmethod.*
@@ -23,6 +24,7 @@ class RallyOverlayService : Service() {
     private var params: WindowManager.LayoutParams? = null
     private var menuOpen = false
     private var resultsMode = false
+    private var settingsMode = false
     private var confirming = false
     private var focusable = false
     private var target = ""
@@ -64,7 +66,7 @@ class RallyOverlayService : Service() {
     private fun restore() {
         target=prefs.getString("target","") ?: ""
         bubbleX=prefs.getInt("x",24); bubbleY=prefs.getInt("y",180)
-        menuOpen=prefs.getBoolean("open",false); resultsMode=prefs.getBoolean("results",false)
+        menuOpen=prefs.getBoolean("open",false); resultsMode=prefs.getBoolean("results",false); settingsMode=prefs.getBoolean("settings",false)
         nextId=prefs.getInt("next",1)
         runCatching {
             val a=JSONArray(prefs.getString("people","[]"))
@@ -81,7 +83,7 @@ class RallyOverlayService : Service() {
         val r=JSONArray(); results.forEach { r.put(JSONObject().put("id",it.id).put("name",it.name).put("launch",it.launch)) }
         prefs.edit().putString("target",target).putString("people",a.toString()).putString("result_rows",r.toString())
             .putInt("next",nextId).putInt("x",bubbleX).putInt("y",bubbleY)
-            .putBoolean("open",menuOpen).putBoolean("results",resultsMode).apply()
+            .putBoolean("open",menuOpen).putBoolean("results",resultsMode).putBoolean("settings",settingsMode).apply()
     }
     private fun notification():Notification {
         val channel="rally_native"
@@ -149,7 +151,7 @@ class RallyOverlayService : Service() {
         if(menuOpen && menuView!=null){p.width=min(dp(300),sw-dp(16));p.height=WindowManager.LayoutParams.WRAP_CONTENT
             p.x=(dp(bubbleX)-p.width/2+dp(23)).coerceIn(0,sw-p.width);p.y=dp(bubbleY-30)
         }else{p.width=dp(58);p.height=dp(92);p.x=dp(bubbleX);p.y=dp(bubbleY)}
-        runCatching{wm.updateViewLayout(r,p)}
+        runCatching{wm.updateViewLayout(r,p);Log.d(TAG,"updateViewLayout x=${p.x} y=${p.y} width=${p.width} height=${p.height} menuOpen=$menuOpen focusable=$focusable")}.onFailure{Log.e(TAG,"updateViewLayout failed",it)}
     }
     private fun collapse(){menuOpen=false;persist();buildCollapsed();applyLayout()}
     private fun showMenu() {
@@ -157,8 +159,8 @@ class RallyOverlayService : Service() {
         val panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; background=bg(0xFF1E2A22.toInt(),12f); setPadding(dp(10),dp(8),dp(10),dp(9)); clipChildren=false;clipToPadding=false }
         menuView=panel
         val header=LinearLayout(this).apply { gravity=Gravity.CENTER_VERTICAL; orientation=LinearLayout.HORIZONTAL }
-        header.addView(text(if(resultsMode)t("نتائج التنسيق","Rally results") else t("أداة تنسيق الحشود","Rally Coordinator"),14f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(34),1f))
-        header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){resultsMode=false;renderMenu()},LinearLayout.LayoutParams(dp(38),dp(34)))
+        header.addView(text(if(settingsMode)t("الإعدادات · تعديل البيانات","Settings · Edit data") else if(resultsMode)t("نتائج التنسيق","Rally results") else t("أداة تنسيق الحشود","Rally Coordinator"),14f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(34),1f))
+        header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(dp(38),dp(34)))
         panel.addView(header)
         val sc=ScrollView(this).apply { isFillViewport=false; clipChildren=false;clipToPadding=false }
         scroll=sc
@@ -176,7 +178,13 @@ class RallyOverlayService : Service() {
             background=bg(0xFF2A3A2F.toInt(),9f);setPadding(dp(9),0,dp(9),0)
             if(numeric){inputType=android.text.InputType.TYPE_CLASS_NUMBER;imeOptions=EditorInfo.IME_ACTION_NEXT}
             else{inputType=android.text.InputType.TYPE_CLASS_TEXT;imeOptions=EditorInfo.IME_ACTION_NEXT}
-            setOnFocusChangeListener{_,has->if(has)setFocus(true)}
+            setOnFocusChangeListener{v,has->
+                if(has){setFocus(true);scroll?.post{val sv=scroll?:return@post;val bottom=v.bottom;val targetY=(bottom-sv.height+dp(18)).coerceAtLeast(0);if(targetY>sv.scrollY)sv.smoothScrollTo(0,targetY)}}
+                else if(numeric){val parsed=parse(text.toString());if(parsed!=null&&parsed<=3600){val normalized=format(parsed);if(text.toString()!=normalized)setText(normalized)}}
+            }
+            setOnEditorActionListener{v,actionId,_->
+                if(actionId==EditorInfo.IME_ACTION_NEXT){v.focusSearch(View.FOCUS_FORWARD)?.requestFocus();true}else false
+            }
         }
     }
     private fun buildEditor(c:LinearLayout) {
@@ -250,7 +258,7 @@ class RallyOverlayService : Service() {
         p.flags=if(on)p.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv() else p.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
         p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         runCatching{wm.updateViewLayout(r,p)}
-        if(on){r.requestFocus();handler.postDelayed({(getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(r,InputMethodManager.SHOW_IMPLICIT)},120)}
+        if(on){handler.postDelayed({val focused=r.findFocus()?:r;(getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(focused,InputMethodManager.SHOW_IMPLICIT)},120)}
         else{(getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(r.windowToken,0)}
     }
     private fun showConfirm() {
@@ -268,7 +276,7 @@ class RallyOverlayService : Service() {
     }
     override fun onDestroy(){handler.removeCallbacksAndMessages(null);root?.let{runCatching{wm.removeView(it)}};root=null
         if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
-    companion object { const val ACTION_STOP="com.mythic.rally.STOP" }
+    companion object { const val ACTION_STOP="com.mythic.rally.STOP"; private const val TAG="RallyOverlay" }
     private class SimpleWatcher(val changed:(String)->Unit):android.text.TextWatcher{
         override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
         override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){changed(s?.toString()?: "")}
