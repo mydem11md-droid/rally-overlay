@@ -152,9 +152,10 @@ class RallyOverlayService : Service() {
             .addAction(Notification.Action.Builder(null,t("إيقاف","Stop"),stop).build()).build()
     }
     private fun createOverlay() {
+        statusInsetPx=dp(24); navInsetPx=dp(24)
         val screenW=(resources.displayMetrics.widthPixels/density).toInt()
         val screenH=(resources.displayMetrics.heightPixels/density).toInt()
-        bubbleX=bubbleX.coerceIn(0,(screenW-50).coerceAtLeast(0)); bubbleY=bubbleY.coerceIn(36,(screenH-55).coerceAtLeast(36))
+        bubbleX=bubbleX.coerceIn(0,(screenW-50).coerceAtLeast(0)); bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(screenH-55).coerceAtLeast(((statusInsetPx+dp(50))/density).roundToInt()))
         val frame=FrameLayout(uiContext).apply { clipChildren=false; clipToPadding=false; direction(this) }
         root=frame
         val p=WindowManager.LayoutParams(dp(58),WindowManager.LayoutParams.WRAP_CONTENT,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -188,6 +189,13 @@ class RallyOverlayService : Service() {
             override fun performClick():Boolean { super.performClick();showConfirm();return true }
         }
         f.addView(close,FrameLayout.LayoutParams(dp(36),dp(36),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{leftMargin=dp(6);topMargin=dp(16)})
+        if(menuOpen) {
+            val width=dp(280); val sw=resources.displayMetrics.widthPixels
+            val desired=dp(bubbleX+29)
+            val expandedLeft=(desired-width/2).coerceIn(0,(sw-width).coerceAtLeast(0))
+            val shift=(desired-(expandedLeft+width/2)).toFloat()
+            capsule.translationX=shift; orb.translationX=shift; close.translationX=shift
+        }
         orb.setOnClickListener { menuOpen=!menuOpen;persist();if(menuOpen)showMenu()else collapse() }
         val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true};MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt();if(abs(dx)+abs(dy)>5)dragged=true;if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-50);bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-55);applyLayout();persist()};true};MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true};else->true} }
         orb.setOnTouchListener(drag);f.setOnTouchListener(drag)
