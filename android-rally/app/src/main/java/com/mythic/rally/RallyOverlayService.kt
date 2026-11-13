@@ -504,7 +504,7 @@ class RallyOverlayService : Service() {
         results.firstOrNull()?.let { r ->
             c.addView(text(String.format(Locale.US,getString(R.string.everyone_arrives),utcTime(r.arrivalAt)),11f,0xFF4CAF50.toInt(),true))
         }
-        c.addView(button(t("نسخ الكل","Copy all"),0xFF2A3A2F.toInt(),Color.WHITE){copy(results.joinToString("\n"){r->"${r.name} — ${if(r.isRally)getString(R.string.start_rally)else getString(R.string.send_action)} ${utcTime(r.actionAt)} UTC"})})
+        c.addView(button(t("نسخ الكل","Copy all"),0xFF2A3A2F.toInt(),Color.WHITE){copy(results.joinToString("\n"){r->copyRowText(r)})})
         c.addView(button(getString(R.string.recalculate_now),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()})
         c.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()})
         updateResultCountdowns()
