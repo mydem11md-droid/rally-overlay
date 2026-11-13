@@ -44,7 +44,9 @@ class RallyOverlayService : Service() {
     private var statusInsetPx = 0
     private var navInsetPx = 0
     private var focusedField: EditText? = null
+    private var miniEditor: LinearLayout? = null
     private var miniEditorTitle: TextView? = null
+    private var lastScrollMode = "idle"
     private var miniEditorValue: TextView? = null
     private var globalLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
     private class CappedScrollView(context: Context) : ScrollView(context) {
