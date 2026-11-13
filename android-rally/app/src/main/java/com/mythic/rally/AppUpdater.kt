@@ -11,6 +11,9 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.UnknownHostException
+import java.net.SocketTimeoutException
+import java.net.ConnectException
 import java.util.concurrent.Executors
 
 data class AvailableUpdate(val versionCode: Int, val versionName: String, val notes: String, val apkUrl: String)
@@ -70,7 +73,10 @@ class AppUpdater(private val activity: MainActivity) {
                 ) else null
                 main.post { callback(update) }
             } catch (e: Exception) {
-                main.post { error(e.message ?: activity.getString(R.string.update_check_failed)) }
+                val message = if (e is UnknownHostException || e is SocketTimeoutException || e is ConnectException)
+                    activity.getString(R.string.update_no_internet)
+                else e.message ?: activity.getString(R.string.update_check_failed)
+                main.post { error(message) }
             }
         }
     }
@@ -123,10 +129,15 @@ class AppUpdater(private val activity: MainActivity) {
             try {
                 val manager = activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
                 val query = DownloadManager.Query().setFilterById(downloadId)
+                var expectedBytes = -1L
                 val status = manager.query(query).use { cursor ->
-                    if (cursor != null && cursor.moveToFirst()) cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) else -1
+                    if (cursor != null && cursor.moveToFirst()) {
+                        expectedBytes = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                        cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                    } else -1
                 }
-                if (status != DownloadManager.STATUS_SUCCESSFUL || !file.exists() || file.length() < 100_000L) {
+                if (status != DownloadManager.STATUS_SUCCESSFUL || !file.exists() ||
+                    file.length() < 100_000L || expectedBytes <= 0L || file.length() != expectedBytes) {
                     throw IllegalStateException(activity.getString(R.string.update_download_failed))
                 }
                 validateApk(file)
