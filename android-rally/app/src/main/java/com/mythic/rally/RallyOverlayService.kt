@@ -115,7 +115,7 @@ class RallyOverlayService : Service() {
         val stop=PendingIntent.getService(this,8,Intent(this,RallyOverlayService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val b=if(Build.VERSION.SDK_INT>=26)Notification.Builder(this,channel) else Notification.Builder(this)
-        return b.setSmallIcon(android.R.drawable.ic_menu_recent_history).setContentTitle(t("أداة تنسيق الحشود","Rally Coordinator"))
+        return b.setSmallIcon(R.drawable.ic_stat_rally).setContentTitle(t("أداة تنسيق الحشود","Rally Coordinator"))
             .setContentText(t("الأداة العائمة تعمل","Floating tool is active")).setOngoing(true)
             .addAction(Notification.Action.Builder(null,t("إيقاف","Stop"),stop).build()).build()
     }
