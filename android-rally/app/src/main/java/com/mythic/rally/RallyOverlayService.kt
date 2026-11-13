@@ -167,30 +167,29 @@ class RallyOverlayService : Service() {
         c.text=formatter.format(Date())
     }
     private fun applyLayout() {
-        val r=root?:return;val p=params?:return
-        val sw=resources.displayMetrics.widthPixels
-        if(menuOpen && menuView!=null){p.width=min(dp(300),sw-dp(16));p.height=WindowManager.LayoutParams.WRAP_CONTENT
-            p.x=(dp(bubbleX)-p.width/2+dp(23)).coerceIn(0,sw-p.width);p.y=dp(bubbleY-30)
-        }else{p.width=dp(58);p.height=dp(92);p.x=dp(bubbleX);p.y=dp(bubbleY)}
-        runCatching{wm.updateViewLayout(r,p);Log.d(TAG,"updateViewLayout x=${p.x} y=${p.y} width=${p.width} height=${p.height} menuOpen=$menuOpen focusable=$focusable")}.onFailure{Log.e(TAG,"updateViewLayout failed",it)}
+        val r=root?:return;val p=params?:return;val sw=resources.displayMetrics.widthPixels
+        if(menuOpen&&menuView!=null){p.width=min(dp(300),sw-dp(16));p.x=(dp(bubbleX+23)-p.width/2).coerceIn(0,sw-p.width);p.y=dp(bubbleY);p.height=WindowManager.LayoutParams.MATCH_PARENT}
+        else {p.width=max(dp(104),dp(46));p.height=dp(80);p.x=dp(bubbleX);p.y=dp(bubbleY)}
+        p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+        runCatching{wm.updateViewLayout(r,p);Log.d(TAG,"updateViewLayout completed; menuOpen=$menuOpen; focusable=$focusable")}.onFailure{Log.e(TAG,"updateViewLayout failed",it)}
     }
     private fun collapse(){menuOpen=false;persist();buildCollapsed();applyLayout()}
     private fun showMenu() {
-        val f=root?:return;f.removeAllViews();f.clipChildren=false;f.clipToPadding=false
-        val panel=LinearLayout(uiContext).apply { orientation=LinearLayout.VERTICAL; background=bg(0xFF1E2A22.toInt(),12f); setPadding(dp(10),dp(8),dp(10),dp(9)); clipChildren=false;clipToPadding=false }
+        val f=root?:return;f.removeAllViews();f.clipChildren=false;f.clipToPadding=false;addPinnedControls(f)
+        val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(10),dp(8),dp(10),dp(9));clipChildren=false;clipToPadding=false;direction(this)}
         menuView=panel
-        val header=LinearLayout(this).apply { gravity=Gravity.CENTER_VERTICAL; orientation=LinearLayout.HORIZONTAL }
-        header.addView(text(if(settingsMode)t("الإعدادات · تعديل البيانات","Settings · Edit data") else if(resultsMode)t("نتائج التنسيق","Rally results") else t("أداة تنسيق الحشود","Rally Coordinator"),14f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(34),1f))
-        header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(dp(38),dp(34)))
+        val header=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL;orientation=LinearLayout.HORIZONTAL;direction(this)}
+        header.addView(text(if(settingsMode)t("الإعدادات","Settings")else if(resultsMode)t("نتائج التنسيق","Rally results")else t("أداة تنسيق الحشود","Rally Coordinator"),14f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(34),1f))
+        header.addView(button("ع | EN",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){changeLanguage()},LinearLayout.LayoutParams(dp(58),dp(32)))
+        header.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
+        header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(dp(34),dp(32)))
         panel.addView(header)
-        val sc=ScrollView(uiContext).apply { isFillViewport=false; clipChildren=false;clipToPadding=false }
-        scroll=sc
-        val content=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; clipChildren=false;clipToPadding=false }
+        val sc=ScrollView(uiContext).apply{isFillViewport=false;clipChildren=false;clipToPadding=false;direction(this)};scroll=sc
+        val content=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=false;clipToPadding=false;direction(this)}
         sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,0,1f))
-        if(resultsMode) buildResults(content) else buildEditor(content)
-        if(!resultsMode) panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(7)})
-        f.addView(panel,FrameLayout.LayoutParams(-1,-1))
-        applyLayout()
+        if(resultsMode)buildResults(content)else buildEditor(content)
+        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(7)})
+        f.addView(panel,FrameLayout.LayoutParams(-1,-1).apply{topMargin=dp(88)});applyLayout()
     }
     private fun renderMenu(){showMenu()}
     private fun label(parent:LinearLayout,s:String){parent.addView(text(s,11f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(23)))}
