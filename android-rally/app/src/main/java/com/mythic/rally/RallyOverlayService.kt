@@ -536,7 +536,6 @@ class RallyOverlayService : Service() {
                 val hour=targetHour.toIntOrNull()
                 if(hour==null||hour !in 0..23){errors.add(getString(R.string.invalid_utc_hour));renderMenu();return}
                 val cal=Calendar.getInstance(TimeZone.getTimeZone("UTC"),Locale.US).apply{timeInMillis=now;set(Calendar.HOUR_OF_DAY,hour);set(Calendar.MINUTE,goal/60);set(Calendar.SECOND,goal%60);set(Calendar.MILLISECOND,0)}
-                if(cal.timeInMillis<=now)cal.add(Calendar.DAY_OF_YEAR,1)
                 cal.timeInMillis
             } else now+goal*1000L
             val late=valid.filter{targetAt-(it.totalSeconds*1000L)<now}
