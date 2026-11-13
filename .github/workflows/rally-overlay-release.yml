@@ -100,6 +100,11 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
       - name: Build signed release APK
         working-directory: android-rally
         env:
@@ -108,8 +113,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          chmod +x ./gradlew
-          ./gradlew --no-daemon :app:assembleRelease
+          gradle --no-daemon :app:assembleRelease
           mkdir -p ../release-assets
           cp app/build/outputs/apk/release/app-release.apk ../release-assets/rally-overlay.apk
 
