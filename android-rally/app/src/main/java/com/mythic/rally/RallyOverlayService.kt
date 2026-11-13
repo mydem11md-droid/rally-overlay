@@ -172,7 +172,7 @@ class RallyOverlayService : Service() {
         val screenW=(resources.displayMetrics.widthPixels/density).toInt()
         val screenH=(resources.displayMetrics.heightPixels/density).toInt()
         bubbleX=bubbleX.coerceIn(0,(screenW-104).coerceAtLeast(0)); bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),(screenH-55).coerceAtLeast(((statusInsetPx+dp(50))/density).roundToInt()))
-        val frame=FrameLayout(uiContext).apply { clipChildren=false; clipToPadding=false; direction(this) }
+        val frame=FrameLayout(uiContext).apply { clipChildren=true; clipToPadding=true; direction(this) }
         root=frame
         val p=WindowManager.LayoutParams(dp(58),WindowManager.LayoutParams.WRAP_CONTENT,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -216,7 +216,7 @@ class RallyOverlayService : Service() {
         val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true};MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt();if(abs(dx)+abs(dy)>5)dragged=true;if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-104);bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-55);applyLayout();persist()};true};MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true};else->true} }
         orb.setOnTouchListener(drag);f.setOnTouchListener(drag)
     }
-    private fun buildCollapsed() { val f=root?:return;f.removeAllViews();f.clipChildren=false;f.clipToPadding=false;addPinnedControls(f);updateClock();applyLayout() }
+    private fun buildCollapsed() { val f=root?:return;f.removeAllViews();f.clipChildren=true;f.clipToPadding=true;addPinnedControls(f);updateClock();applyLayout() }
     private var downX=0f;private var downY=0f;private var startX=0;private var startY=0;private var dragged=false
     private fun updateClock() {
         val c=root?.findViewWithTag<TextView>("utc_time")?:return
@@ -290,7 +290,7 @@ class RallyOverlayService : Service() {
         } else { menuOpen=false;persist();buildCollapsed();applyLayout() }
     }
     private fun showMenu() {
-        val f=root?:return;f.removeAllViews();f.clipChildren=false;f.clipToPadding=false;addPinnedControls(f)
+        val f=root?:return;f.removeAllViews();f.clipChildren=true;f.clipToPadding=true;addPinnedControls(f)
         val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(10),dp(8),dp(10),dp(9));clipChildren=true;clipToPadding=true;direction(this)}
         menuView=panel
         val header=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL;orientation=LinearLayout.HORIZONTAL;direction(this)}
