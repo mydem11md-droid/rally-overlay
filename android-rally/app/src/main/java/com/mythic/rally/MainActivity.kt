@@ -59,7 +59,7 @@ class MainActivity : Activity() {
         packageManager.setComponentEnabledSetting(other,android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,android.content.pm.PackageManager.DONT_KILL_APP)
     }
     private fun refreshPermissionStatus() {
-        val status=findViewById<TextView>(android.R.id.content)?.findViewWithTag("permission_status") as? TextView ?: return
+        val content=findViewById<View>(android.R.id.content); val status=content.findViewWithTag<TextView>("permission_status") ?: return
         status.text=if(Settings.canDrawOverlays(this))getString(R.string.ready) else getString(R.string.permission_needed)
     }
     private fun actionButton(label:String,color:Int,fg:Int,onClick:()->Unit)=TextView(this).apply { text=label;textSize=14f;gravity=Gravity.CENTER;setTextColor(fg);setTypeface(typeface,android.graphics.Typeface.BOLD);background=android.graphics.drawable.GradientDrawable().apply{setColor(color);cornerRadius=dp(9).toFloat()};setOnClickListener{onClick()} }
