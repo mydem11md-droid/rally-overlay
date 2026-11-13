@@ -175,24 +175,62 @@ class RallyOverlayService : Service() {
     private fun renderMenu(){showMenu()}
     private fun label(parent:LinearLayout,s:String){parent.addView(text(s,11f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(23)))}
     private fun input(hint:String,value:String,numeric:Boolean=false):EditText {
-        return EditText(this).apply { setSingleLine(true);textSize=13f;setTextColor(Color.WHITE);setHintTextColor(0xFFA5C4AA.toInt());setHint(hint);setText(value)
-            background=bg(0xFF2A3A2F.toInt(),9f);setPadding(dp(9),0,dp(9),0)
-            if(numeric){inputType=android.text.InputType.TYPE_CLASS_NUMBER;imeOptions=EditorInfo.IME_ACTION_NEXT}
-            else{inputType=android.text.InputType.TYPE_CLASS_TEXT;imeOptions=EditorInfo.IME_ACTION_NEXT}
-            setOnFocusChangeListener{v,has->
-                if(has){setFocus(true);scroll?.post{val sv=scroll?:return@post;val bottom=v.bottom;val targetY=(bottom-sv.height+dp(18)).coerceAtLeast(0);if(targetY>sv.scrollY)sv.smoothScrollTo(0,targetY)}}
-                else if(numeric){val parsed=parse(text.toString());if(parsed!=null&&parsed<=3600){val normalized=format(parsed);if(text.toString()!=normalized)setText(normalized)}}
+        return EditText(this).apply {
+            setSingleLine(true); textSize=13f; setTextColor(Color.WHITE); setHintTextColor(0xFFA5C4AA.toInt()); setHint(hint); setText(value)
+            background=bg(0xFF2A3A2F.toInt(),9f); setPadding(dp(9),0,dp(9),0)
+            if(numeric) { inputType=android.text.InputType.TYPE_CLASS_NUMBER; keyListener=android.text.method.DigitsKeyListener.getInstance("0123456789"); imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=View.TEXT_DIRECTION_LTR; textAlignment=View.TEXT_ALIGNMENT_CENTER }
+            else { inputType=android.text.InputType.TYPE_CLASS_TEXT; imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=if(ar())View.TEXT_DIRECTION_RTL else View.TEXT_DIRECTION_LTR }
+            setOnFocusChangeListener { v,has ->
+                if(has) {
+                    setFocus(true)
+                    scroll?.post { val sv=scroll?:return@post; val rect=Rect(); v.getDrawingRect(rect); sv.offsetDescendantRectToMyCoords(v,rect); val targetY=(rect.bottom-sv.height+dp(18)).coerceAtLeast(0); if(targetY>sv.scrollY)sv.smoothScrollTo(0,targetY) }
+                } else if(numeric) finalizeTimeInput(this) {}
             }
-            setOnEditorActionListener{v,actionId,_->
-                if(actionId==EditorInfo.IME_ACTION_NEXT){v.focusSearch(View.FOCUS_FORWARD)?.requestFocus();true}else false
+            setOnEditorActionListener { v,actionId,_ ->
+                if(actionId==EditorInfo.IME_ACTION_NEXT) { if(numeric)finalizeTimeInput(this){}; v.focusSearch(View.FOCUS_FORWARD)?.requestFocus(); true } else false
             }
         }
+    }
+    private fun timePreview(digits: String): String {
+        if (digits.length <= 2) return digits
+        val mins = digits.dropLast(2).trimStart('0').ifEmpty { "0" }
+        return mins + ":" + digits.takeLast(2)
+    }
+    private fun bindTimeInput(field: EditText, changed: (String) -> Unit) {
+        var formatting = false
+        field.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                if (formatting) return
+                val digits = (s?.toString() ?: "").filter { it in '0'..'9' }.take(4)
+                val rebuilt = timePreview(digits)
+                if (rebuilt != s?.toString()) { formatting=true; field.setText(rebuilt); field.setSelection(rebuilt.length); formatting=false }
+                changed(rebuilt)
+            }
+        })
+        field.setOnFocusChangeListener { v,has ->
+            if(has) { setFocus(true); scroll?.post { val sv=scroll?:return@post; val rect=Rect(); v.getDrawingRect(rect); sv.offsetDescendantRectToMyCoords(v,rect); val targetY=(rect.bottom-sv.height+dp(18)).coerceAtLeast(0); if(targetY>sv.scrollY)sv.smoothScrollTo(0,targetY) } }
+            else finalizeTimeInput(field,changed)
+        }
+        field.setOnEditorActionListener { v,actionId,_ ->
+            if(actionId==EditorInfo.IME_ACTION_NEXT) { finalizeTimeInput(field,changed); v.focusSearch(View.FOCUS_FORWARD)?.requestFocus(); true } else false
+        }
+    }
+    private fun finalizeTimeInput(field: EditText, changed: (String) -> Unit) {
+        val digits=field.text.toString().filter { it in '0'..'9' }.take(4)
+        if(digits.isEmpty()) { changed(""); return }
+        val minutes=if(digits.length>2)digits.dropLast(2).toIntOrNull()?:0 else 0
+        val seconds=if(digits.length>2)digits.takeLast(2).toIntOrNull()?:0 else digits.toIntOrNull()?:0
+        val total=minutes*60+seconds
+        if(total<=3600) { val normalized=format(total); if(field.text.toString()!=normalized) { field.setText(normalized); field.setSelection(normalized.length) }; changed(normalized) }
+        else changed(timePreview(digits))
     }
     private fun buildEditor(c:LinearLayout) {
         label(c,t("الوقت المستهدف","Target time"))
         targetInput=input("MM:SS",target,true)
         c.addView(targetInput,LinearLayout.LayoutParams(-1,dp(38)))
-        targetInput?.addTextChangedListener(SimpleWatcher{target=it.filter(Char::isDigit).take(4);persist()})
+        targetInput?.let { bindTimeInput(it) { value -> target=value; persist() } }
         label(c,t("المشاركون","Participants")+" · ${people.size}")
         people.forEachIndexed{index,p->
             val row=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;setPadding(0,dp(5),0,dp(5))}
@@ -201,7 +239,7 @@ class RallyOverlayService : Service() {
             val name=input(t("اسم اللاعب","Player name"),p.name)
             val duration=input("MM:SS",p.duration,true)
             name.addTextChangedListener(SimpleWatcher{p.name=it;persist()})
-            duration.addTextChangedListener(SimpleWatcher{p.duration=it.filter(Char::isDigit).take(4);persist()})
+            bindTimeInput(duration) { value -> p.duration=value; persist() }
             fields.addView(name,LinearLayout.LayoutParams(0,dp(38),1f))
             fields.addView(Space(this),LinearLayout.LayoutParams(dp(5),1))
             fields.addView(duration,LinearLayout.LayoutParams(dp(82),dp(38)))
@@ -250,7 +288,7 @@ class RallyOverlayService : Service() {
         val total=mins*60+secs
         return total.takeIf{it<=3600}
     }
-    private fun format(n:Int):String=String.format(Locale.US,"%02d:%02d",n/60,n%60)
+    private fun format(n:Int):String=String.format(Locale.US,"%d:%02d",n/60,n%60)
     private fun copy(s:String){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Rally",s));Toast.makeText(this,t("تم النسخ","Copied"),Toast.LENGTH_SHORT).show()}
     private fun setFocus(on:Boolean) {
         val r=root?:return;val p=params?:return
