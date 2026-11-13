@@ -157,7 +157,7 @@ class RallyOverlayService : Service() {
         statusInsetPx=dp(24); navInsetPx=dp(24)
         val screenW=(resources.displayMetrics.widthPixels/density).toInt()
         val screenH=(resources.displayMetrics.heightPixels/density).toInt()
-        bubbleX=bubbleX.coerceIn(0,(screenW-104).coerceAtLeast(0)); bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(screenH-55).coerceAtLeast(((statusInsetPx+dp(50))/density).roundToInt()))
+        bubbleX=bubbleX.coerceIn(0,(screenW-104).coerceAtLeast(0)); bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),(screenH-55).coerceAtLeast(((statusInsetPx+dp(50))/density).roundToInt()))
         val frame=FrameLayout(uiContext).apply { clipChildren=false; clipToPadding=false; direction(this) }
         root=frame
         val p=WindowManager.LayoutParams(dp(58),WindowManager.LayoutParams.WRAP_CONTENT,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
