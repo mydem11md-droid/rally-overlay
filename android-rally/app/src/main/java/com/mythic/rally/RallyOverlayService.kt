@@ -441,11 +441,12 @@ class RallyOverlayService : Service() {
         val sec=((ms+999L)/1000L).coerceAtLeast(0L)
         return String.format(Locale.US,"%02d:%02d",sec/60,sec%60)
     }
-    private fun copyRow(r:ResultRow) {
+    private fun copyRowText(r:ResultRow):String {
         val verb=if(r.isRally)getString(R.string.start_rally) else getString(R.string.send_action)
         val extra=if(r.isRally)String.format(Locale.US,getString(R.string.rally_copy_suffix),r.rallySeconds/60) else ""
-        copy("${r.name} — ${verb} ${utcTime(r.actionAt)} UTC${extra}")
+        return "${r.name} — ${verb} ${utcTime(r.actionAt)} UTC${extra}"
     }
+    private fun copyRow(r:ResultRow) = copy(copyRowText(r))
     private fun updateResultCountdowns() {
         if(!resultsMode||resultCountdowns.isEmpty())return
         val now=System.currentTimeMillis()
@@ -507,6 +508,11 @@ class RallyOverlayService : Service() {
         c.addView(button(getString(R.string.recalculate_now),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()})
         c.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()})
         updateResultCountdowns()
+        val now=System.currentTimeMillis()
+        results.forEach { r ->
+            val wait=(r.actionAt-now).coerceAtLeast(0L)
+            handler.postDelayed({updateResultCountdowns()},wait)
+        }
     }
     private fun calculate() {
         errors.clear()
