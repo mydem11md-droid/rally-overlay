@@ -546,7 +546,7 @@ class RallyOverlayService : Service() {
             }.sortedBy{it.actionAtMillis}
             arrival=targetAt
             if(late.isNotEmpty()) {
-                results=rows.map{ResultRow(it.id,it.name,it.isRally,it.rallySeconds,it.marchSeconds,it.actionAtMillis,it.departAtMillis,it.arrivalAtMillis)}
+                results=rows.map{ResultRow(it.id,it.name,it.isRally,it.rallySeconds,it.marchSeconds,it.actionAtMillis,it.departAtMillis,it.arrivalAtMillis)}.toMutableList()
                 resultsMode=true;persist();renderMenu()
                 val postpone=button(getString(R.string.postpone_target_hour),0xFF4CAF50.toInt(),0xFF102014.toInt()){
                     val shifted=Calendar.getInstance(TimeZone.getTimeZone("UTC"),Locale.US).apply{timeInMillis=targetAt+3600000L}
@@ -558,7 +558,7 @@ class RallyOverlayService : Service() {
                 return
             }
         }
-        results=rows.map{ResultRow(it.id,it.name,it.isRally,it.rallySeconds,it.marchSeconds,it.actionAtMillis,it.departAtMillis,arrival)}
+        results=rows.map{ResultRow(it.id,it.name,it.isRally,it.rallySeconds,it.marchSeconds,it.actionAtMillis,it.departAtMillis,arrival)}.toMutableList()
         resultsMode=true;resultZeroAt.clear();vibratedIds.clear();persist();renderMenu()
     }
     private fun parse(raw:String):Int? = RallyTime.seconds(raw)
