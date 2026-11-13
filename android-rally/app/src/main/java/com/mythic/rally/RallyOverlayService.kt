@@ -418,10 +418,10 @@ class RallyOverlayService : Service() {
                     durations.addView(button("${mins}د",if(p.rallyMinutes==mins)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes==mins)0xFF102014.toInt() else Color.WHITE){p.rallyMinutes=mins;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(27),1f))
                 }
                 row.addView(durations)
-                val customToggle=button(t("مخصص","Custom"),0xFF2A3A2F.toInt(),Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE}
-                row.addView(customToggle,LinearLayout.LayoutParams(-1,dp(26)).apply{topMargin=dp(3)})
                 val custom=input(t("دقائق","Minutes"),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))p.rallyMinutes.toString() else "",true)
                 custom.visibility=View.GONE
+                val customToggle=button(t("مخصص","Custom"),0xFF2A3A2F.toInt(),Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE}
+                row.addView(customToggle,LinearLayout.LayoutParams(-1,dp(26)).apply{topMargin=dp(3)})
                 custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it in 1..180}?.let{p.rallyMinutes=it;persist()}})
                 row.addView(custom,LinearLayout.LayoutParams(-1,dp(32)).apply{topMargin=dp(3)})
             }
@@ -541,7 +541,12 @@ class RallyOverlayService : Service() {
             if(late.isNotEmpty()) {
                 results=rows.map{ResultRow(it.id,it.name,it.isRally,it.rallySeconds,it.marchSeconds,it.actionAtMillis,it.departAtMillis,it.arrivalAtMillis)}
                 resultsMode=true;persist();renderMenu()
-                val postpone=button(t("تأجيل الهدف ساعة","Postpone target by one hour"),0xFF4CAF50.toInt(),0xFF102014.toInt()){targetHour=if(targetHour.isNotBlank())String.format(Locale.US,"%02d",(targetHour.toInt()+1)%24)else "";target=if(targetHour.isBlank())RallyTime.format(((goal+3600)%3600)) else target;persist();calculate()}
+                val postpone=button(t("تأجيل الهدف ساعة","Postpone target by one hour"),0xFF4CAF50.toInt(),0xFF102014.toInt()){
+                    val shifted=Calendar.getInstance(TimeZone.getTimeZone("UTC"),Locale.US).apply{timeInMillis=targetAt+3600000L}
+                    targetHour=String.format(Locale.US,"%02d",shifted.get(Calendar.HOUR_OF_DAY))
+                    target=String.format(Locale.US,"%d:%02d",shifted.get(Calendar.MINUTE),shifted.get(Calendar.SECOND))
+                    persist();calculate()
+                }
                 menuView?.addView(postpone,LinearLayout.LayoutParams(-1,dp(34)).apply{topMargin=dp(5)})
                 return
             }
