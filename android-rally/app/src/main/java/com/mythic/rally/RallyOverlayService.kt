@@ -215,11 +215,17 @@ class RallyOverlayService : Service() {
     }
     private fun installInsetsTracking(view: View) {
         statusInsetPx=dp(24); navInsetPx=dp(24)
-        if (Build.VERSION.SDK_INT >= 30) view.setOnApplyWindowInsetsListener { _, insets ->
-            val bars=insets.getInsets(WindowInsets.Type.statusBars() or WindowInsets.Type.displayCutout())
-            statusInsetPx=bars.top
-            navInsetPx=insets.getInsets(WindowInsets.Type.navigationBars()).bottom
-            imeHeightPx=insets.getInsets(WindowInsets.Type.ime()).bottom
+        view.setOnApplyWindowInsetsListener { _, insets ->
+            if (Build.VERSION.SDK_INT >= 30) {
+                val bars=insets.getInsets(WindowInsets.Type.statusBars() or WindowInsets.Type.displayCutout())
+                statusInsetPx=bars.top
+                navInsetPx=insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+                imeHeightPx=insets.getInsets(WindowInsets.Type.ime()).bottom
+            } else {
+                val cutoutTop=if(Build.VERSION.SDK_INT>=28)insets.displayCutout?.safeInsetTop ?: 0 else 0
+                statusInsetPx=max(insets.systemWindowInsetTop,cutoutTop)
+                navInsetPx=insets.systemWindowInsetBottom
+            }
             resizeForInsets()
             insets
         }
