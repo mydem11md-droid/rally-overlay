@@ -210,11 +210,7 @@ class RallyOverlayService : Service() {
             }
         }
     }
-    private fun timePreview(digits: String): String {
-        if (digits.length <= 2) return digits
-        val mins = digits.dropLast(2).trimStart('0').ifEmpty { "0" }
-        return mins + ":" + digits.takeLast(2)
-    }
+    private fun timePreview(digits: String): String = RallyTime.preview(digits)
     private fun bindTimeInput(field: EditText, changed: (String) -> Unit) {
         var formatting = false
         field.addTextChangedListener(object : android.text.TextWatcher {
@@ -237,13 +233,10 @@ class RallyOverlayService : Service() {
         }
     }
     private fun finalizeTimeInput(field: EditText, changed: (String) -> Unit) {
-        val digits=field.text.toString().filter { it in '0'..'9' }.take(4)
-        if(digits.isEmpty()) { changed(""); return }
-        val minutes=if(digits.length>2)digits.dropLast(2).toIntOrNull()?:0 else 0
-        val seconds=if(digits.length>2)digits.takeLast(2).toIntOrNull()?:0 else digits.toIntOrNull()?:0
-        val total=minutes*60+seconds
-        if(total<=3600) { val normalized=format(total); if(field.text.toString()!=normalized) { field.setText(normalized); field.setSelection(normalized.length) }; changed(normalized) }
-        else changed(timePreview(digits))
+        val raw=field.text.toString()
+        val normalized=RallyTime.normalize(raw)
+        if(normalized!=null) { if(raw!=normalized){field.setText(normalized);field.setSelection(normalized.length)};changed(normalized) }
+        else changed(RallyTime.preview(raw))
     }
     private fun buildEditor(c:LinearLayout) {
         label(c,t("الوقت المستهدف","Target time"))
@@ -300,14 +293,8 @@ class RallyOverlayService : Service() {
         if(rows.isEmpty()){renderMenu();return}
         results=rows;resultsMode=true;persist();renderMenu()
     }
-    private fun parse(raw:String):Int? {
-        val d=raw.filter(Char::isDigit);if(d.isEmpty())return null
-        val mins=if(d.length>2)d.dropLast(2).toIntOrNull()?:return null else 0
-        val secs=(if(d.length>2)d.takeLast(2) else d).toIntOrNull()?:return null
-        val total=mins*60+secs
-        return total.takeIf{it<=3600}
-    }
-    private fun format(n:Int):String=String.format(Locale.US,"%d:%02d",n/60,n%60)
+    private fun parse(raw:String):Int? = RallyTime.seconds(raw)
+    private fun format(n:Int):String = RallyTime.format(n)
     private fun copy(s:String){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Rally",s));Toast.makeText(uiContext,t("تم النسخ","Copied"),Toast.LENGTH_SHORT).show()}
     private fun setFocus(on:Boolean) {
         val r=root?:return;val p=params?:return
