@@ -66,8 +66,13 @@ jobs:
           git push origin HEAD:"$DEFAULT_BRANCH"
           BUMP_SHA=$(git rev-parse HEAD)
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            git tag "v${{ steps.version.outputs.version }}" "$BUMP_SHA"
-            git push origin "v${{ steps.version.outputs.version }}"
+            RELEASE_TAG="v${{ steps.version.outputs.version }}"
+            if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+              echo "Release tag $RELEASE_TAG already exists; reusing it."
+            else
+              git tag "$RELEASE_TAG" "$BUMP_SHA"
+              git push origin "$RELEASE_TAG"
+            fi
             git checkout --detach "$BUMP_SHA"
           else
             git checkout --detach "$SOURCE_SHA"
