@@ -31,6 +31,15 @@ class RallyOverlayService : Service() {
     private var confirming = false
     private var focusable = false
     private var target = ""
+    private var targetHour = ""
+    private var calculationMode = "now"
+    private var prepSeconds = 10
+    private var vibrationEnabled = true
+    private var targetHourInput: EditText? = null
+    private var resultCountdowns = mutableMapOf<Int,TextView>()
+    private var resultRowsViews = mutableMapOf<Int,View>()
+    private var resultZeroAt = mutableMapOf<Int,Long>()
+    private var vibratedIds = mutableSetOf<Int>()
     private var people = mutableListOf<Person>()
     private var results = mutableListOf<ResultRow>()
     private var errors = mutableListOf<String>()
@@ -93,15 +102,15 @@ class RallyOverlayService : Service() {
     private fun button(value: String, color: Int, fg: Int, action: () -> Unit) =
         TextView(uiContext).apply { text=value; textSize=13f; gravity=Gravity.CENTER; setTextColor(fg); direction(this)
             background=bg(color,9f); setPadding(dp(10),dp(7),dp(10),dp(7)); setOnClickListener { action() } }
-    private data class Person(val id:Int,var name:String,var duration:String)
-    private data class ResultRow(val id:Int,val name:String,val launch:Int)
+    private data class Person(val id:Int,var name:String,var duration:String,var kind:String="solo",var rallyMinutes:Int=5)
+    private data class ResultRow(val id:Int,val name:String,val isRally:Boolean,val rallySeconds:Int,val marchSeconds:Int,val actionAt:Long,val departAt:Long,val arrivalAt:Long)
     private val localeReceiver = object: BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             uiContext=localizedContext()
             if(root!=null){if(menuOpen)showMenu()else buildCollapsed();startForeground(27,notification())}
         }
     }
-    private val clockTick = object: Runnable { override fun run() { updateClock(); handler.postDelayed(this,1000) } }
+    private val clockTick = object: Runnable { override fun run() { updateClock(); updateResultCountdowns(); handler.postDelayed(this,1000) } }
 
     override fun onCreate() {
         super.onCreate()
@@ -122,23 +131,27 @@ class RallyOverlayService : Service() {
 
     private fun restore() {
         target=prefs.getString("target","") ?: ""
+        targetHour=prefs.getString("target_hour","") ?: ""
+        calculationMode=prefs.getString("calculation_mode","now") ?: "now"
+        prepSeconds=prefs.getInt("prep_seconds",10)
+        vibrationEnabled=prefs.getBoolean("vibration_enabled",true)
         bubbleX=prefs.getInt("x",24); bubbleY=prefs.getInt("y",180)
         menuOpen=prefs.getBoolean("open",false); resultsMode=prefs.getBoolean("results",false); settingsMode=prefs.getBoolean("settings",false)
         nextId=prefs.getInt("next",1)
         runCatching {
             val a=JSONArray(prefs.getString("people","[]"))
-            for(i in 0 until a.length()){val o=a.getJSONObject(i);people.add(Person(o.getInt("id"),o.optString("name"),o.optString("duration")))}
+            for(i in 0 until a.length()){val o=a.getJSONObject(i);people.add(Person(o.getInt("id"),o.optString("name"),o.optString("duration"),o.optString("kind","solo"),o.optInt("rally_minutes",5)))}
         }
         if(people.isEmpty()) people.add(Person(nextId++,"",""))
         runCatching {
             val a=JSONArray(prefs.getString("result_rows","[]"))
-            for(i in 0 until a.length()){val o=a.getJSONObject(i);results.add(ResultRow(o.getInt("id"),o.optString("name"),o.getInt("launch")))}
+            for(i in 0 until a.length()){val o=a.getJSONObject(i);results.add(ResultRow(o.getInt("id"),o.optString("name"),o.optBoolean("is_rally"),o.optInt("rally_seconds"),o.optInt("march_seconds"),o.optLong("action_at"),o.optLong("depart_at"),o.optLong("arrival_at")))}
         }
     }
     private fun persist() {
-        val a=JSONArray(); people.forEach { a.put(JSONObject().put("id",it.id).put("name",it.name).put("duration",it.duration)) }
-        val r=JSONArray(); results.forEach { r.put(JSONObject().put("id",it.id).put("name",it.name).put("launch",it.launch)) }
-        prefs.edit().putString("target",target).putString("people",a.toString()).putString("result_rows",r.toString())
+        val a=JSONArray(); people.forEach { a.put(JSONObject().put("id",it.id).put("name",it.name).put("duration",it.duration).put("kind",it.kind).put("rally_minutes",it.rallyMinutes)) }
+        val r=JSONArray(); results.forEach { r.put(JSONObject().put("id",it.id).put("name",it.name).put("is_rally",it.isRally).put("rally_seconds",it.rallySeconds).put("march_seconds",it.marchSeconds).put("action_at",it.actionAt).put("depart_at",it.departAt).put("arrival_at",it.arrivalAt)) }
+        prefs.edit().putString("target",target).putString("target_hour",targetHour).putString("calculation_mode",calculationMode).putInt("prep_seconds",prepSeconds).putBoolean("vibration_enabled",vibrationEnabled).putString("people",a.toString()).putString("result_rows",r.toString())
             .putInt("next",nextId).putInt("x",bubbleX).putInt("y",bubbleY)
             .putBoolean("open",menuOpen).putBoolean("results",resultsMode).putBoolean("settings",settingsMode).apply()
     }
@@ -349,10 +362,35 @@ class RallyOverlayService : Service() {
         else changed(RallyTime.preview(raw))
     }
     private fun buildEditor(c:LinearLayout) {
-        label(c,t("الوقت المستهدف","Target time"))
-        targetInput=input("MM:SS",target,true).apply{contentDescription=t("الوقت المستهدف","Target time")}
-        c.addView(targetInput,LinearLayout.LayoutParams(-1,dp(38)))
-        targetInput?.let { bindTimeInput(it) { value -> target=value; persist() } }
+        if(settingsMode) {
+            label(c,t("الإعدادات","Settings"))
+            c.addView(button(if(vibrationEnabled)getString(R.string.vibration_on)else getString(R.string.vibration_off),0xFF2A3A2F.toInt(),Color.WHITE){vibrationEnabled=!vibrationEnabled;persist();renderMenu()})
+            c.addView(button(getString(R.string.back),0xFF4CAF50.toInt(),0xFF102014.toInt()){settingsMode=false;persist();renderMenu()})
+            return
+        }
+        val modes=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;direction(this)}
+        modes.addView(button(getString(R.string.mode_now),if(calculationMode=="now")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(calculationMode=="now")0xFF102014.toInt() else Color.WHITE){calculationMode="now";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
+        modes.addView(Space(uiContext),LinearLayout.LayoutParams(dp(6),1))
+        modes.addView(button(getString(R.string.mode_target),if(calculationMode=="target")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(calculationMode=="target")0xFF102014.toInt() else Color.WHITE){calculationMode="target";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
+        c.addView(modes)
+        if(calculationMode=="now") {
+            label(c,getString(R.string.prep_delay))
+            val delays=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
+            listOf(5,10,20,30).forEach { value ->
+                delays.addView(button(value.toString(),if(prepSeconds==value)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(prepSeconds==value)0xFF102014.toInt() else Color.WHITE){prepSeconds=value;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(30),1f))
+                if(value!=30)delays.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
+            }
+            c.addView(delays)
+        } else {
+            label(c,t("الوقت المستهدف · MM:SS","Target time · MM:SS"))
+            targetInput=input("MM:SS",target,true).apply{contentDescription=t("الوقت المستهدف","Target time")}
+            c.addView(targetInput,LinearLayout.LayoutParams(-1,dp(38)))
+            targetInput?.let { bindTimeInput(it) { value -> target=value; persist() } }
+            label(c,getString(R.string.utc_hour_optional))
+            targetHourInput=input("HH",targetHour,true)
+            c.addView(targetHourInput,LinearLayout.LayoutParams(-1,dp(34)))
+            targetHourInput?.addTextChangedListener(SimpleWatcher{targetHour=it.filter{ch->ch.isDigit()}.take(2);persist()})
+        }
         label(c,t("المشاركون","Participants")+" · ${people.size}")
         people.forEachIndexed{index,p->
             val row=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;setPadding(0,dp(5),0,dp(5))}
@@ -368,6 +406,26 @@ class RallyOverlayService : Service() {
             fields.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
             fields.addView(duration,LinearLayout.LayoutParams(dp(82),dp(38)))
             row.addView(fields)
+            val kindRow=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
+            kindRow.addView(button(getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(28),1f))
+            kindRow.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
+            kindRow.addView(button(getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(28),1f))
+            row.addView(kindRow,LinearLayout.LayoutParams(-1,dp(30)).apply{topMargin=dp(4)})
+            if(p.kind=="rally") {
+                duration.hint=getString(R.string.rally_march_arrival);duration.contentDescription=getString(R.string.rally_march_arrival)
+                label(row,getString(R.string.rally_duration))
+                val durations=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
+                listOf(1,3,5,10,15,30,60).forEach { mins ->
+                    durations.addView(button(if(ar())"${mins}د" else "${mins}m",if(p.rallyMinutes==mins)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes==mins)0xFF102014.toInt() else Color.WHITE){p.rallyMinutes=mins;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(27),1f))
+                }
+                row.addView(durations)
+                val custom=input(getString(R.string.minutes),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))p.rallyMinutes.toString() else "",true)
+                custom.visibility=View.GONE
+                val customToggle=button(getString(R.string.custom_minutes),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))0xFF102014.toInt() else Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE}
+                row.addView(customToggle,LinearLayout.LayoutParams(-1,dp(26)).apply{topMargin=dp(3)})
+                custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it > 0 && it <= Int.MAX_VALUE/60}?.let{p.rallyMinutes=it;persist();customToggle.setBackground(bg(0xFF4CAF50.toInt(),9f));customToggle.setTextColor(0xFF102014.toInt())}})
+                row.addView(custom,LinearLayout.LayoutParams(-1,dp(32)).apply{topMargin=dp(3)})
+            }
             val actions=LinearLayout(uiContext).apply{gravity=if(ar())Gravity.END else Gravity.START}
             actions.addView(button(t("تعديل","Edit"),0xFF2A3A2F.toInt(),Color.WHITE){name.requestFocus();name.setSelection(name.text.length);setFocus(true)})
             actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
@@ -378,32 +436,129 @@ class RallyOverlayService : Service() {
         c.addView(button(t("+ إضافة مشارك","+ Add participant"),0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){people.add(Person(nextId++,"",""));persist();renderMenu();scroll?.post{scroll?.fullScroll(View.FOCUS_DOWN)}})
         errors.forEach{c.addView(text(it,11f,0xFFE57373.toInt()))}
     }
-    private fun buildResults(c:LinearLayout) {
-        label(c,t("وقت الوصول المستهدف","Target arrival time")+" · "+format(parse(target)?:0))
+    private fun utcTime(epoch:Long):String = SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(epoch))
+    private fun countdown(ms:Long):String {
+        val sec=((ms+999L)/1000L).coerceAtLeast(0L)
+        return String.format(Locale.US,"%02d:%02d",sec/60,sec%60)
+    }
+    private fun copyRowText(r:ResultRow):String {
+        val verb=if(r.isRally)getString(R.string.start_rally) else getString(R.string.send_action)
+        val extra=if(r.isRally)String.format(Locale.US,getString(R.string.rally_copy_suffix),r.rallySeconds/60) else ""
+        return "${r.name} — ${verb} ${utcTime(r.actionAt)} UTC${extra}"
+    }
+    private fun copyRow(r:ResultRow) = copy(copyRowText(r))
+    private fun updateResultCountdowns() {
+        if(!resultsMode||resultCountdowns.isEmpty())return
+        val now=System.currentTimeMillis()
         results.forEach { r ->
-            val row=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL}
-            row.addView(text(r.name,12f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(38),1f))
-            row.addView(text(if(r.launch<0)"—" else format(r.launch),14f,0xFF4CAF50.toInt(),true))
-            row.addView(button(t("نسخ","Copy"),0xFF2A3A2F.toInt(),Color.WHITE){copy("${r.name} — ${if(r.launch<0) "−"+format(-r.launch) else format(r.launch)}")})
-            c.addView(row)
-            if(r.launch<0)c.addView(text(t("وقت الإرسال سالب للمشارك: ","Negative launch time for: ")+r.name,10f,0xFFE57373.toInt()))
+            val label=resultCountdowns[r.id]?:return@forEach
+            val remaining=r.actionAt-now
+            if(remaining>0) {
+                label.text=String.format(Locale.US,getString(R.string.countdown_in),countdown(remaining))
+                label.setTextColor(if(remaining<=10_000L)0xFFFF9100.toInt() else 0xFFA5C4AA.toInt())
+            } else {
+                val zeroAt=resultZeroAt.getOrPut(r.id){now}
+                label.text=getString(R.string.now_label)
+                label.setTextColor(if(now-zeroAt<3000L)0xFF4CAF50.toInt() else 0xFF78907D.toInt())
+                resultRowsViews[r.id]?.alpha=if(now-zeroAt<3000L)1f else 0.55f
+                if(vibrationEnabled&&vibratedIds.add(r.id)) {
+                    runCatching {
+                        val vibrator=if(Build.VERSION.SDK_INT>=31)getSystemService(VibratorManager::class.java).defaultVibrator else @Suppress("DEPRECATION") getSystemService(VIBRATOR_SERVICE) as Vibrator
+                        if(Build.VERSION.SDK_INT>=26)vibrator.vibrate(VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE)) else @Suppress("DEPRECATION") vibrator.vibrate(70)
+                    }
+                }
+            }
         }
-        c.addView(button(t("نسخ الكل","Copy all"),0xFF2A3A2F.toInt(),Color.WHITE){copy(results.joinToString("\n"){"${it.name} — ${if(it.launch<0)"−"+format(-it.launch)else format(it.launch)}"})})
-        c.addView(button(t("رجوع للتعديل","Back to edit"),0xFF4CAF50.toInt(),0xFF102014.toInt()){resultsMode=false;persist();renderMenu()})
+    }
+    private fun buildResults(c:LinearLayout) {
+        resultCountdowns.clear();resultRowsViews.clear()
+        label(c,getString(R.string.execution_schedule))
+        results.forEachIndexed { index,r ->
+            val wrap=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;setPadding(0,dp(5),0,dp(5));direction(this)}
+            resultRowsViews[r.id]=wrap
+            val top=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
+            val info=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL}
+            info.addView(text(r.name,12f,Color.WHITE,true))
+            info.addView(text(if(r.isRally)String.format(Locale.US,getString(R.string.rally_badge),r.rallySeconds/60) else getString(R.string.solo),10f,0xFFA5C4AA.toInt()))
+            top.addView(info,LinearLayout.LayoutParams(0,-2,1f))
+            top.addView(text(if(r.isRally)getString(R.string.start_rally) else getString(R.string.send_action),11f,0xFFA5C4AA.toInt(),true))
+            val time=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;layoutDirection=View.LAYOUT_DIRECTION_LTR}
+            time.addView(text(utcTime(r.actionAt).substring(0,2),11f,0xFFA5C4AA.toInt()))
+            time.addView(text(utcTime(r.actionAt).substring(2),17f,Color.WHITE,true))
+            top.addView(time,LinearLayout.LayoutParams(-2,dp(34)).apply{marginStart=dp(7)})
+            top.addView(button(t("نسخ","Copy"),0xFF2A3A2F.toInt(),Color.WHITE){copyRow(r)})
+            wrap.addView(top)
+            val timer=text("",11f,0xFFA5C4AA.toInt(),true).apply{textDirection=View.TEXT_DIRECTION_LTR}
+            resultCountdowns[r.id]=timer
+            wrap.addView(timer,LinearLayout.LayoutParams(-1,dp(22)))
+            if(r.isRally)wrap.addView(text(t("ينطلق ","Departs ")+utcTime(r.departAt),10f,0xFFA5C4AA.toInt()))
+            c.addView(wrap)
+            if(index<results.lastIndex) {
+                val next=results[index+1]
+                val gap=((next.actionAt-r.actionAt)/1000L).coerceAtLeast(0L)
+                c.addView(text(String.format(Locale.US,getString(R.string.after_player_by),r.name,countdown(gap*1000)),9f,0xFFA5C4AA.toInt()))
+                c.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
+            }
+        }
+        errors.forEach{c.addView(text(it,10f,0xFFE57373.toInt()))}
+        results.firstOrNull()?.let { r ->
+            c.addView(text(String.format(Locale.US,getString(R.string.everyone_arrives),utcTime(r.arrivalAt)),11f,0xFF4CAF50.toInt(),true))
+        }
+        c.addView(button(t("نسخ الكل","Copy all"),0xFF2A3A2F.toInt(),Color.WHITE){copy(results.joinToString("\n"){r->copyRowText(r)})})
+        c.addView(button(getString(R.string.recalculate_now),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()})
+        c.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()})
+        updateResultCountdowns()
+        val now=System.currentTimeMillis()
+        results.forEach { r ->
+            val wait=(r.actionAt-now).coerceAtLeast(0L)
+            handler.postDelayed({updateResultCountdowns()},wait)
+        }
     }
     private fun calculate() {
         errors.clear()
-        val goal=parse(target)
-        if(goal==null){errors.add(t("أدخل الوقت المستهدف بصيغة MM:SS (حتى 60:00).","Enter a target time up to 60:00."));renderMenu();targetInput?.requestFocus();return}
-        val rows=mutableListOf<ResultRow>()
+        val valid=mutableListOf<RallyInput>()
         people.forEachIndexed{i,p->
             if(p.name.isBlank()){errors.add(t("أدخل اسم اللاعب للمشارك ","Enter a player name for participant ")+(i+1));return@forEachIndexed}
-            val d=parse(p.duration)
-            if(d==null){errors.add(t("مدة المسيرة غير صالحة للمشارك: ","Invalid march duration for: ")+p.name);return@forEachIndexed}
-            rows.add(ResultRow(p.id,p.name.trim(),goal-d))
+            val march=parse(p.duration)
+            if(march==null){errors.add(t("مدة المسيرة غير صالحة للمشارك: ","Invalid march duration for: ")+p.name);return@forEachIndexed}
+            valid.add(RallyInput(p.id,p.name.trim(),march,if(p.kind=="rally")p.rallyMinutes*60 else 0))
         }
-        if(rows.isEmpty()){renderMenu();return}
-        results=rows;resultsMode=true;persist();renderMenu()
+        if(valid.isEmpty()){resultsMode=false;renderMenu();return}
+        val now=System.currentTimeMillis()
+        val rows:List<RallyPlanRow>
+        val arrival:Long
+        if(calculationMode=="now") {
+            val plan=RallyPlanner.planNow(now,prepSeconds,valid);rows=plan.rows;arrival=plan.arrivalAtMillis
+        } else {
+            val goal=parse(target)
+            if(goal==null){errors.add(getString(R.string.invalid_target_mmss));resultsMode=false;renderMenu();targetInput?.requestFocus();return}
+            val targetAt=if(targetHour.isNotBlank()) {
+                val hour=targetHour.toIntOrNull()
+                if(hour==null||hour !in 0..23){errors.add(getString(R.string.invalid_utc_hour));renderMenu();return}
+                val cal=Calendar.getInstance(TimeZone.getTimeZone("UTC"),Locale.US).apply{timeInMillis=now;set(Calendar.HOUR_OF_DAY,hour);set(Calendar.MINUTE,goal/60);set(Calendar.SECOND,goal%60);set(Calendar.MILLISECOND,0)}
+                cal.timeInMillis
+            } else now+goal*1000L
+            val late=valid.filter{targetAt-(it.totalSeconds*1000L)<now}
+            late.forEach{errors.add(String.format(Locale.US,getString(R.string.missed_action_for),it.name))}
+            rows=valid.filterNot{it in late}.map{p->
+                RallyPlanRow(p.id,p.name,p.isRally,p.rallySeconds,p.marchSeconds,targetAt-p.totalSeconds*1000L,targetAt-p.marchSeconds*1000L,targetAt)
+            }.sortedBy{it.actionAtMillis}
+            arrival=targetAt
+            if(late.isNotEmpty()) {
+                results=rows.map{ResultRow(it.id,it.name,it.isRally,it.rallySeconds,it.marchSeconds,it.actionAtMillis,it.departAtMillis,it.arrivalAtMillis)}.toMutableList()
+                resultsMode=true;persist();renderMenu()
+                val postpone=button(getString(R.string.postpone_target_hour),0xFF4CAF50.toInt(),0xFF102014.toInt()){
+                    val shifted=Calendar.getInstance(TimeZone.getTimeZone("UTC"),Locale.US).apply{timeInMillis=targetAt+3600000L}
+                    targetHour=String.format(Locale.US,"%02d",shifted.get(Calendar.HOUR_OF_DAY))
+                    target=String.format(Locale.US,"%d:%02d",shifted.get(Calendar.MINUTE),shifted.get(Calendar.SECOND))
+                    persist();calculate()
+                }
+                menuView?.addView(postpone,LinearLayout.LayoutParams(-1,dp(34)).apply{topMargin=dp(5)})
+                return
+            }
+        }
+        results=rows.map{ResultRow(it.id,it.name,it.isRally,it.rallySeconds,it.marchSeconds,it.actionAtMillis,it.departAtMillis,arrival)}.toMutableList()
+        resultsMode=true;resultZeroAt.clear();vibratedIds.clear();persist();renderMenu()
     }
     private fun parse(raw:String):Int? = RallyTime.seconds(raw)
     private fun format(n:Int):String = RallyTime.format(n)
