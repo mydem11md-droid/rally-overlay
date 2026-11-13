@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">أداة تنسيق الحشود</string>
+    <string name="ready">صلاحية العرض فوق التطبيقات مفعّلة</string>
+    <string name="permission_needed">يلزم السماح بعرض الأداة فوق التطبيقات الأخرى</string>
+    <string name="start">تشغيل أداة تنسيق الحشود</string>
+    <string name="stop">إيقاف</string>
+    <string name="started">تم تشغيل الأداة العائمة</string>
+    <string name="stopped">تم إيقاف الأداة</string>
+    <string name="permission_title">صلاحية العرض فوق التطبيقات</string>
+    <string name="permission_guide">لإظهار أداة تنسيق الحشود فوق اللعبة والتطبيقات الأخرى، فعّل السماح بالظهور فوق التطبيقات ثم ارجع واضغط تشغيل.</string>
+    <string name="open_settings">فتح الإعدادات</string>
+    <string name="cancel">إلغاء</string>
+</resources>

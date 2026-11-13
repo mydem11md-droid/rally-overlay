@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Rally Coordinator</string>
+    <string name="ready">Overlay permission is enabled</string>
+    <string name="permission_needed">Allow display over other apps to use the floating tool</string>
+    <string name="start">Start Rally Coordinator</string>
+    <string name="stop">Stop</string>
+    <string name="started">Floating tool started</string>
+    <string name="stopped">Floating tool stopped</string>
+    <string name="permission_title">Display over other apps</string>
+    <string name="permission_guide">To show the rally tool over your game and other apps, allow display over other apps, return here, and tap Start.</string>
+    <string name="open_settings">Open settings</string>
+    <string name="cancel">Cancel</string>
+</resources>
