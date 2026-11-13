@@ -69,4 +69,21 @@
     <string name="countdown_after">بعد %1$s</string>
     <string name="now_label">الآن</string>
     <string name="back">رجوع</string>
+
+    <string name="check_update">تحقق من التحديث</string>
+    <string name="update_available">تحديث متوفر · الإصدار %1$s</string>
+    <string name="update_action">تحديث</string>
+    <string name="later">لاحقاً</string>
+    <string name="update_downloading">جارٍ تنزيل التحديث…</string>
+    <string name="update_ready">اكتمل التنزيل. تابع التثبيت.</string>
+    <string name="update_no_update">لديك أحدث إصدار.</string>
+    <string name="update_notes_empty">يتوفر إصدار أحدث.</string>
+    <string name="update_check_failed">تعذر التحقق من التحديث. تحقق من اتصال الإنترنت وحاول مجدداً.</string>
+    <string name="update_rate_limited">قيّد GitHub طلبات التحقق مؤقتاً. حاول لاحقاً.</string>
+    <string name="update_metadata_missing">معلومات الإصدار غير موجودة.</string>
+    <string name="update_apk_missing">تعذر العثور على ملف APK في الإصدار.</string>
+    <string name="update_download_failed">فشل تنزيل التحديث. حاول مجدداً.</string>
+    <string name="update_invalid_apk">الملف الذي تم تنزيله ليس APK صالحاً.</string>
+    <string name="update_wrong_package">ملف APK تابع لتطبيق مختلف.</string>
+    <string name="update_signature_mismatch">توقيع APK لا يطابق توقيع التطبيق المثبت. تم منع التثبيت.</string>
 </resources>
