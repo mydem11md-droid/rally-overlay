@@ -73,12 +73,24 @@ class RallyOverlayService : Service() {
             background=bg(color,9f); setPadding(dp(10),dp(7),dp(10),dp(7)); setOnClickListener { action() } }
     private data class Person(val id:Int,var name:String,var duration:String)
     private data class ResultRow(val id:Int,val name:String,val launch:Int)
+    private val localeReceiver = object: BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            uiContext=localizedContext()
+            if(root!=null){if(menuOpen)showMenu()else buildCollapsed();startForeground(27,notification())}
+        }
+    }
     private val clockTick = object: Runnable { override fun run() { updateClock(); handler.postDelayed(this,1000) } }
 
-    override fun onCreate() { super.onCreate(); uiContext=localizedContext(); wm=getSystemService(WINDOW_SERVICE) as WindowManager; restore() }
+    override fun onCreate() {
+        super.onCreate()
+        uiContext=localizedContext()
+        wm=getSystemService(WINDOW_SERVICE) as WindowManager
+        val filter=IntentFilter(ACTION_LANGUAGE_CHANGED)
+        if(Build.VERSION.SDK_INT>=33) registerReceiver(localeReceiver,filter,Context.RECEIVER_NOT_EXPORTED) else registerReceiver(localeReceiver,filter)
+        restore()
+    }
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         if(intent?.action==ACTION_STOP){stopSelf();return START_NOT_STICKY}
-        if(intent?.action==ACTION_LANGUAGE_CHANGED){uiContext=localizedContext();if(root!=null){if(menuOpen)showMenu()else buildCollapsed();startForeground(27,notification())};return START_STICKY}
         if(!Settings.canDrawOverlays(this)){stopSelf();return START_NOT_STICKY}
         startForeground(27,notification())
         if(root==null) createOverlay()
@@ -321,7 +333,7 @@ class RallyOverlayService : Service() {
         val p=params?:return;p.width=dp(240);p.height=dp(120);p.x=(resources.displayMetrics.widthPixels-p.width)/2;p.y=(resources.displayMetrics.heightPixels-p.height)/2
         runCatching{wm.updateViewLayout(r,p)}
     }
-    override fun onDestroy(){handler.removeCallbacksAndMessages(null);root?.let{runCatching{wm.removeView(it)}};root=null
+    override fun onDestroy(){runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);root?.let{runCatching{wm.removeView(it)}};root=null
         if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
     companion object { const val ACTION_STOP="com.mythic.rally.STOP"; const val ACTION_LANGUAGE_CHANGED="com.mythic.rally.LANGUAGE_CHANGED"; private const val TAG="RallyOverlay" }
     private class SimpleWatcher(val changed:(String)->Unit):android.text.TextWatcher{
