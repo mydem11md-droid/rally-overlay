@@ -2,6 +2,7 @@ package com.mythic.rally
 
 import android.app.*
 import android.content.*
+import android.content.res.Configuration
 import android.graphics.*
 import android.graphics.drawable.GradientDrawable
 import android.os.*
@@ -18,6 +19,8 @@ import kotlin.math.*
 
 class RallyOverlayService : Service() {
     private val prefs by lazy { getSharedPreferences("rally_native", MODE_PRIVATE) }
+    private lateinit var uiContext: Context
+    private var language = "en"
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var wm: WindowManager
     private var root: FrameLayout? = null
@@ -40,23 +43,42 @@ class RallyOverlayService : Service() {
     private val density get() = resources.displayMetrics.density
     private fun dp(v: Int) = (v * density).roundToInt()
     private fun dp(v: Float) = (v * density).roundToInt()
-    private fun ar() = !Locale.getDefault().language.equals("en", true)
+    private fun ar() = language == "ar"
     private fun t(a: String, e: String) = if (ar()) a else e
+    private fun localizedContext(): Context {
+        language = prefs.getString("language", null) ?: if (Locale.getDefault().language.equals("ar", true)) "ar" else "en"
+        val locale = Locale.forLanguageTag(language)
+        val config = Configuration(resources.configuration)
+        config.setLocale(locale)
+        config.setLayoutDirection(locale)
+        return createConfigurationContext(config)
+    }
+    private fun changeLanguage() {
+        language = if (language == "ar") "en" else "ar"
+        prefs.edit().putString("language", language).apply()
+        uiContext = localizedContext()
+        persist()
+        if (root != null) { if (menuOpen) showMenu() else buildCollapsed(); startForeground(27, notification()) }
+    }
+    private fun direction(view: View) {
+        view.layoutDirection = if (ar()) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+    }
     private fun bg(color: Int, radius: Float): GradientDrawable =
         GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
     private fun text(value: String, size: Float, color: Int, bold: Boolean = false) =
-        TextView(this).apply { text=value; textSize=size; setTextColor(color); gravity=Gravity.CENTER_VERTICAL
+        TextView(uiContext).apply { text=value; textSize=size; setTextColor(color); gravity=Gravity.CENTER_VERTICAL; direction(this)
             if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD) }
     private fun button(value: String, color: Int, fg: Int, action: () -> Unit) =
-        TextView(this).apply { text=value; textSize=13f; gravity=Gravity.CENTER; setTextColor(fg)
+        TextView(uiContext).apply { text=value; textSize=13f; gravity=Gravity.CENTER; setTextColor(fg); direction(this)
             background=bg(color,9f); setPadding(dp(10),dp(7),dp(10),dp(7)); setOnClickListener { action() } }
     private data class Person(val id:Int,var name:String,var duration:String)
     private data class ResultRow(val id:Int,val name:String,val launch:Int)
     private val clockTick = object: Runnable { override fun run() { updateClock(); handler.postDelayed(this,1000) } }
 
-    override fun onCreate() { super.onCreate(); wm=getSystemService(WINDOW_SERVICE) as WindowManager; restore() }
+    override fun onCreate() { super.onCreate(); uiContext=localizedContext(); wm=getSystemService(WINDOW_SERVICE) as WindowManager; restore() }
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         if(intent?.action==ACTION_STOP){stopSelf();return START_NOT_STICKY}
+        if(intent?.action==ACTION_LANGUAGE_CHANGED){uiContext=localizedContext();if(root!=null){if(menuOpen)showMenu()else buildCollapsed();startForeground(27,notification())};return START_STICKY}
         if(!Settings.canDrawOverlays(this)){stopSelf();return START_NOT_STICKY}
         startForeground(27,notification())
         if(root==null) createOverlay()
@@ -101,7 +123,7 @@ class RallyOverlayService : Service() {
         val screenW=(resources.displayMetrics.widthPixels/density).toInt()
         val screenH=(resources.displayMetrics.heightPixels/density).toInt()
         bubbleX=bubbleX.coerceIn(0,(screenW-50).coerceAtLeast(0)); bubbleY=bubbleY.coerceIn(36,(screenH-55).coerceAtLeast(36))
-        val frame=FrameLayout(this).apply { clipChildren=false; clipToPadding=false }
+        val frame=FrameLayout(uiContext).apply { clipChildren=false; clipToPadding=false; direction(this) }
         root=frame
         val p=WindowManager.LayoutParams(dp(58),dp(92),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -113,7 +135,7 @@ class RallyOverlayService : Service() {
         if(menuOpen) showMenu()
         handler.post(clockTick)
     }
-    private fun iconCircle():View = object:View(this) {
+    private fun iconCircle():View = object:View(uiContext) {
         private val paint=Paint(3).apply { color=Color.WHITE; style=Paint.Style.STROKE; strokeWidth=dp(2).toFloat(); strokeCap=Paint.Cap.ROUND }
         override fun onDraw(c:Canvas) { super.onDraw(c); val x=width/2f;val y=height/2f
             c.drawCircle(x,y,dp(9).toFloat(),paint);c.drawLine(x,y,x,y-dp(5),paint);c.drawLine(x,y,x+dp(4),y+dp(3),paint) }
@@ -124,7 +146,7 @@ class RallyOverlayService : Service() {
         f.addView(utc,FrameLayout.LayoutParams(dp(104),dp(24),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin=0 })
         val orb=FrameLayout(this).apply { background=bg(0xFF2E7D32.toInt(),50f); addView(iconCircle(),FrameLayout.LayoutParams(dp(24),dp(24),Gravity.CENTER)) }
         f.addView(orb,FrameLayout.LayoutParams(dp(46),dp(46),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin=dp(34) })
-        val close=TextView(this).apply { text="×";textSize=15f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);background=bg(0xFFE57373.toInt(),20f) }
+        val close=TextView(uiContext).apply { text="×";textSize=15f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);background=bg(0xFFE57373.toInt(),20f) }
         f.addView(close,FrameLayout.LayoutParams(dp(17),dp(17),Gravity.TOP or Gravity.END).apply { topMargin=dp(30) })
         orb.setOnClickListener { menuOpen=!menuOpen; persist(); if(menuOpen)showMenu() else collapse() }
         close.setOnClickListener { showConfirm() }
@@ -157,13 +179,13 @@ class RallyOverlayService : Service() {
     private fun collapse(){menuOpen=false;persist();buildCollapsed();applyLayout()}
     private fun showMenu() {
         val f=root?:return;f.removeAllViews();f.clipChildren=false;f.clipToPadding=false
-        val panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; background=bg(0xFF1E2A22.toInt(),12f); setPadding(dp(10),dp(8),dp(10),dp(9)); clipChildren=false;clipToPadding=false }
+        val panel=LinearLayout(uiContext).apply { orientation=LinearLayout.VERTICAL; background=bg(0xFF1E2A22.toInt(),12f); setPadding(dp(10),dp(8),dp(10),dp(9)); clipChildren=false;clipToPadding=false }
         menuView=panel
         val header=LinearLayout(this).apply { gravity=Gravity.CENTER_VERTICAL; orientation=LinearLayout.HORIZONTAL }
         header.addView(text(if(settingsMode)t("الإعدادات · تعديل البيانات","Settings · Edit data") else if(resultsMode)t("نتائج التنسيق","Rally results") else t("أداة تنسيق الحشود","Rally Coordinator"),14f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(34),1f))
         header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(dp(38),dp(34)))
         panel.addView(header)
-        val sc=ScrollView(this).apply { isFillViewport=false; clipChildren=false;clipToPadding=false }
+        val sc=ScrollView(uiContext).apply { isFillViewport=false; clipChildren=false;clipToPadding=false }
         scroll=sc
         val content=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; clipChildren=false;clipToPadding=false }
         sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,0,1f))
@@ -175,7 +197,7 @@ class RallyOverlayService : Service() {
     private fun renderMenu(){showMenu()}
     private fun label(parent:LinearLayout,s:String){parent.addView(text(s,11f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(23)))}
     private fun input(hint:String,value:String,numeric:Boolean=false):EditText {
-        return EditText(this).apply {
+        return EditText(uiContext).apply {
             setSingleLine(true); textSize=13f; setTextColor(Color.WHITE); setHintTextColor(0xFFA5C4AA.toInt()); setHint(hint); setText(value)
             background=bg(0xFF2A3A2F.toInt(),9f); setPadding(dp(9),0,dp(9),0)
             if(numeric) { inputType=android.text.InputType.TYPE_CLASS_NUMBER; keyListener=android.text.method.DigitsKeyListener.getInstance("0123456789"); imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=View.TEXT_DIRECTION_LTR; textAlignment=View.TEXT_ALIGNMENT_CENTER }
@@ -241,7 +263,7 @@ class RallyOverlayService : Service() {
             name.addTextChangedListener(SimpleWatcher{p.name=it;persist()})
             bindTimeInput(duration) { value -> p.duration=value; persist() }
             fields.addView(name,LinearLayout.LayoutParams(0,dp(38),1f))
-            fields.addView(Space(this),LinearLayout.LayoutParams(dp(5),1))
+            fields.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
             fields.addView(duration,LinearLayout.LayoutParams(dp(82),dp(38)))
             row.addView(fields)
             val actions=LinearLayout(this).apply{gravity=if(ar())Gravity.END else Gravity.START}
@@ -289,7 +311,7 @@ class RallyOverlayService : Service() {
         return total.takeIf{it<=3600}
     }
     private fun format(n:Int):String=String.format(Locale.US,"%d:%02d",n/60,n%60)
-    private fun copy(s:String){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Rally",s));Toast.makeText(this,t("تم النسخ","Copied"),Toast.LENGTH_SHORT).show()}
+    private fun copy(s:String){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Rally",s));Toast.makeText(uiContext,t("تم النسخ","Copied"),Toast.LENGTH_SHORT).show()}
     private fun setFocus(on:Boolean) {
         val r=root?:return;val p=params?:return
         if(focusable==on)return
@@ -315,7 +337,7 @@ class RallyOverlayService : Service() {
     }
     override fun onDestroy(){handler.removeCallbacksAndMessages(null);root?.let{runCatching{wm.removeView(it)}};root=null
         if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
-    companion object { const val ACTION_STOP="com.mythic.rally.STOP"; private const val TAG="RallyOverlay" }
+    companion object { const val ACTION_STOP="com.mythic.rally.STOP"; const val ACTION_LANGUAGE_CHANGED="com.mythic.rally.LANGUAGE_CHANGED"; private const val TAG="RallyOverlay" }
     private class SimpleWatcher(val changed:(String)->Unit):android.text.TextWatcher{
         override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
         override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){changed(s?.toString()?: "")}
