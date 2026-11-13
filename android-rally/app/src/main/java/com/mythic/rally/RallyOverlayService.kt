@@ -408,9 +408,9 @@ class RallyOverlayService : Service() {
             fields.addView(duration,LinearLayout.LayoutParams(dp(82),dp(38)))
             row.addView(fields)
             val kindRow=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
-            kindRow.addView(button(uiContext.getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(40),1f))
+            kindRow.addView(fitControl(button(uiContext.getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(40),1f))
             kindRow.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
-            kindRow.addView(button(uiContext.getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(28),1f))
+            kindRow.addView(fitControl(button(uiContext.getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(40),1f))
             row.addView(kindRow,LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(4)})
             if(p.kind=="rally") {
                 duration.hint="MM:SS";duration.contentDescription=uiContext.getString(R.string.rally_march_arrival)
@@ -426,8 +426,8 @@ class RallyOverlayService : Service() {
                 }
                 val custom=input(uiContext.getString(R.string.minutes),if(p.rallyMinutes !in presets)p.rallyMinutes.toString() else "",true)
                 custom.visibility=View.GONE
-                val customToggle=fitControl(button(uiContext.getString(R.string.custom_minutes),if(p.rallyMinutes !in presets)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes !in presets)0xFF102014.toInt() else Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE}),LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(8)})
-                row.addView(customToggle)
+                val customToggle=fitControl(button(uiContext.getString(R.string.custom_minutes),if(p.rallyMinutes !in presets)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes !in presets)0xFF102014.toInt() else Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE})
+                row.addView(customToggle,LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(8)})
                 custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it > 0 && it <= Int.MAX_VALUE/60}?.let{p.rallyMinutes=it;persist();customToggle.setBackground(bg(0xFF4CAF50.toInt(),9f));customToggle.setTextColor(0xFF102014.toInt())}})
                 row.addView(custom,LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(4)})
             }
