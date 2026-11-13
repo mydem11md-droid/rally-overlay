@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.util.Base64
 
 plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 
@@ -8,7 +9,7 @@ val versionProperties = Properties().apply {
 val releaseStoreFile = System.getenv("ANDROID_KEYSTORE_BASE64")?.takeIf { it.isNotBlank() }?.let { encoded ->
     val file = layout.buildDirectory.file("release-signing/rally-release.jks").get().asFile
     file.parentFile.mkdirs()
-    file.writeBytes(java.util.Base64.getDecoder().decode(encoded))
+    file.writeBytes(Base64.getDecoder().decode(encoded))
     file
 }
 val releaseStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
