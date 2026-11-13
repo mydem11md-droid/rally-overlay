@@ -86,11 +86,11 @@ class AppUpdater(private val activity: MainActivity) {
                 .setMimeType("application/vnd.android.package-archive")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 .setDestinationInExternalFilesDir(activity, android.os.Environment.DIRECTORY_DOWNLOADS, "rally-overlay-update.apk")
-            downloadId = (activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
-            pollProgress()
             val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
             if (Build.VERSION.SDK_INT >= 33) activity.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
             else @Suppress("DEPRECATION") activity.registerReceiver(receiver, filter)
+            downloadId = (activity.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+            pollProgress()
         } catch (e: Exception) {
             error(activity.getString(R.string.update_download_failed))
         }
@@ -139,14 +139,16 @@ class AppUpdater(private val activity: MainActivity) {
     }
 
     private fun validateApk(file: File) {
-        val archive = activity.packageManager.getPackageArchiveInfo(file.absolutePath, PackageManager.GET_SIGNING_CERTIFICATES)
+        val archiveFlags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
+        val archive = activity.packageManager.getPackageArchiveInfo(file.absolutePath, archiveFlags)
             ?: throw IllegalStateException(activity.getString(R.string.update_invalid_apk))
         if (archive.packageName != activity.packageName) throw IllegalStateException(activity.getString(R.string.update_wrong_package))
-        val current = activity.packageManager.getPackageInfo(activity.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
-        val oldSigners = current.signingInfo?.apkContentsSigners ?: throw IllegalStateException(activity.getString(R.string.update_signature_mismatch))
-        val newSigners = archive.signingInfo?.apkContentsSigners ?: throw IllegalStateException(activity.getString(R.string.update_signature_mismatch))
-        val matches = oldSigners.map { it.toCharsString() }.toSet() == newSigners.map { it.toCharsString() }.toSet()
-        if (!matches) throw IllegalStateException(activity.getString(R.string.update_signature_mismatch))
+        val current = activity.packageManager.getPackageInfo(activity.packageName, archiveFlags)
+        val oldSigners = if (Build.VERSION.SDK_INT >= 28) current.signingInfo?.apkContentsSigners else @Suppress("DEPRECATION") current.signatures
+        val newSigners = if (Build.VERSION.SDK_INT >= 28) archive.signingInfo?.apkContentsSigners else @Suppress("DEPRECATION") archive.signatures
+        val oldSet = oldSigners?.map { it.toCharsString() }?.toSet()
+        val newSet = newSigners?.map { it.toCharsString() }?.toSet()
+        if (oldSet.isNullOrEmpty() || oldSet != newSet) throw IllegalStateException(activity.getString(R.string.update_signature_mismatch))
     }
 
     private fun install(file: File) {
@@ -155,6 +157,7 @@ class AppUpdater(private val activity: MainActivity) {
             activity.startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${activity.packageName}")))
             return
         }
+        prefs.edit().remove("pending_apk").apply()
         val uri = FileProvider.getUriForFile(activity, activity.packageName + ".updates", file)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
