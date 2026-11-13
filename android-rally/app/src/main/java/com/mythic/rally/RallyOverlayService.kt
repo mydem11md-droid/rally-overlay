@@ -50,6 +50,7 @@ class RallyOverlayService : Service() {
     private var scroll: ScrollView? = null
     private var targetInput: EditText? = null
     private var imeHeightPx = 0
+    private var imeWasVisible = false
     private var statusInsetPx = 0
     private var navInsetPx = 0
     private var focusedField: EditText? = null
@@ -216,7 +217,7 @@ class RallyOverlayService : Service() {
         val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true};MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt();if(abs(dx)+abs(dy)>5)dragged=true;if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-104);bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-55);applyLayout();persist()};true};MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true};else->true} }
         orb.setOnTouchListener(drag);f.setOnTouchListener(drag)
     }
-    private fun buildCollapsed() { val f=root?:return;f.removeAllViews();f.clipChildren=true;f.clipToPadding=true;addPinnedControls(f);updateClock();applyLayout() }
+    private fun buildCollapsed() { if (focusable) { focusedField?.clearFocus(); setFocus(false) }; val f=root?:return;f.removeAllViews();f.clipChildren=true;f.clipToPadding=true;addPinnedControls(f);updateClock();applyLayout() }
     private var downX=0f;private var downY=0f;private var startX=0;private var startY=0;private var dragged=false
     private fun updateClock() {
         val c=root?.findViewWithTag<TextView>("utc_time")?:return
@@ -240,6 +241,7 @@ class RallyOverlayService : Service() {
                 statusInsetPx=max(insets.systemWindowInsetTop,cutoutTop)
                 navInsetPx=insets.systemWindowInsetBottom
             }
+            updateImeFocusState()
             resizeForInsets()
             insets
         }
@@ -247,11 +249,23 @@ class RallyOverlayService : Service() {
             val rect=Rect(); view.getWindowVisibleDisplayFrame(rect)
             val fallback=(resources.displayMetrics.heightPixels-rect.bottom-navInsetPx).coerceAtLeast(0)
             val next=if(fallback>dp(80))fallback else 0
-            if(next!=imeHeightPx){imeHeightPx=next;resizeForInsets()}
+            if(next!=imeHeightPx){imeHeightPx=next;updateImeFocusState();resizeForInsets()}
         }
         globalLayoutListener=listener
         view.viewTreeObserver.addOnGlobalLayoutListener(listener)
         view.requestApplyInsets()
+    }
+    private fun updateImeFocusState() {
+        val visible = imeHeightPx > dp(80)
+        if (visible) {
+            imeWasVisible = true
+        } else if (imeWasVisible) {
+            imeWasVisible = false
+            if (focusable) {
+                focusedField?.clearFocus()
+                setFocus(false)
+            }
+        }
     }
     private fun resizeForInsets() { if(root!=null){applyLayout();focusedField?.post{ensureFocusedFieldVisible(focusedField!!)}} }
     private fun ensureFocusedFieldVisible(field: EditText) {
@@ -282,6 +296,7 @@ class RallyOverlayService : Service() {
         }.onFailure{Log.e("RallyLayout","update failed",it)}
     }
     private fun collapse(){
+        if (focusable) { focusedField?.clearFocus(); setFocus(false) }
         val panel=menuView
         if(panel!=null) {
             panel.animate().alpha(0f).setDuration(150).withEndAction {
@@ -580,6 +595,7 @@ class RallyOverlayService : Service() {
     }
     private fun showConfirm() {
         if(confirming)return;confirming=true
+        if (focusable) { focusedField?.clearFocus(); setFocus(false) }
         val dialog=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(16),dp(12),dp(16),dp(12))}
         dialog.addView(text(t("هل تريد إغلاق الأداة؟","Close the tool?"),13f,Color.WHITE,true))
         val actions=LinearLayout(uiContext).apply{gravity=Gravity.CENTER}
