@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="__LANG__" dir="__DIR__">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+:root{color-scheme:dark;--acc2:#B9822A;--onacc:#1a1204;--err:#F0566B;--r:12px;--display:'Cinzel',serif;
+ --abyss:#070912;--frost:#0E1426;--rune:#171F3A;--edge:#26315A;
+ --acc:#E9B24A;--glacier:#6FD3F2;--text:#EEF2FF;--muted:#9AA5C8;--ok:#4FCB9A;
+ --body:system-ui,sans-serif;
+}
+html,body{width:100%;height:100%;margin:0;padding:0;overflow:hidden;background:transparent!important;color:var(--text);font-family:var(--body);line-height:1.7;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box}button{touch-action:manipulation}
+</style>
+<script>
+var lang="__LANG__";
+(function(){
+ const key="mythic-rally-floating-v1";
+ let state=null;
+ try{const saved=window.AndroidBridge&&AndroidBridge.loadState();if(saved)localStorage.setItem(key,saved)}catch(e){}
+ try{state=JSON.parse(localStorage.getItem(key)||"null")}catch(e){}
+ try{
+  const originalSetItem=Storage.prototype.setItem;
+  Storage.prototype.setItem=function(k,v){
+   originalSetItem.call(this,k,v);
+   if(k===key&&window.AndroidBridge)try{AndroidBridge.saveState(String(v))}catch(e){}
+  };
+ }catch(e){}
+ const base={enabled:true,open:false,settings:false,target:"",people:[{id:1,name:"",duration:""}],nextId:2,x:null,y:null};
+ state=state&&typeof state==="object"?Object.assign(base,state):base;
+ state.enabled=true;
+ if(!Array.isArray(state.people)||!state.people.length)state.people=base.people;
+ localStorage.setItem(key,JSON.stringify(state));
+})();
+</script>
+</head>
+<body>
+<!--MYTHIC_RALLY_SOURCE-->
+<script>
+(function(){
+ const key="mythic-rally-floating-v1";
+ const style=document.createElement("style");
+ style.id="native-overlay-layout";
+ document.head.appendChild(style);
+ window.__mythicApplyNativeLayout=function(mode,rootLeft,rootTop,menuWidth,menuMaxHeight,above){
+  const rules=[
+   "#mythic-rally-float{left:"+rootLeft+"px!important;top:"+rootTop+"px!important;width:46px!important;height:46px!important}",
+   "#mythic-rally-float .menu{width:"+menuWidth+"px!important;max-width:"+menuWidth+"px!important;max-height:min("+menuMaxHeight+"px,calc(100vh - 100px))!important;left:0!important;right:auto!important;transform:none!important;overflow:auto!important}",
+   "#mythic-rally-float .menu{"+(above?"top:auto!important;bottom:53px!important":"top:53px!important;bottom:auto!important")+"}"
+  ];
+  if(mode==="bubble")rules.push("#mythic-rally-float .menu{display:none!important}");
+  if(mode==="confirm")rules.push("#mythic-rally-float .clock,#mythic-rally-float .orb,#mythic-rally-float .close,#mythic-rally-float .menu{visibility:hidden!important}");
+  style.textContent=rules.join("\n");
+  requestAnimationFrame(function(){
+   const menu=document.querySelector("#mythic-rally-float .menu");
+   if(mode==="menu"&&menu&&!menu.hidden&&window.AndroidBridge)AndroidBridge.onMenuMeasured(Math.ceil(menu.getBoundingClientRect().height));
+  });
+ };
+ function stateChanged(){
+  try{const s=JSON.parse(localStorage.getItem(key)||"{}");if(window.AndroidBridge)AndroidBridge.onMenuStateChanged(!!s.open)}catch(e){}
+ }
+ document.addEventListener("click",function(e){
+  const target=e.target&&e.target.closest?e.target.closest(".orb,.close,.confirm-yes,.confirm-no,.confirm-backdrop"):null;
+  if(!target)return;
+  if(target.classList.contains("orb"))setTimeout(stateChanged,0);
+  if(target.classList.contains("close"))setTimeout(function(){if(window.AndroidBridge)AndroidBridge.onCloseRequested()},0);
+  if(target.classList.contains("confirm-no"))setTimeout(function(){if(window.AndroidBridge)AndroidBridge.onCloseCancelled()},0);
+  if(target.classList.contains("confirm-yes"))setTimeout(function(){if(window.AndroidBridge)AndroidBridge.onStop()},0);
+  if(target.classList.contains("confirm-backdrop")&&e.target===target)setTimeout(function(){if(window.AndroidBridge)AndroidBridge.onCloseCancelled()},0);
+ },false);
+ document.addEventListener("focusin",function(){if(window.AndroidBridge)AndroidBridge.onInputFocus()});
+ document.addEventListener("focusout",function(){if(window.AndroidBridge)AndroidBridge.onInputBlur()});
+ document.addEventListener("input",function(e){
+  const el=e.target;
+  if(!el||!el.matches||!el.matches("#rf-target,[data-f='duration']"))return;
+  const clean=el.value.replace(/[٠-٩۰-۹]/g,function(ch){
+   const code=ch.charCodeAt(0);
+   return String(code-(code>=0x6f0?0x6f0:0x660));
+  }).replace(/[^0-9]/g,"").slice(0,4);
+  if(clean!==el.value){
+   const pos=clean.length;
+   el.value=clean;
+   try{el.setSelectionRange(pos,pos)}catch(_){}
+  }
+  if(clean.length===4){
+   const fields=Array.from(document.querySelectorAll("#rf-target,[data-f]"));
+   const next=fields[fields.indexOf(el)+1]||document.querySelector("#mythic-rally-float .add");
+   if(next)setTimeout(function(){next.focus()},0);
+  }
+ },true);
+ const observer=new MutationObserver(function(){
+  const menu=document.querySelector("#mythic-rally-float .menu");
+  if(menu&&!menu.hidden&&window.AndroidBridge)AndroidBridge.onMenuMeasured(Math.ceil(menu.getBoundingClientRect().height));
+ });
+ observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["hidden"]});
+ window.addEventListener("resize",function(){setTimeout(function(){const menu=document.querySelector("#mythic-rally-float .menu");if(menu&&!menu.hidden&&window.AndroidBridge)AndroidBridge.onMenuMeasured(Math.ceil(menu.getBoundingClientRect().height))},60)});
+ window.addEventListener("load",stateChanged);
+})();
+</script>
+</body>
+</html>
