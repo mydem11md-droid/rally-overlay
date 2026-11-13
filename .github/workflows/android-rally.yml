@@ -73,7 +73,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          RELEASE_TAG: rally-overlay-fix-pr5
+          RELEASE_TAG: rally-overlay-fix-${{ github.event.pull_request.head.sha }}
         run: |
           gh release create "$RELEASE_TAG" android-rally/app/build/outputs/apk/debug/app-debug.apk \
             --repo "$GITHUB_REPOSITORY" \
