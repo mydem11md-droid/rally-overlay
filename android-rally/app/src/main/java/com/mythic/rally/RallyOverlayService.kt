@@ -44,6 +44,8 @@ class RallyOverlayService : Service() {
     private var statusInsetPx = 0
     private var navInsetPx = 0
     private var focusedField: EditText? = null
+    private var miniEditorTitle: TextView? = null
+    private var miniEditorValue: TextView? = null
     private var globalLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
     private class CappedScrollView(context: Context) : ScrollView(context) {
         var maxHeightPx = Int.MAX_VALUE
@@ -202,6 +204,7 @@ class RallyOverlayService : Service() {
         return (full - statusInsetPx - navInsetPx - imeHeightPx - dp(16)).coerceAtLeast(dp(120))
     }
     private fun installInsetsTracking(view: View) {
+        statusInsetPx=dp(24); navInsetPx=dp(24)
         if (Build.VERSION.SDK_INT >= 30) view.setOnApplyWindowInsetsListener { _, insets ->
             val bars=insets.getInsets(WindowInsets.Type.statusBars() or WindowInsets.Type.displayCutout())
             statusInsetPx=bars.top
@@ -224,7 +227,13 @@ class RallyOverlayService : Service() {
     private fun ensureFocusedFieldVisible(field: EditText) {
         val sc=scroll?:return
         val rect=Rect();field.getDrawingRect(rect);sc.offsetDescendantRectToMyCoords(field,rect)
-        if(rect.bottom>sc.scrollY+sc.height-dp(12))sc.smoothScrollTo(0,(rect.bottom-sc.height+dp(18)).coerceAtLeast(0))
+        val visibleBottom=sc.scrollY+sc.height-dp(12)
+        if(rect.bottom>visibleBottom)sc.smoothScrollTo(0,(rect.bottom-sc.height+dp(18)).coerceAtLeast(0))
+        val needsMini=imeHeightPx>dp(80) && (sc.height<dp(90) || rect.height()>sc.height)
+        miniEditorTitle?.text=field.contentDescription?.toString() ?: field.hint?.toString().orEmpty()
+        miniEditorValue?.text=field.text?.toString().orEmpty()
+        miniEditor?.visibility=if(needsMini)View.VISIBLE else View.GONE
+        if(needsMini)lastScrollMode="mini-editor"
     }
     private fun applyLayout() {
         val r=root?:return;val p=params?:return;val sw=resources.displayMetrics.widthPixels
@@ -253,18 +262,26 @@ class RallyOverlayService : Service() {
         header.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
         header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(dp(34),dp(32)))
         panel.addView(header)
+        miniEditor=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;visibility=View.GONE;background=bg(0xFF2A3A2F.toInt(),9f);setPadding(dp(9),dp(5),dp(9),dp(5))}
+        miniEditorTitle=text("",10f,0xFFA5C4AA.toInt(),true)
+        miniEditorValue=text("",18f,Color.WHITE,true)
+        miniEditor?.addView(miniEditorTitle);miniEditor?.addView(miniEditorValue)
+        panel.addView(miniEditor,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(5)})
         val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=false;clipToPadding=false;direction(this)};scroll=sc
         val content=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=false;clipToPadding=false;direction(this)}
         sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,-2))
         if(resultsMode)buildResults(content)else buildEditor(content)
         if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(12)})
-        f.addView(panel,FrameLayout.LayoutParams(dp(280),-2).apply{topMargin=dp(88)});applyLayout()
+        panel.alpha=0f
+        f.addView(panel,FrameLayout.LayoutParams(dp(280),-2).apply{topMargin=dp(88)})
+        applyLayout()
+        panel.animate().alpha(1f).setDuration(150).start()
     }
     private fun renderMenu(){showMenu()}
     private fun label(parent:LinearLayout,s:String){parent.addView(text(s,11f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(23)))}
     private fun input(hint:String,value:String,numeric:Boolean=false):EditText {
         return EditText(uiContext).apply {
-            setSingleLine(true); textSize=13f; setTextColor(Color.WHITE); setHintTextColor(0xFFA5C4AA.toInt()); setHint(hint); setText(value)
+            setSingleLine(true); textSize=13f; setTextColor(Color.WHITE); setHintTextColor(0xFFA5C4AA.toInt()); setHint(hint); setText(value); contentDescription=hint
             background=bg(0xFF2A3A2F.toInt(),9f); setPadding(dp(9),0,dp(9),0)
             if(numeric) { inputType=android.text.InputType.TYPE_CLASS_NUMBER; keyListener=android.text.method.DigitsKeyListener.getInstance("0123456789"); imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=View.TEXT_DIRECTION_LTR; textAlignment=View.TEXT_ALIGNMENT_CENTER }
             else { inputType=android.text.InputType.TYPE_CLASS_TEXT; imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=if(ar())View.TEXT_DIRECTION_RTL else View.TEXT_DIRECTION_LTR }
@@ -288,6 +305,7 @@ class RallyOverlayService : Service() {
                 val rebuilt = timePreview(digits)
                 if (rebuilt != s?.toString()) { formatting=true; field.setText(rebuilt); field.setSelection(rebuilt.length); formatting=false }
                 changed(rebuilt)
+                if(focusedField===field)miniEditorValue?.text=rebuilt
             }
         })
         val initial=RallyTime.preview(field.text.toString())
@@ -319,7 +337,9 @@ class RallyOverlayService : Service() {
             val fields=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
             val name=input(t("اسم اللاعب","Player name"),p.name)
             val duration=input("MM:SS",p.duration,true)
-            name.addTextChangedListener(SimpleWatcher{p.name=it;persist()})
+            name.contentDescription=t("مشارك ${index+1} · الاسم","Participant ${index+1} · name")
+            duration.contentDescription=t("مشارك ${index+1} · المدة","Participant ${index+1} · duration")
+            name.addTextChangedListener(SimpleWatcher{p.name=it;persist();if(focusedField===name)miniEditorValue?.text=it})
             bindTimeInput(duration) { value -> p.duration=value; persist() }
             fields.addView(name,LinearLayout.LayoutParams(0,dp(38),1f))
             fields.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
