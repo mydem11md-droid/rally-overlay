@@ -242,7 +242,8 @@ class RallyOverlayService : Service() {
                 if (rebuilt != s?.toString()) { formatting=true; field.setText(rebuilt); field.setSelection(rebuilt.length); formatting=false }
                 changed(rebuilt)
             }
-        })        val initial=RallyTime.preview(field.text.toString())
+        })
+        val initial=RallyTime.preview(field.text.toString())
         if(initial!=field.text.toString()){field.setText(initial);field.setSelection(initial.length)}
         changed(initial)
         field.setOnFocusChangeListener { v,has ->
