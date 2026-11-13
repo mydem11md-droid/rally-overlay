@@ -22,6 +22,9 @@
 
 لا ترفع ملف keystore إلى Git أو إلى أي artifact، ولا تضع كلمات المرور في الملفات أو سجلات البناء. البناء المحلي يستخدم توقيع debug تلقائياً إذا لم تكن متغيرات توقيع الإصدار موجودة.
 
+
+> **First stable-signing release:** APKs previously distributed from CI debug builds were signed with a different debug key. Android cannot update those installs with the new release key. For the first transition to stable releases, uninstall the old debug build and install the first signed release; later signed releases will update in place and retain app data.
+
 ## التحديث داخل التطبيق
 
 تتحقق الشاشة الرئيسية من GitHub Releases عند فتحها، وبحد أقصى مرة كل 6 ساعات، مع زر للتحقق اليدوي. عند توفر إصدار أحدث، يعرض التطبيق ملاحظات الإصدار والتنزيل والتقدم. قبل فتح مُثبّت Android يتحقق من صلاحية APK وحجمه واسم الحزمة وتطابق توقيع التطبيق المثبت. يتطلب Android موافقة المستخدم على التثبيت من هذا المصدر.
