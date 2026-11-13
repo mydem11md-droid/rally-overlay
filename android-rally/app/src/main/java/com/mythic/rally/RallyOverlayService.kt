@@ -140,33 +140,31 @@ class RallyOverlayService : Service() {
         override fun onDraw(c:Canvas) { super.onDraw(c); val x=width/2f;val y=height/2f
             c.drawCircle(x,y,dp(9).toFloat(),paint);c.drawLine(x,y,x,y-dp(5),paint);c.drawLine(x,y,x+dp(4),y+dp(3),paint) }
     }.apply { contentDescription=t("الوقت","Clock") }
-    private fun buildCollapsed() {
-        val f=root?:return; f.removeAllViews()
-        val utc=text("00:00:00 UTC",10f,Color.WHITE,true).apply { gravity=Gravity.CENTER; background=bg(0xFF2A3A2F.toInt(),8f) }
-        f.addView(utc,FrameLayout.LayoutParams(dp(104),dp(24),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin=0 })
-        val orb=FrameLayout(this).apply { background=bg(0xFF2E7D32.toInt(),50f); addView(iconCircle(),FrameLayout.LayoutParams(dp(24),dp(24),Gravity.CENTER)) }
-        f.addView(orb,FrameLayout.LayoutParams(dp(46),dp(46),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply { topMargin=dp(34) })
-        val close=TextView(uiContext).apply { text="×";textSize=15f;gravity=Gravity.CENTER;setTextColor(Color.WHITE);background=bg(0xFFE57373.toInt(),20f) }
-        f.addView(close,FrameLayout.LayoutParams(dp(17),dp(17),Gravity.TOP or Gravity.END).apply { topMargin=dp(30) })
-        orb.setOnClickListener { menuOpen=!menuOpen; persist(); if(menuOpen)showMenu() else collapse() }
-        close.setOnClickListener { showConfirm() }
-        val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){
-            MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true}
-            MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt()
-                if(abs(dx)+abs(dy)>5)dragged=true
-                if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-50)
-                    bubbleY=(startY+dy).coerceIn(36,(resources.displayMetrics.heightPixels/density).roundToInt()-55); applyLayout();persist()}
-                true}
-            MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true}
-            else->true} }
-        orb.setOnTouchListener(drag)
-        f.setOnTouchListener(drag)
-        updateClock()
+    private fun addPinnedControls(f: FrameLayout) {
+        val capsule=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),10f);setPadding(dp(12),dp(5),dp(12),dp(5));minimumWidth=dp(104);direction(this) }
+        val clock=TextView(uiContext).apply { tag="utc_time";text="00:00:00";textSize=15f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
+        val utc=TextView(uiContext).apply { text="UTC";textSize=11f;setTextColor(0xFFA5C4AA.toInt());includeFontPadding=false;isSingleLine=true;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR }
+        capsule.addView(clock);capsule.addView(utc,LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(4)})
+        f.addView(capsule,FrameLayout.LayoutParams(-2,-2,Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+        val orb=FrameLayout(uiContext).apply { background=bg(0xFF2E7D32.toInt(),50f);addView(iconCircle(),FrameLayout.LayoutParams(dp(24),dp(24),Gravity.CENTER)) }
+        f.addView(orb,FrameLayout.LayoutParams(dp(46),dp(46),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(34)})
+        val close=object:View(uiContext) {
+            private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
+            override fun onDraw(canvas:Canvas) { super.onDraw(canvas);val cx=width/2f;val cy=height/2f;paint.style=Paint.Style.FILL;paint.color=0xFF1E2A22.toInt();canvas.drawCircle(cx,cy,dp(10).toFloat(),paint);paint.color=if(isPressed)0xFFE57373.toInt() else 0xFF2A3A2F.toInt();canvas.drawCircle(cx,cy,dp(8).toFloat(),paint);paint.color=Color.WHITE;paint.style=Paint.Style.STROKE;paint.strokeWidth=dp(1.5f).toFloat();paint.strokeCap=Paint.Cap.ROUND;val d=dp(3).toFloat();canvas.drawLine(cx-d,cy-d,cx+d,cy+d,paint);canvas.drawLine(cx+d,cy-d,cx-d,cy+d,paint) }
+            override fun onTouchEvent(event:MotionEvent):Boolean { when(event.actionMasked){MotionEvent.ACTION_DOWN->{isPressed=true;invalidate();return true};MotionEvent.ACTION_UP->{isPressed=false;invalidate();performClick();return true};MotionEvent.ACTION_CANCEL->{isPressed=false;invalidate();return true}};return true }
+            override fun performClick():Boolean { super.performClick();showConfirm();return true }
+        }
+        f.addView(close,FrameLayout.LayoutParams(dp(36),dp(36),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{leftMargin=dp(6);topMargin=dp(16)})
+        orb.setOnClickListener { menuOpen=!menuOpen;persist();if(menuOpen)showMenu()else collapse() }
+        val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true};MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt();if(abs(dx)+abs(dy)>5)dragged=true;if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-50);bubbleY=(startY+dy).coerceIn(36,(resources.displayMetrics.heightPixels/density).roundToInt()-55);applyLayout();persist()};true};MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true};else->true} }
+        orb.setOnTouchListener(drag);f.setOnTouchListener(drag)
     }
+    private fun buildCollapsed() { val f=root?:return;f.removeAllViews();f.clipChildren=false;f.clipToPadding=false;addPinnedControls(f);updateClock();f.measure(View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));params?.let{p->p.width=max(dp(46),f.measuredWidth);p.height=dp(80);runCatching{wm.updateViewLayout(f,p)}} }
     private var downX=0f;private var downY=0f;private var startX=0;private var startY=0;private var dragged=false
     private fun updateClock() {
-        val c=root?.getChildAt(0) as? TextView ?: return
-        val formatter=SimpleDateFormat("HH:mm:ss",Locale.US).apply { timeZone=TimeZone.getTimeZone("UTC") }; c.text=formatter.format(Date())+" UTC"
+        val c=root?.findViewWithTag<TextView>("utc_time")?:return
+        val formatter=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}
+        c.text=formatter.format(Date())
     }
     private fun applyLayout() {
         val r=root?:return;val p=params?:return
