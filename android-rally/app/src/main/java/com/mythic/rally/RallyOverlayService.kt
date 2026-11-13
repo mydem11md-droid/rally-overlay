@@ -364,17 +364,17 @@ class RallyOverlayService : Service() {
     private fun buildEditor(c:LinearLayout) {
         if(settingsMode) {
             label(c,t("الإعدادات","Settings"))
-            c.addView(button(if(vibrationEnabled)t("الاهتزاز: تشغيل","Vibration: On")else t("الاهتزاز: إيقاف","Vibration: Off"),0xFF2A3A2F.toInt(),Color.WHITE){vibrationEnabled=!vibrationEnabled;persist();renderMenu()})
-            c.addView(button(t("رجوع","Back"),0xFF4CAF50.toInt(),0xFF102014.toInt()){settingsMode=false;persist();renderMenu()})
+            c.addView(button(if(vibrationEnabled)getString(R.string.vibration_on)else getString(R.string.vibration_off),0xFF2A3A2F.toInt(),Color.WHITE){vibrationEnabled=!vibrationEnabled;persist();renderMenu()})
+            c.addView(button(getString(R.string.back),0xFF4CAF50.toInt(),0xFF102014.toInt()){settingsMode=false;persist();renderMenu()})
             return
         }
         val modes=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;direction(this)}
-        modes.addView(button(t("الآن","Now"),if(calculationMode=="now")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(calculationMode=="now")0xFF102014.toInt() else Color.WHITE){calculationMode="now";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
+        modes.addView(button(getString(R.string.mode_now),if(calculationMode=="now")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(calculationMode=="now")0xFF102014.toInt() else Color.WHITE){calculationMode="now";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
         modes.addView(Space(uiContext),LinearLayout.LayoutParams(dp(6),1))
-        modes.addView(button(t("وقت وصول محدد","Target arrival"),if(calculationMode=="target")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(calculationMode=="target")0xFF102014.toInt() else Color.WHITE){calculationMode="target";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
+        modes.addView(button(getString(R.string.mode_target),if(calculationMode=="target")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(calculationMode=="target")0xFF102014.toInt() else Color.WHITE){calculationMode="target";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
         c.addView(modes)
         if(calculationMode=="now") {
-            label(c,t("مهلة التجهيز · ثوانٍ","Preparation delay · seconds"))
+            label(c,getString(R.string.prep_delay))
             val delays=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
             listOf(5,10,20,30).forEach { value ->
                 delays.addView(button(value.toString(),if(prepSeconds==value)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(prepSeconds==value)0xFF102014.toInt() else Color.WHITE){prepSeconds=value;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(30),1f))
@@ -386,7 +386,7 @@ class RallyOverlayService : Service() {
             targetInput=input("MM:SS",target,true).apply{contentDescription=t("الوقت المستهدف","Target time")}
             c.addView(targetInput,LinearLayout.LayoutParams(-1,dp(38)))
             targetInput?.let { bindTimeInput(it) { value -> target=value; persist() } }
-            label(c,t("ساعة UTC (اختياري)","UTC hour (optional)"))
+            label(c,getString(R.string.utc_hour_optional))
             targetHourInput=input("HH",targetHour,true)
             c.addView(targetHourInput,LinearLayout.LayoutParams(-1,dp(34)))
             targetHourInput?.addTextChangedListener(SimpleWatcher{targetHour=it.filter{ch->ch.isDigit()}.take(2);persist()})
@@ -407,21 +407,21 @@ class RallyOverlayService : Service() {
             fields.addView(duration,LinearLayout.LayoutParams(dp(82),dp(38)))
             row.addView(fields)
             val kindRow=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
-            kindRow.addView(button(t("فردي","Solo"),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(28),1f))
+            kindRow.addView(button(getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(28),1f))
             kindRow.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
-            kindRow.addView(button(t("حشد","Rally"),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(28),1f))
+            kindRow.addView(button(getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(28),1f))
             row.addView(kindRow,LinearLayout.LayoutParams(-1,dp(30)).apply{topMargin=dp(4)})
             if(p.kind=="rally") {
-                duration.hint=t("وصول مسيرة الحشد","Rally march arrival");duration.contentDescription=t("وصول مسيرة الحشد","Rally march arrival")
-                label(row,t("مدة الحشد","Rally duration"))
+                duration.hint=getString(R.string.rally_march_arrival);duration.contentDescription=getString(R.string.rally_march_arrival)
+                label(row,getString(R.string.rally_duration))
                 val durations=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
                 listOf(1,3,5,10,15,30,60).forEach { mins ->
                     durations.addView(button("${mins}د",if(p.rallyMinutes==mins)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes==mins)0xFF102014.toInt() else Color.WHITE){p.rallyMinutes=mins;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(27),1f))
                 }
                 row.addView(durations)
-                val custom=input(t("دقائق","Minutes"),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))p.rallyMinutes.toString() else "",true)
+                val custom=input(getString(R.string.minutes),if(p.rallyMinutes !in listOf(1,3,5,10,15,30,60))p.rallyMinutes.toString() else "",true)
                 custom.visibility=View.GONE
-                val customToggle=button(t("مخصص","Custom"),0xFF2A3A2F.toInt(),Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE}
+                val customToggle=button(getString(R.string.custom_minutes),0xFF2A3A2F.toInt(),Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE}
                 row.addView(customToggle,LinearLayout.LayoutParams(-1,dp(26)).apply{topMargin=dp(3)})
                 custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it in 1..180}?.let{p.rallyMinutes=it;persist()}})
                 row.addView(custom,LinearLayout.LayoutParams(-1,dp(32)).apply{topMargin=dp(3)})
@@ -442,8 +442,8 @@ class RallyOverlayService : Service() {
         return String.format(Locale.US,"%02d:%02d",sec/60,sec%60)
     }
     private fun copyRow(r:ResultRow) {
-        val verb=if(r.isRally)t("ابدأ الحشد","Start rally") else t("أرسل","Send")
-        val extra=if(r.isRally)t(" (مهلة ${r.rallySeconds/60} د)"," (duration ${r.rallySeconds/60} min)") else ""
+        val verb=if(r.isRally)getString(R.string.start_rally) else getString(R.string.send_action)
+        val extra=if(r.isRally)String.format(Locale.US,getString(R.string.rally_copy_suffix),r.rallySeconds/60) else ""
         copy("${r.name} — ${verb} ${utcTime(r.actionAt)} UTC${extra}")
     }
     private fun updateResultCountdowns() {
@@ -453,11 +453,11 @@ class RallyOverlayService : Service() {
             val label=resultCountdowns[r.id]?:return@forEach
             val remaining=r.actionAt-now
             if(remaining>0) {
-                label.text=t("بعد ${countdown(remaining)}","In ${countdown(remaining)}")
+                label.text=String.format(Locale.US,getString(R.string.countdown_in),countdown(remaining))
                 label.setTextColor(if(remaining<=10_000L)0xFFFF9100.toInt() else 0xFFA5C4AA.toInt())
             } else {
                 val zeroAt=resultZeroAt.getOrPut(r.id){now}
-                label.text=t("الآن","NOW")
+                label.text=getString(R.string.now_label)
                 label.setTextColor(if(now-zeroAt<3000L)0xFF4CAF50.toInt() else 0xFF78907D.toInt())
                 resultRowsViews[r.id]?.alpha=if(now-zeroAt<3000L)1f else 0.55f
                 if(vibrationEnabled&&vibratedIds.add(r.id)) {
@@ -471,16 +471,16 @@ class RallyOverlayService : Service() {
     }
     private fun buildResults(c:LinearLayout) {
         resultCountdowns.clear();resultRowsViews.clear()
-        label(c,t("جدول التنفيذ","Execution schedule"))
+        label(c,getString(R.string.execution_schedule))
         results.forEachIndexed { index,r ->
             val wrap=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;setPadding(0,dp(5),0,dp(5));direction(this)}
             resultRowsViews[r.id]=wrap
             val top=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
             val info=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL}
             info.addView(text(r.name,12f,Color.WHITE,true))
-            info.addView(text(if(r.isRally)t("حشد · ${r.rallySeconds/60} د","Rally · ${r.rallySeconds/60} min") else t("فردي","Solo"),10f,0xFFA5C4AA.toInt()))
+            info.addView(text(if(r.isRally)String.format(Locale.US,getString(R.string.rally_badge),r.rallySeconds/60) else getString(R.string.solo),10f,0xFFA5C4AA.toInt()))
             top.addView(info,LinearLayout.LayoutParams(0,-2,1f))
-            top.addView(text(if(r.isRally)t("ابدأ الحشد","Start rally") else t("أرسل","Send"),11f,0xFFA5C4AA.toInt(),true))
+            top.addView(text(if(r.isRally)getString(R.string.start_rally) else getString(R.string.send_action),11f,0xFFA5C4AA.toInt(),true))
             val time=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;layoutDirection=View.LAYOUT_DIRECTION_LTR}
             time.addView(text(utcTime(r.actionAt).substring(0,2),11f,0xFFA5C4AA.toInt()))
             time.addView(text(utcTime(r.actionAt).substring(2),17f,Color.WHITE,true))
@@ -495,16 +495,16 @@ class RallyOverlayService : Service() {
             if(index<results.lastIndex) {
                 val next=results[index+1]
                 val gap=((next.actionAt-r.actionAt)/1000L).coerceAtLeast(0L)
-                c.addView(text(t("بعد ${r.name} بـ ${countdown(gap*1000)}","After ${r.name} by ${countdown(gap*1000)}"),9f,0xFFA5C4AA.toInt()))
+                c.addView(text(String.format(Locale.US,getString(R.string.after_player_by),r.name,countdown(gap*1000)),9f,0xFFA5C4AA.toInt()))
                 c.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
             }
         }
         errors.forEach{c.addView(text(it,10f,0xFFE57373.toInt()))}
         results.firstOrNull()?.let { r ->
-            c.addView(text(t("وصول الجميع ","Everyone arrives ")+utcTime(r.arrivalAt)+" UTC",11f,0xFF4CAF50.toInt(),true))
+            c.addView(text(String.format(Locale.US,getString(R.string.everyone_arrives),utcTime(r.arrivalAt)),11f,0xFF4CAF50.toInt(),true))
         }
-        c.addView(button(t("نسخ الكل","Copy all"),0xFF2A3A2F.toInt(),Color.WHITE){copy(results.joinToString("\n"){r->"${r.name} — ${if(r.isRally)t("ابدأ الحشد","Start rally")else t("أرسل","Send")} ${utcTime(r.actionAt)} UTC"})})
-        c.addView(button(t("حساب من جديد","Recalculate now"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()})
+        c.addView(button(t("نسخ الكل","Copy all"),0xFF2A3A2F.toInt(),Color.WHITE){copy(results.joinToString("\n"){r->"${r.name} — ${if(r.isRally)getString(R.string.start_rally)else getString(R.string.send_action)} ${utcTime(r.actionAt)} UTC"})})
+        c.addView(button(getString(R.string.recalculate_now),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()})
         c.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()})
         updateResultCountdowns()
     }
@@ -525,16 +525,16 @@ class RallyOverlayService : Service() {
             val plan=RallyPlanner.planNow(now,prepSeconds,valid);rows=plan.rows;arrival=plan.arrivalAtMillis
         } else {
             val goal=parse(target)
-            if(goal==null){errors.add(t("أدخل وقت الوصول بصيغة MM:SS.","Enter target time as MM:SS."));resultsMode=false;renderMenu();targetInput?.requestFocus();return}
+            if(goal==null){errors.add(getString(R.string.invalid_target_mmss));resultsMode=false;renderMenu();targetInput?.requestFocus();return}
             val targetAt=if(targetHour.isNotBlank()) {
                 val hour=targetHour.toIntOrNull()
-                if(hour==null||hour !in 0..23){errors.add(t("ساعة UTC غير صالحة.","Invalid UTC hour."));renderMenu();return}
+                if(hour==null||hour !in 0..23){errors.add(getString(R.string.invalid_utc_hour));renderMenu();return}
                 val cal=Calendar.getInstance(TimeZone.getTimeZone("UTC"),Locale.US).apply{timeInMillis=now;set(Calendar.HOUR_OF_DAY,hour);set(Calendar.MINUTE,goal/60);set(Calendar.SECOND,goal%60);set(Calendar.MILLISECOND,0)}
                 if(cal.timeInMillis<=now)cal.add(Calendar.DAY_OF_YEAR,1)
                 cal.timeInMillis
             } else now+goal*1000L
             val late=valid.filter{targetAt-(it.totalSeconds*1000L)<now}
-            late.forEach{errors.add(t("فات وقت المشارك: ","Missed action time for: ")+it.name)}
+            late.forEach{errors.add(String.format(Locale.US,getString(R.string.missed_action_for),it.name))}
             rows=valid.filterNot{it in late}.map{p->
                 RallyPlanRow(p.id,p.name,p.isRally,p.rallySeconds,p.marchSeconds,targetAt-p.totalSeconds*1000L,targetAt-p.marchSeconds*1000L,targetAt)
             }.sortedBy{it.actionAtMillis}
@@ -542,7 +542,7 @@ class RallyOverlayService : Service() {
             if(late.isNotEmpty()) {
                 results=rows.map{ResultRow(it.id,it.name,it.isRally,it.rallySeconds,it.marchSeconds,it.actionAtMillis,it.departAtMillis,it.arrivalAtMillis)}
                 resultsMode=true;persist();renderMenu()
-                val postpone=button(t("تأجيل الهدف ساعة","Postpone target by one hour"),0xFF4CAF50.toInt(),0xFF102014.toInt()){
+                val postpone=button(getString(R.string.postpone_target_hour),0xFF4CAF50.toInt(),0xFF102014.toInt()){
                     val shifted=Calendar.getInstance(TimeZone.getTimeZone("UTC"),Locale.US).apply{timeInMillis=targetAt+3600000L}
                     targetHour=String.format(Locale.US,"%02d",shifted.get(Calendar.HOUR_OF_DAY))
                     target=String.format(Locale.US,"%d:%02d",shifted.get(Calendar.MINUTE),shifted.get(Calendar.SECOND))
