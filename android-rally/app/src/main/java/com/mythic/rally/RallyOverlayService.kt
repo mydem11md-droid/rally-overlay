@@ -40,6 +40,17 @@ class RallyOverlayService : Service() {
     private var menuView: LinearLayout? = null
     private var scroll: ScrollView? = null
     private var targetInput: EditText? = null
+    private var imeHeightPx = 0
+    private var statusInsetPx = 0
+    private var navInsetPx = 0
+    private var focusedField: EditText? = null
+    private var globalLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
+    private class CappedScrollView(context: Context) : ScrollView(context) {
+        var maxHeightPx = Int.MAX_VALUE
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(maxHeightPx.coerceAtLeast(0), MeasureSpec.AT_MOST))
+        }
+    }
     private val density get() = resources.displayMetrics.density
     private fun dp(v: Int) = (v * density).roundToInt()
     private fun dp(v: Float) = (v * density).roundToInt()
@@ -144,13 +155,14 @@ class RallyOverlayService : Service() {
         bubbleX=bubbleX.coerceIn(0,(screenW-50).coerceAtLeast(0)); bubbleY=bubbleY.coerceIn(36,(screenH-55).coerceAtLeast(36))
         val frame=FrameLayout(uiContext).apply { clipChildren=false; clipToPadding=false; direction(this) }
         root=frame
-        val p=WindowManager.LayoutParams(dp(58),dp(92),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+        val p=WindowManager.LayoutParams(dp(58),WindowManager.LayoutParams.WRAP_CONTENT,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT).apply { gravity=Gravity.TOP or Gravity.START; x=dp(bubbleX); y=dp(bubbleY)
                 softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN }
         params=p
         wm.addView(frame,p)
         buildCollapsed()
+        installInsetsTracking(frame)
         if(menuOpen) showMenu()
         handler.post(clockTick)
     }
@@ -161,7 +173,7 @@ class RallyOverlayService : Service() {
     }.apply { contentDescription=t("الوقت","Clock") }
     private fun addPinnedControls(f: FrameLayout) {
         val capsule=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),10f);setPadding(dp(12),dp(5),dp(12),dp(5));minimumWidth=dp(104);direction(this) }
-        val clock=TextView(uiContext).apply { tag="utc_time";text="00:00:00";textSize=15f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
+        val clock=TextView(uiContext).apply { tag="utc_time";text=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(System.currentTimeMillis()));textSize=15f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
         val utc=TextView(uiContext).apply { text="UTC";textSize=11f;setTextColor(0xFFA5C4AA.toInt());includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR }
         capsule.addView(clock);capsule.addView(utc,LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(4)})
         f.addView(capsule,FrameLayout.LayoutParams(-2,-2,Gravity.TOP or Gravity.CENTER_HORIZONTAL))
@@ -178,19 +190,57 @@ class RallyOverlayService : Service() {
         val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true};MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt();if(abs(dx)+abs(dy)>5)dragged=true;if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-50);bubbleY=(startY+dy).coerceIn(36,(resources.displayMetrics.heightPixels/density).roundToInt()-55);applyLayout();persist()};true};MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true};else->true} }
         orb.setOnTouchListener(drag);f.setOnTouchListener(drag)
     }
-    private fun buildCollapsed() { val f=root?:return;f.removeAllViews();f.clipChildren=false;f.clipToPadding=false;addPinnedControls(f);updateClock();f.measure(View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));params?.let{p->p.width=max(dp(46),f.measuredWidth);p.height=dp(80);runCatching{wm.updateViewLayout(f,p)}} }
+    private fun buildCollapsed() { val f=root?:return;f.removeAllViews();f.clipChildren=false;f.clipToPadding=false;addPinnedControls(f);updateClock();applyLayout() }
     private var downX=0f;private var downY=0f;private var startX=0;private var startY=0;private var dragged=false
     private fun updateClock() {
         val c=root?.findViewWithTag<TextView>("utc_time")?:return
         val formatter=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}
         c.text=formatter.format(Date())
     }
+    private fun availableOverlayHeight(): Int {
+        val full = if (Build.VERSION.SDK_INT >= 30) wm.currentWindowMetrics.bounds.height() else resources.displayMetrics.heightPixels
+        return (full - statusInsetPx - navInsetPx - imeHeightPx - dp(16)).coerceAtLeast(dp(120))
+    }
+    private fun installInsetsTracking(view: View) {
+        if (Build.VERSION.SDK_INT >= 30) view.setOnApplyWindowInsetsListener { _, insets ->
+            val bars=insets.getInsets(WindowInsets.Type.statusBars() or WindowInsets.Type.displayCutout())
+            statusInsetPx=bars.top
+            navInsetPx=insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+            imeHeightPx=insets.getInsets(WindowInsets.Type.ime()).bottom
+            resizeForInsets()
+            insets
+        }
+        val listener=ViewTreeObserver.OnGlobalLayoutListener {
+            val rect=Rect(); view.getWindowVisibleDisplayFrame(rect)
+            val fallback=(resources.displayMetrics.heightPixels-rect.bottom-navInsetPx).coerceAtLeast(0)
+            val next=if(fallback>dp(80))fallback else 0
+            if(next!=imeHeightPx){imeHeightPx=next;resizeForInsets()}
+        }
+        globalLayoutListener=listener
+        view.viewTreeObserver.addOnGlobalLayoutListener(listener)
+        view.requestApplyInsets()
+    }
+    private fun resizeForInsets() { if(root!=null){applyLayout();focusedField?.post{ensureFocusedFieldVisible(focusedField!!)}} }
+    private fun ensureFocusedFieldVisible(field: EditText) {
+        val sc=scroll?:return
+        val rect=Rect();field.getDrawingRect(rect);sc.offsetDescendantRectToMyCoords(field,rect)
+        if(rect.bottom>sc.scrollY+sc.height-dp(12))sc.smoothScrollTo(0,(rect.bottom-sc.height+dp(18)).coerceAtLeast(0))
+    }
     private fun applyLayout() {
         val r=root?:return;val p=params?:return;val sw=resources.displayMetrics.widthPixels
-        if(menuOpen&&menuView!=null){p.width=min(dp(300),sw-dp(16));p.x=(dp(bubbleX+23)-p.width/2).coerceIn(0,sw-p.width);p.y=dp(bubbleY);p.height=(resources.displayMetrics.heightPixels-p.y).coerceAtLeast(dp(200))}
-        else {val cap=r.getChildAt(0);cap.measure(View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));p.width=max(dp(46),cap.measuredWidth);p.height=dp(80);p.x=dp(bubbleX);p.y=dp(bubbleY)}
-        p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
-        runCatching{wm.updateViewLayout(r,p);Log.d(TAG,"updateViewLayout completed; menuOpen=$menuOpen; focusable=$focusable")}.onFailure{Log.e(TAG,"updateViewLayout failed",it)}
+        val width=if(menuOpen&&menuView!=null)dp(280) else dp(58)
+        p.width=width;p.height=WindowManager.LayoutParams.WRAP_CONTENT
+        p.x=if(menuOpen&&menuView!=null)(dp(bubbleX+23)-width/2).coerceIn(0,(sw-width).coerceAtLeast(0))else dp(bubbleX)
+        p.y=dp(bubbleY.coerceAtLeast(((statusInsetPx+dp(50))/density).roundToInt()))
+        p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+        val cap=(availableOverlayHeight()-dp(88+34+17+38+12)).coerceAtLeast(dp(72))
+        (scroll as? CappedScrollView)?.maxHeightPx=if(resultsMode)(availableOverlayHeight()-dp(88+34+17)).coerceAtLeast(dp(72))else cap
+        r.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(availableOverlayHeight(),View.MeasureSpec.AT_MOST))
+        runCatching {
+            wm.updateViewLayout(r,p)
+            val mode=if((scroll?.getChildAt(0)?.height?:0)>(scroll?.height?:0))"scroll" else "content"
+            Log.d("RallyLayout","windowHeight=${r.measuredHeight}px availableHeight=${availableOverlayHeight()}px keyboardHeight=${imeHeightPx}px scrollMode=$mode")
+        }.onFailure{Log.e("RallyLayout","update failed",it)}
     }
     private fun collapse(){menuOpen=false;persist();buildCollapsed();applyLayout()}
     private fun showMenu() {
@@ -203,12 +253,12 @@ class RallyOverlayService : Service() {
         header.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
         header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(dp(34),dp(32)))
         panel.addView(header)
-        val sc=ScrollView(uiContext).apply{isFillViewport=false;clipChildren=false;clipToPadding=false;direction(this)};scroll=sc
+        val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=false;clipToPadding=false;direction(this)};scroll=sc
         val content=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=false;clipToPadding=false;direction(this)}
-        sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,0,1f))
+        sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,-2))
         if(resultsMode)buildResults(content)else buildEditor(content)
-        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(7)})
-        f.addView(panel,FrameLayout.LayoutParams(-1,-1).apply{topMargin=dp(88)});applyLayout()
+        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(12)})
+        f.addView(panel,FrameLayout.LayoutParams(dp(280),-2).apply{topMargin=dp(88)});applyLayout()
     }
     private fun renderMenu(){showMenu()}
     private fun label(parent:LinearLayout,s:String){parent.addView(text(s,11f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(23)))}
@@ -219,10 +269,7 @@ class RallyOverlayService : Service() {
             if(numeric) { inputType=android.text.InputType.TYPE_CLASS_NUMBER; keyListener=android.text.method.DigitsKeyListener.getInstance("0123456789"); imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=View.TEXT_DIRECTION_LTR; textAlignment=View.TEXT_ALIGNMENT_CENTER }
             else { inputType=android.text.InputType.TYPE_CLASS_TEXT; imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=if(ar())View.TEXT_DIRECTION_RTL else View.TEXT_DIRECTION_LTR }
             setOnFocusChangeListener { v,has ->
-                if(has) {
-                    setFocus(true)
-                    scroll?.post { val sv=scroll?:return@post; val rect=Rect(); v.getDrawingRect(rect); sv.offsetDescendantRectToMyCoords(v,rect); val targetY=(rect.bottom-sv.height+dp(18)).coerceAtLeast(0); if(targetY>sv.scrollY)sv.smoothScrollTo(0,targetY) }
-                } else if(numeric) finalizeTimeInput(this) {}
+                if(has) { focusedField=this; setFocus(true); scroll?.post { ensureFocusedFieldVisible(this) } } else if(numeric) finalizeTimeInput(this) {}
             }
             setOnEditorActionListener { v,actionId,_ ->
                 if(actionId==EditorInfo.IME_ACTION_NEXT) { if(numeric)finalizeTimeInput(this){}; v.focusSearch(View.FOCUS_FORWARD)?.requestFocus(); true } else false
@@ -247,7 +294,7 @@ class RallyOverlayService : Service() {
         if(initial!=field.text.toString()){field.setText(initial);field.setSelection(initial.length)}
         changed(initial)
         field.setOnFocusChangeListener { v,has ->
-            if(has) { setFocus(true); scroll?.post { val sv=scroll?:return@post; val rect=Rect(); v.getDrawingRect(rect); sv.offsetDescendantRectToMyCoords(v,rect); val targetY=(rect.bottom-sv.height+dp(18)).coerceAtLeast(0); if(targetY>sv.scrollY)sv.smoothScrollTo(0,targetY) } }
+            if(has) { focusedField=field; setFocus(true); scroll?.post { ensureFocusedFieldVisible(field) } }
             else finalizeTimeInput(field,changed)
         }
         field.setOnEditorActionListener { v,actionId,_ ->
@@ -341,7 +388,7 @@ class RallyOverlayService : Service() {
         val p=params?:return;p.width=dp(240);p.height=dp(120);p.x=(resources.displayMetrics.widthPixels-p.width)/2;p.y=(resources.displayMetrics.heightPixels-p.height)/2
         runCatching{wm.updateViewLayout(r,p)}
     }
-    override fun onDestroy(){runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);root?.let{runCatching{wm.removeView(it)}};root=null
+    override fun onDestroy(){runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};root?.let{runCatching{wm.removeView(it)}};root=null
         if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
     companion object { const val ACTION_STOP="com.mythic.rally.STOP"; const val ACTION_LANGUAGE_CHANGED="com.mythic.rally.LANGUAGE_CHANGED"; private const val TAG="RallyOverlay" }
     private class SimpleWatcher(val changed:(String)->Unit):android.text.TextWatcher{
