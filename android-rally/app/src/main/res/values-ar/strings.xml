@@ -87,4 +87,8 @@
     <string name="update_wrong_package">ملف APK تابع لتطبيق مختلف.</string>
     <string name="update_signature_mismatch">توقيع APK لا يطابق توقيع التطبيق المثبت. تم منع التثبيت.</string>
     <string name="update_no_internet">لا يوجد اتصال بالإنترنت. اتصل بالشبكة وحاول مجدداً.</string>
+    <string name="utc_enable">تفعيل التوقيت العالمي</string>
+    <string name="utc_disable">إيقاف التوقيت العالمي</string>
+    <string name="utc_notif_channel">التوقيت العالمي</string>
+    <string name="utc_notif_title">التوقيت العالمي (UTC) يعمل</string>
 </resources>
