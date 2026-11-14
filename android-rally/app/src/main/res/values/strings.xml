@@ -87,4 +87,8 @@
     <string name="update_wrong_package">This APK belongs to a different application.</string>
     <string name="update_signature_mismatch">The APK signature does not match this installed app. Installation was blocked.</string>
     <string name="update_no_internet">No internet connection. Connect and try again.</string>
+    <string name="utc_enable">Enable World Time</string>
+    <string name="utc_disable">Disable World Time</string>
+    <string name="utc_notif_channel">World time</string>
+    <string name="utc_notif_title">World time (UTC) is running</string>
 </resources>
