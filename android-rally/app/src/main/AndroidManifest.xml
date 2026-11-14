@@ -14,6 +14,9 @@
         <activity-alias android:name=".LauncherArabic" android:targetActivity=".MainActivity" android:label="@string/app_name_ar" android:icon="@mipmap/ic_launcher" android:enabled="false" android:exported="true">
             <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
         </activity-alias>
+        <service android:name=".ClockOverlayService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="floating_world_clock_overlay"/>
+        </service>
         <service android:name=".RallyOverlayService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-requested interactive rally calculator overlay"/>
         </service>
