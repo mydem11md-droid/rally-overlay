@@ -25,6 +25,7 @@ class MainActivity : Activity() {
     private var page: LinearLayout? = null
     private var updateCard: LinearLayout? = null
     private var currentUpdate: AvailableUpdate? = null
+    private var utcClockButton: TextView? = null
 
     override fun attachBaseContext(newBase: Context) {
         val saved = newBase.getSharedPreferences("rally_native", MODE_PRIVATE).getString("language", null)
@@ -45,6 +46,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshPermissionStatus()
+        refreshUtcButton()
         if (::updater.isInitialized) {
             updater.resumePendingInstall()
             checkForUpdates(false)
@@ -69,10 +71,44 @@ class MainActivity : Activity() {
             if(!Settings.canDrawOverlays(this)) startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:$packageName")))
             else { val i=Intent(this,RallyOverlayService::class.java);if(Build.VERSION.SDK_INT>=26)startForegroundService(i)else startService(i);Toast.makeText(this,R.string.started,Toast.LENGTH_SHORT).show() }
         },LinearLayout.LayoutParams(-1,dp(46)))
+        utcClockButton = TextView(this).apply {
+            text = getString(if (ClockOverlayService.running) R.string.utc_disable else R.string.utc_enable)
+            textSize = 15f
+            gravity = Gravity.CENTER
+            setTextColor(0xFF7FD68A.toInt())
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            compoundDrawablePadding = dp(9)
+            setCompoundDrawablesRelativeWithIntrinsicBounds(R.drawable.ic_clock, 0, 0, 0)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(0xFF1F3A2A.toInt())
+                cornerRadius = dp(16).toFloat()
+                setStroke(dp(2), 0xFF4CAF50.toInt())
+            }
+            setOnClickListener {
+                val service = Intent(this@MainActivity, ClockOverlayService::class.java)
+                when {
+                    ClockOverlayService.running -> {
+                        stopService(service)
+                        setText(R.string.utc_enable)
+                    }
+                    !Settings.canDrawOverlays(this@MainActivity) -> {
+                        startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+                    }
+                    else -> {
+                        if (Build.VERSION.SDK_INT >= 26) startForegroundService(service) else startService(service)
+                        setText(R.string.utc_disable)
+                    }
+                }
+            }
+        }
+        root.addView(utcClockButton, LinearLayout.LayoutParams(-1, dp(56)).apply { topMargin = dp(16) })
         root.addView(actionButton(getString(R.string.stop),0xFF2A3A2F.toInt(),-1) { stopService(Intent(this,RallyOverlayService::class.java));Toast.makeText(this,R.string.stopped,Toast.LENGTH_SHORT).show() },LinearLayout.LayoutParams(-1,dp(46)).apply { topMargin=dp(10) })
         root.addView(actionButton(getString(R.string.check_update),0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()) { checkForUpdates(true) },LinearLayout.LayoutParams(-1,dp(42)).apply { topMargin=dp(10) })
         setContentView(root)
         refreshPermissionStatus()
+    }
+    private fun refreshUtcButton() {
+        utcClockButton?.setText(if (ClockOverlayService.running) R.string.utc_disable else R.string.utc_enable)
     }
     private fun checkForUpdates(force: Boolean) {
         updater.check(force, { update ->
