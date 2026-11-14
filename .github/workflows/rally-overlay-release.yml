@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - ".github/workflows/rally-overlay-release.yml"
+      - "android-rally/version.properties"
     tags:
       - "v*"
   workflow_dispatch:
