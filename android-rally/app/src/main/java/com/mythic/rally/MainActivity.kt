@@ -107,7 +107,9 @@ class MainActivity : Activity() {
         setContentView(root)
         refreshPermissionStatus()
     }
-    private fun refreshUtcButton() {\n        utcClockButton?.setText(if (ClockOverlayService.running) R.string.utc_disable else R.string.utc_enable)\n    }\n    private fun checkForUpdates(force: Boolean) {
+    private fun refreshUtcButton() {
+        utcClockButton?.setText(if (ClockOverlayService.running) R.string.utc_disable else R.string.utc_enable)
+    }\n    private fun checkForUpdates(force: Boolean) {
         updater.check(force, { update ->
             if (update != null) showUpdateCard(update)
             else if (force) Toast.makeText(this,R.string.update_no_update,Toast.LENGTH_SHORT).show()
