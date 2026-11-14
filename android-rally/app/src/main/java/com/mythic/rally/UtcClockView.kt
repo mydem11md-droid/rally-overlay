@@ -12,16 +12,23 @@ import java.time.ZoneOffset
 import java.util.Locale
 
 class UtcClockView(context: Context) : View(context) {
+    companion object {
+        const val SIZE_DP = 80
+    }
+
     private val density = resources.displayMetrics.density
-    private val sizePx = (122f * density).toInt()
+    private val sizePx = (SIZE_DP * density).toInt()
 
     private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF202B25.toInt() }
     private val trackPaint = ring(0xFF33473B.toInt())
     private val arcPaint = ring(0xFF4CAF50.toInt()).apply { strokeCap = Paint.Cap.ROUND }
-    private val utcPaint = text(0xFF9FBFA9.toInt(), 11f).apply { letterSpacing = 0.15f }
-    private val timePaint = text(Color.WHITE, 28f)
-    private val secondsPaint = text(0xFF9FE6A6.toInt(), 15f)
+    private val utcPaint = text(0xFF9FBFA9.toInt()).apply { letterSpacing = 0.15f }
+    private val timePaint = text(Color.WHITE)
+    private val secondsPaint = text(0xFF9FE6A6.toInt())
     private val oval = RectF()
+
+    private var scale = 0f
+    private var ringRadius = 0f
 
     private var hour = 0
     private var minute = 0
@@ -29,13 +36,11 @@ class UtcClockView(context: Context) : View(context) {
 
     private fun ring(color: Int) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 8f * density
         this.color = color
     }
 
-    private fun text(color: Int, size: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private fun text(color: Int) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = color
-        textSize = size * density
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         textAlign = Paint.Align.CENTER
         fontFeatureSettings = "tnum"
@@ -74,19 +79,32 @@ class UtcClockView(context: Context) : View(context) {
         setMeasuredDimension(sizePx, sizePx)
     }
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        val u = w / 122f
+        scale = u
+        ringRadius = 50f * u
+
+        val ringWidth = 8f * u
+        trackPaint.strokeWidth = ringWidth
+        arcPaint.strokeWidth = ringWidth
+
+        utcPaint.textSize = 12f * u
+        timePaint.textSize = 30f * u
+        secondsPaint.textSize = 16f * u
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val center = width / 2f
-        val scale = width / 122f
-        val radius = 50f * scale
+        val c = width / 2f
 
-        canvas.drawCircle(center, center, center - scale, backgroundPaint)
-        oval.set(center - radius, center - radius, center + radius, center + radius)
-        canvas.drawCircle(center, center, radius, trackPaint)
+        canvas.drawCircle(c, c, c - scale, backgroundPaint)
+        oval.set(c - ringRadius, c - ringRadius, c + ringRadius, c + ringRadius)
+        canvas.drawCircle(c, c, ringRadius, trackPaint)
         if (second > 0) canvas.drawArc(oval, -90f, second * 6f, false, arcPaint)
 
-        canvas.drawText("UTC", center, center - 19f * scale, utcPaint)
-        canvas.drawText(String.format(Locale.US, "%02d:%02d", hour, minute), center, center + 9f * scale, timePaint)
-        canvas.drawText(String.format(Locale.US, ":%02d", second), center, center + 29f * scale, secondsPaint)
+        canvas.drawText("UTC", c, c - 19f * scale, utcPaint)
+        canvas.drawText(String.format(Locale.US, "%02d:%02d", hour, minute), c, c + 9f * scale, timePaint)
+        canvas.drawText(String.format(Locale.US, ":%02d", second), c, c + 29f * scale, secondsPaint)
     }
 }
