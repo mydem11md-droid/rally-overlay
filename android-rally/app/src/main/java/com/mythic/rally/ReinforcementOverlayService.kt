@@ -34,6 +34,7 @@ class ReinforcementOverlayService : Service() {
     private val prefs by lazy { getSharedPreferences("reinforcement_overlay", MODE_PRIVATE) }
     private var expanded = false
     private var dragging = false
+    private var dragEligible = false
     private var downRawX = 0f
     private var downRawY = 0f
     private var startX = 0
@@ -88,6 +89,10 @@ class ReinforcementOverlayService : Service() {
     private fun handleWindowDrag(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                val bubbleLeft = if (expanded) (params.width - dp(COLLAPSED_SIZE)) / 2 else 0
+                dragEligible = event.x >= bubbleLeft && event.x <= bubbleLeft + dp(COLLAPSED_SIZE) &&
+                    event.y >= 0 && event.y <= dp(COLLAPSED_SIZE)
+                if (!dragEligible) return false
                 downRawX = event.rawX
                 downRawY = event.rawY
                 startX = params.x
@@ -96,6 +101,7 @@ class ReinforcementOverlayService : Service() {
                 return false
             }
             MotionEvent.ACTION_MOVE -> {
+                if (!dragEligible) return false
                 val dx = (event.rawX - downRawX).toInt()
                 val dy = (event.rawY - downRawY).toInt()
                 if (!dragging && (abs(dx) > touchSlop || abs(dy) > touchSlop)) dragging = true
@@ -112,6 +118,7 @@ class ReinforcementOverlayService : Service() {
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 val wasDragging = dragging
                 dragging = false
+                dragEligible = false
                 if (wasDragging) {
                     prefs.edit().putInt("x", params.x).putInt("y", params.y).apply()
                     return true
