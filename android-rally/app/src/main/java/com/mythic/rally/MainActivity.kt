@@ -165,6 +165,8 @@ class MainActivity : Activity() {
     private fun refreshReinforcementButton() {
         val active = ReinforcementOverlayService.isOverlayAttached
         prefs.edit().putBoolean("reinforcement_overlay_active", active).apply()
+        getSharedPreferences("reinforcement_overlay", MODE_PRIVATE).edit()
+            .putBoolean("window_attached", active).apply()
         reinforcementButton?.apply {
             text = if (active) "✓ أداة التعزيزات: تعمل" else "أداة التعزيزات"
             setTextColor(if (active) 0xFF102014.toInt() else -1)
