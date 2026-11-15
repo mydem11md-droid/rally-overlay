@@ -135,10 +135,54 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          NOTES=$(git log -10 --pretty=format:'- %s' "${GITHUB_SHA}" 2>/dev/null || git log -10 --pretty=format:'- %s')
-          [[ -n "$NOTES" ]] || NOTES="Maintenance and improvements."
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ "$VERSION" == "3.0.3" ]]; then
+            NOTES=$(cat <<'RELEASE_NOTES'
+## العربية
+تحديث MYTHIC Rally Overlay — الإصدار 3.0.3
+
+### أبرز الإضافات والتحسينات
+- **حاسبة توقيت التعزيز العائمة:** حساب توقيت وصول التعزيزات بسهولة أثناء اللعب.
+- **تحسين النافذة العائمة:** إصلاح التركيز ولوحة المفاتيح وتحسين تغيير حجم النافذة وحوافها.
+- **ساعة UTC عائمة:** عرض توقيت العالم مباشرة فوق اللعبة.
+- **تحسينات الاستقرار:** إصلاحات عامة لتحسين التوافق وسلاسة الاستخدام.
+
+### التحميل
+[تحميل تطبيق Android (APK)](https://github.com/mydem11md-droid/rally-overlay/releases/download/v3.0.3/rally-overlay.apk)
+
+---
+
+## English
+MYTHIC Rally Overlay — Version 3.0.3
+
+### What's new
+- **Floating Reinforcement Timer:** Calculate reinforcement arrival timing while playing.
+- **Overlay Improvements:** Fixed keyboard focus and improved floating-window resizing and edge handling.
+- **Floating UTC Clock:** Keep world time visible over the game.
+- **Stability Improvements:** General fixes for better compatibility and smoother use.
+
+### Download
+[Download Android APK](https://github.com/mydem11md-droid/rally-overlay/releases/download/v3.0.3/rally-overlay.apk)
+RELEASE_NOTES
+)
+          else
+            NOTES=$(cat <<'RELEASE_NOTES'
+## العربية
+تحديث MYTHIC Rally Overlay — الإصدار ${VERSION}
+
+- تحسينات عامة وإصلاحات للأخطاء.
+- تحسين الاستقرار والتوافق وتجربة الاستخدام.
+
+## English
+MYTHIC Rally Overlay — Version ${VERSION}
+
+- General improvements and bug fixes.
+- Better stability, compatibility, and user experience.
+RELEASE_NOTES
+)
+          fi
           printf '%s\n' "$NOTES" > release-assets/release-notes.md
-          jq -n --argjson versionCode "${{ steps.version.outputs.version_code }}" --arg versionName "${{ steps.version.outputs.version }}" --arg notes "$NOTES" '{versionCode:$versionCode,versionName:$versionName,apk:"rally-overlay.apk",notes:$notes}' > release-assets/version.json
+          jq -n --argjson versionCode "${{ steps.version.outputs.version_code }}" --arg versionName "$VERSION" --arg notes "$NOTES" '{versionCode:$versionCode,versionName:$versionName,apk:"rally-overlay.apk",notes:$notes}' > release-assets/version.json
           echo "body<<EOF" >> "$GITHUB_OUTPUT"
           printf '%s\n' "$NOTES" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
@@ -148,7 +192,7 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}
           target_commitish: ${{ github.event.repository.default_branch }}
-          name: Rally Overlay v${{ steps.version.outputs.version }}
+          name: Rally Overlay v${{ steps.version.outputs.version }} | Reinforcement Timing Update
           body: ${{ steps.notes.outputs.body }}
           overwrite_files: true
           files: |
