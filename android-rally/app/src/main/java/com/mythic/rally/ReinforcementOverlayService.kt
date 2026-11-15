@@ -151,9 +151,34 @@ class ReinforcementOverlayService : Service() {
 
     private fun detachWindow() {
         if (!isOverlayAttached) return
+
+        // Collapse the page before detaching, but retain this exact WebView and its localStorage state.
+        if (pageLoaded) {
+            runCatching {
+                webView.evaluateJavascript(
+                    "(function(){var p=document.getElementById('p');if(p&&!p.hidden)toggle()})()",
+                    null
+                )
+                webView.clearFocus()
+            }
+        }
+        val screen = resources.displayMetrics
+        val closedSize = dp(INITIAL_SIZE_DP).coerceAtMost(screen.widthPixels)
+        val closedHeight = dp(INITIAL_SIZE_DP).coerceAtMost(screen.heightPixels)
+        val closedCircleX = dp(INITIAL_CIRCLE_X_DP)
+        params.x = (params.x + oldCircleXPx - closedCircleX)
+            .coerceIn(0, max(0, screen.widthPixels - closedSize))
+        params.y = params.y.coerceIn(0, max(0, screen.heightPixels - closedHeight))
+        params.width = closedSize
+        params.height = closedHeight
+        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+        circleXdp = INITIAL_CIRCLE_X_DP
+        oldCircleXPx = closedCircleX
         runCatching { windowManager.removeView(webView) }
         isOverlayAttached = false
-        prefs.edit().putBoolean("window_attached", false).apply()
+        prefs.edit().putBoolean("window_attached", false)
+            .putInt("x", params.x).putInt("y", params.y).apply()
         publishState()
     }
 
