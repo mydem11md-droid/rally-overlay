@@ -164,7 +164,7 @@ class MainActivity : Activity() {
             clipToPadding = false
             setPadding(0, 0, 0, dp(12))
             overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
-            addView(root, android.widget.ScrollView.LayoutParams(-1, -2))
+            addView(root, android.widget.FrameLayout.LayoutParams(-1, -2))
         }
         setContentView(scroll)
         refreshPermissionStatus()
