@@ -42,6 +42,10 @@ class MainActivity : Activity() {
         updater = AppUpdater(this)
         render()
         checkForUpdates(false)
+        if (!prefs.getBoolean("overlay_permission_prompted", false) && !Settings.canDrawOverlays(this)) {
+            prefs.edit().putBoolean("overlay_permission_prompted", true).apply()
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+        }
     }
     override fun onResume() {
         super.onResume()
@@ -71,6 +75,15 @@ class MainActivity : Activity() {
             if(!Settings.canDrawOverlays(this)) startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:$packageName")))
             else { val i=Intent(this,RallyOverlayService::class.java);if(Build.VERSION.SDK_INT>=26)startForegroundService(i)else startService(i);Toast.makeText(this,R.string.started,Toast.LENGTH_SHORT).show() }
         },LinearLayout.LayoutParams(-1,dp(46)))
+        root.addView(actionButton("أداة التعزيزات",0xFF245C9A.toInt(),-1) {
+            if (!Settings.canDrawOverlays(this)) {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            } else {
+                val service = Intent(this, ReinforcementOverlayService::class.java)
+                if (Build.VERSION.SDK_INT >= 26) startForegroundService(service) else startService(service)
+                Toast.makeText(this, "تم تشغيل أداة التعزيزات", Toast.LENGTH_SHORT).show()
+            }
+        },LinearLayout.LayoutParams(-1,dp(46)).apply { topMargin=dp(10) })
         utcClockButton = TextView(this).apply {
             text = getString(if (ClockOverlayService.running) R.string.utc_disable else R.string.utc_enable)
             textSize = 15f
