@@ -65,8 +65,6 @@ class ReinforcementOverlayService : Service() {
     private var startWindowY = 0
     private var expandedPanelWidthPx = 0
     private var expandedPanelWidthCss = 300
-    private var expandedCircleXCss = 122
-    private var panelOnLeft = false
     private var expandedLayout = false
     private val touchSlop by lazy { ViewConfiguration.get(this).scaledTouchSlop }
 
@@ -181,7 +179,6 @@ class ReinforcementOverlayService : Service() {
         params.height = closedHeight
         expandedLayout = false
         expandedPanelWidthPx = 0
-        panelOnLeft = false
         circleXdp = INITIAL_CIRCLE_X_DP
         oldCircleXPx = dp(INITIAL_CIRCLE_X_DP)
         params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
@@ -262,34 +259,18 @@ class ReinforcementOverlayService : Service() {
     }
 
     private fun updateExpandedGeometry(circleScreenX: Int, screenWidth: Int, forceStyle: Boolean = false) {
+        // Keep the orb centered over the panel. The WebView is one window, so
+        // moving its LayoutParams moves the orb and panel together in one frame.
         val circleSizePx = dp(CIRCLE_SIZE_DP)
-        val rightMax = max(0, screenWidth - expandedPanelWidthPx)
-        val leftMin = min(expandedPanelWidthPx, max(0, screenWidth - circleSizePx))
-        val rightPosition = circleScreenX.coerceIn(0, rightMax)
-        val leftPosition = circleScreenX.coerceIn(leftMin, max(leftMin, screenWidth - circleSizePx))
-        val useLeft = abs(leftPosition - circleScreenX) < abs(rightPosition - circleScreenX)
-        val nextCircleCss = if (useLeft) expandedPanelWidthCss else expandedCircleXCss
-        val nextCirclePx = dp(nextCircleCss)
+        val windowWidthPx = dp(expandedPanelWidthCss + 12)
+            .coerceAtMost(screenWidth.coerceAtLeast(1))
+        val circleOffsetPx = ((windowWidthPx - circleSizePx).coerceAtLeast(0)) / 2
 
-        if (panelOnLeft != useLeft || forceStyle) {
-            val panelOffset = if (useLeft) "-${expandedPanelWidthCss}px" else "0px"
-            val orbOffset = if (useLeft) "${expandedPanelWidthCss}px" else "${expandedCircleXCss}px"
-            webView.evaluateJavascript(
-                "(function(){var w=document.getElementById('w'),p=document.getElementById('p');" +
-                    "if(w)w.style.left='$orbOffset';if(p)p.style.left='$panelOffset';})()",
-                null
-            )
-        }
-        panelOnLeft = useLeft
-        circleXdp = nextCircleCss
-        oldCircleXPx = nextCirclePx
-        params.width = if (useLeft) {
-            dp(expandedPanelWidthCss + CIRCLE_SIZE_DP)
-        } else {
-            dp(expandedCircleXCss + expandedPanelWidthCss)
-        }
-        val safeCircleX = if (useLeft) leftPosition else rightPosition
-        params.x = safeCircleX - nextCirclePx
+        params.width = windowWidthPx
+        params.x = (circleScreenX - circleOffsetPx)
+            .coerceIn(0, max(0, screenWidth - windowWidthPx))
+        circleXdp = ((expandedPanelWidthCss + 12 - CIRCLE_SIZE_DP).coerceAtLeast(0)) / 2
+        oldCircleXPx = circleOffsetPx
     }
 
     private inner class RallyBridge {
@@ -304,10 +285,9 @@ class ReinforcementOverlayService : Service() {
 
                 if (open) {
                     expandedPanelWidthCss = (w - 12).coerceAtLeast(1)
-                    expandedCircleXCss = circleX
                     expandedPanelWidthPx = dp(expandedPanelWidthCss)
                     expandedLayout = true
-                    updateExpandedGeometry(circleScreenX, screen.widthPixels, forceStyle = true)
+                    updateExpandedGeometry(circleScreenX, screen.widthPixels)
                 } else {
                     val closedSize = dp(INITIAL_SIZE_DP).coerceAtMost(screen.widthPixels)
                     val newCircleX = dp(circleX)
@@ -316,7 +296,6 @@ class ReinforcementOverlayService : Service() {
                         .coerceIn(0, max(0, screen.widthPixels - closedSize))
                     expandedPanelWidthPx = 0
                     expandedLayout = false
-                    panelOnLeft = false
                     circleXdp = circleX
                     oldCircleXPx = newCircleX
                 }
