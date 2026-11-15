@@ -11,6 +11,8 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
@@ -32,6 +34,7 @@ class ReinforcementOverlayService : Service() {
     private lateinit var webView: WebView
     private lateinit var params: WindowManager.LayoutParams
     private val prefs by lazy { getSharedPreferences("reinforcement_overlay", MODE_PRIVATE) }
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var expanded = false
     private var dragging = false
     private var dragEligible = false
@@ -131,7 +134,7 @@ class ReinforcementOverlayService : Service() {
     private inner class OverlayBridge {
         @JavascriptInterface
         fun setExpanded(open: Boolean) {
-            runOnUiThread {
+            mainHandler.post {
                 if (expanded == open || !::webView.isInitialized) return@runOnUiThread
                 expanded = open
                 val centerX = params.x + if (open) dp(COLLAPSED_SIZE) / 2 else dp(EXPANDED_WIDTH) / 2
