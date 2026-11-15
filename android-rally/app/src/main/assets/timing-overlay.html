@@ -246,7 +246,7 @@ function place(){
   var l=Math.min(Math.max(8,r.left+W/2-pw/2),innerWidth-pw-8);
   p.style.left=(l-r.left)+"px";p.style.right="auto";
   if(r.top+W/2>innerHeight/2){p.style.bottom=(W+8)+"px";p.style.top="auto"}else{p.style.top=(W+8)+"px";p.style.bottom="auto"}}
-function fit(){if(OV&&!p.hidden)p.style.maxHeight=Math.max(120,innerHeight-PAD-W-8-PAD)+"px"}
+function fit(){if(OV&&!p.hidden)p.style.maxHeight=MAX_PANEL_H+"px"}
 function report(){
   var open=!p.hidden,cl=open?Math.round((WW-W)/2):PAD,ww=open?WW:W+2*PAD,
       hh=open?Math.round(Math.min(p.scrollHeight,MAX_PANEL_H)+PAD+W+8+PAD):W+2*PAD,key=[open,ww,hh,cl].join();
@@ -255,7 +255,7 @@ function report(){
   try{window.RallyBridge.setLayout(open,ww,hh,cl)}catch(e){}}
 function toggle(){
   var open=p.hidden;p.hidden=!open;c.setAttribute("aria-expanded",String(open));
-  if(!open)p.style.maxHeight="";
+  if(!open)p.style.maxHeight=OV?MAX_PANEL_H+"px":"";
   if(open){place();tick()}
   if(OV)report()}
 if(OV){
