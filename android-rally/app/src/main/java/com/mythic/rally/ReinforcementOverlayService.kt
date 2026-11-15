@@ -55,7 +55,8 @@ class ReinforcementOverlayService : Service() {
     private var webViewCreated = false
     private var pageLoaded = false
     private var circleXdp = INITIAL_CIRCLE_X_DP
-    private var oldCircleXPx = dp(INITIAL_CIRCLE_X_DP)
+    // Service Context is not attached during Kotlin property initialization.
+    private var oldCircleXPx = 0
     private var trackingCircle = false
     private var dragging = false
     private var downRawX = 0f
@@ -67,6 +68,7 @@ class ReinforcementOverlayService : Service() {
     override fun onCreate() {
         super.onCreate()
         isServiceAlive = true
+        oldCircleXPx = dp(INITIAL_CIRCLE_X_DP)
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         createNotificationChannel()
         ServiceCompat.startForeground(
