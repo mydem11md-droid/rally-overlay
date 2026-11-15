@@ -89,7 +89,7 @@ class MainActivity : Activity() {
     }
     private fun render() {
         val rtl = language == "ar"
-        val root = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;setPadding(dp(28),dp(30),dp(28),dp(30));setBackgroundColor(0xFF1E2A22.toInt());layoutDirection=if(rtl)View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR }
+        val root = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL;gravity=Gravity.TOP or Gravity.CENTER_HORIZONTAL;setPadding(dp(28),dp(30),dp(28),dp(40));setBackgroundColor(0xFF1E2A22.toInt());layoutDirection=if(rtl)View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR }
         page = root
         val logo = ImageView(this).apply { setImageResource(R.mipmap.ic_launcher);contentDescription=getString(R.string.app_name);scaleType=ImageView.ScaleType.FIT_CENTER }
         root.addView(logo,LinearLayout.LayoutParams(dp(96),dp(96)))
@@ -159,7 +159,14 @@ class MainActivity : Activity() {
             Toast.makeText(this,R.string.stopped,Toast.LENGTH_SHORT).show()
         },LinearLayout.LayoutParams(-1,dp(46)).apply { topMargin=dp(10) })
         root.addView(actionButton(getString(R.string.check_update),0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()) { checkForUpdates(true) },LinearLayout.LayoutParams(-1,dp(42)).apply { topMargin=dp(10) })
-        setContentView(root)
+        val scroll = android.widget.ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+            setPadding(0, 0, 0, dp(12))
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            addView(root, android.widget.FrameLayout.LayoutParams(-1, -2))
+        }
+        setContentView(scroll)
         refreshPermissionStatus()
     }
 
