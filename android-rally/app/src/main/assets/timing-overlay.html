@@ -155,13 +155,13 @@ function bindTime(el,cb){
 
 function tabs(){
   var t=$("tabs");t.innerHTML="";
-  pages.forEach(function(x,i){var b=document.createElement("button");b.className="tab"+(i===cur?" on":"");b.textContent=defaultName(x.n||"حشد "+(i+1),"rally",i+1);
+  pages.forEach(function(x,i){var b=document.createElement("button");b.className="tab"+(i===cur?" on":"");b.textContent=defaultName(x.n||"حشد "+(i+1),"rally",i+1,x.defaultRallyName!==false);
     b.onclick=function(){cur=i;save();render()};t.appendChild(b)});
   if(pages.length<8){var a=document.createElement("button");a.className="tab add";a.textContent=tr("+ حشد","+ Rally");a.setAttribute("aria-label","إضافة حشد جديد");
     a.onclick=function(){pages.push(mk(tr("حشد "+(pages.length+1),"Rally "+(pages.length+1)),pg().em));pages[pages.length-1].pl=[{n:tr("لاعب 1","Player 1"),defaultName:true,m:"0:45"}];cur=pages.length-1;save();render()};t.appendChild(a)}}
 function render(){
   tabs();var g=pg();
-  $("pname").value=defaultName(g.n,"rally",cur+1);$("eta").value=g.eta;$("em").value=g.em;markChips();draw();
+  $("pname").value=defaultName(g.n,"rally",cur+1,g.defaultRallyName!==false);$("eta").value=g.eta;$("em").value=g.em;markChips();draw();
   $("ban").hidden=!g.ref;if(g.ref)$("arr").textContent=utc(g.ref);
   $("del").hidden=pages.length<2;$("cpa").hidden=pages.length<2;$("cps").textContent="";tick()}
 function draw(){
@@ -169,7 +169,7 @@ function draw(){
   pg().pl.forEach(function(p,i){
     var d=document.createElement("div");d.className="r";
     d.innerHTML='<input class="nm" aria-label="'+tr("اسم اللاعب","Player name")+'"><input aria-label="'+tr("مدة المسيرة","March duration")+'"><span class="at">--</span><span class="cd"></span><button class="x" aria-label="'+tr("حذف","Delete")+'">×</button>';
-    var ins=d.querySelectorAll("input");ins[0].value=defaultName(p.n,"player",i+1);ins[1].value=p.m;
+    var ins=d.querySelectorAll("input");ins[0].value=defaultName(p.n,"player",i+1,p.defaultName!==false);ins[1].value=p.m;
     ins[0].oninput=function(){p.n=ins[0].value;p.defaultName=false;save()};
     bindTime(ins[1],function(){p.m=ins[1].value;save();tick()});
     d.querySelector("button").onclick=function(){pg().pl.splice(i,1);save();draw();tick()};
