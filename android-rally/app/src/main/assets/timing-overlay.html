@@ -24,7 +24,7 @@ display:flex;flex-direction:column;align-items:center;justify-content:center;fon
 #c small{font-size:8px;font-weight:600;opacity:.85;letter-spacing:.05em;line-height:1.2}
 #p{position:absolute;width:min(300px,calc(100vw - 16px));max-height:min(78vh,540px);overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 6px;width:100%;direction:ltr;text-align:center;min-width:0}
-input.nm{direction:rtl;text-align:right}
+[dir="rtl"] input.nm{direction:rtl;text-align:right}[dir="ltr"] input.nm{direction:ltr;text-align:left}
 input[type=color]{width:30px;height:24px;padding:0;border-radius:6px;cursor:pointer}
 input:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
 label{display:block;font-size:.7rem;color:var(--mute)}
@@ -96,41 +96,51 @@ html.ov #p .st{font-size:.66rem}
 </style>
 </head>
 <body>
-<div class="note">اضغط الدائرة لفتح الأداة، واسحبها لتغيير مكانها</div>
+<div class="note" data-i18n="note">اضغط الدائرة لفتح الأداة، واسحبها لتغيير مكانها</div>
 <div id="w">
   <button id="c" aria-label="فتح أو إغلاق حاسبة التوقيت" aria-expanded="false"><span id="clk">--:--:--</span><small>UTC</small></button>
   <div id="p" hidden>
-    <div class="hd"><b>حاسبة التعزيز</b>
+    <div class="hd"><b data-i18n="title">حاسبة التعزيز</b>
       <button class="x ic" id="gear" aria-label="الإعدادات" aria-expanded="false"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button></div>
     <div id="set" hidden>
-      <label>لون الأداة</label>
+      <label data-i18n="color">لون الأداة</label>
       <div class="sw" id="sw"></div>
-      <label>المظهر</label>
-      <div class="md" id="md"><button data-m="auto">تلقائي</button><button data-m="light">فاتح</button><button data-m="dark">داكن</button></div>
+      <label data-i18n="appearance">المظهر</label>
+      <div class="md" id="md"><button data-m="auto" data-i18n="auto">تلقائي</button><button data-m="light" data-i18n="light">فاتح</button><button data-m="dark" data-i18n="dark">داكن</button></div>
     </div>
+      <label data-i18n="languageLabel">لغة الأداة</label><div class="md" id="lang"><button data-lang="app">لغة التطبيق</button><button data-lang="ar">العربية</button><button data-lang="en">English</button></div>
     <div class="tabs" id="tabs"></div>
     <div class="pn"><input class="nm" id="pname" aria-label="اسم الحشد" placeholder="اسم الحشد"><button class="x ic" id="del" aria-label="حذف هذا الحشد" hidden>×</button></div>
     <div class="top">
-      <div><label for="eta">عدّاد يحشد (د:ث)</label><input id="eta"></div>
-      <div><label for="em">مسيرة الخصم (د:ث)</label><input id="em"></div>
-      <button class="b" id="go">ابدأ</button>
+      <div><label for="eta" data-i18n="eta">عدّاد يحشد (د:ث)</label><input id="eta"></div>
+      <div><label for="em" data-i18n="enemyMarch">مسيرة الخصم (د:ث)</label><input id="em"></div>
+      <button class="b" id="go" data-i18n="start">ابدأ</button>
     </div>
     <div class="chips" id="chips"></div>
-    <div class="ban" id="ban" hidden><small>وصول الجميع UTC</small><b id="arr">--:--:--</b></div>
-    <div class="r h" style="margin-top:8px"><span style="text-align:right">اللاعب</span><span>مسيرة</span><span>أرسل UTC</span><span>بعد</span><span></span></div>
+    <div class="ban" id="ban" hidden><small data-i18n="allArrival">وصول الجميع UTC</small><b id="arr">--:--:--</b></div>
+    <div class="r h" style="margin-top:8px"><span data-i18n="player">اللاعب</span><span data-i18n="march">مسيرة</span><span data-i18n="sendUtc">أرسل UTC</span><span data-i18n="after">بعد</span><span></span></div>
     <div id="pls"></div>
-    <div class="bar"><button class="b g" id="add">+ لاعب</button><button class="b" id="cpb">نسخ</button><button class="b g" id="cpa" hidden>نسخ الكل</button><span class="st" id="cps"></span></div>
+    <div class="bar"><button class="b g" id="add">+ لاعب</button><button class="b" id="cpb" data-i18n="copy">نسخ</button><button class="b g" id="cpa" data-i18n="copyAll" hidden>نسخ الكل</button><span class="st" id="cps"></span></div>
   </div>
 </div>
 <script>
 var OV=!!window.RallyBridge||/[?&#]overlay/.test(location.href);
 if(OV)document.documentElement.classList.add('ov');
-function mk(n,em){return{n:n,eta:"4:00",em:em||"0:38",pl:[{n:"لاعب 1",m:"0:45"},{n:"لاعب 2",m:"1:30"}],ref:null}}
-var pages=[mk("حشد 1")],cur=0;
+function mk(n,em){return{n:n,eta:"4:00",em:em||"0:38",pl:[{n:tr("لاعب 1","Player 1"),m:"0:45"},{n:tr("لاعب 2","Player 2"),m:"1:30"}],ref:null}}
+var pages=[mk(tr("حشد 1","Rally 1"))],cur=0;
 try{var sv=JSON.parse(localStorage.getItem("rp4")||"null");
   if(sv&&Array.isArray(sv.pages)&&sv.pages.length){pages=sv.pages.map(function(x){x.ref=null;return x});cur=Math.min(sv.cur||0,pages.length-1)}}catch(e){}
 function pg(){return pages[cur]}
 function $(i){return document.getElementById(i)}
+var appLanguage="en",toolLanguageMode="app",language="en";
+try{appLanguage=window.RallyBridge?RallyBridge.getAppLanguage():(localStorage.getItem("rally-app-language")||"en")}catch(e){}
+try{toolLanguageMode=window.RallyBridge?RallyBridge.getToolLanguage():(localStorage.getItem("rp4-language-mode")||"app")}catch(e){}
+function tr(ar,en){return language==="en"?en:ar}
+var I18N={note:["اضغط الدائرة لفتح الأداة، واسحبها لتغيير مكانها","Tap the circle to open the tool, and drag it to move"],title:["حاسبة التعزيز","Reinforcement Calculator"],color:["لون الأداة","Tool color"],appearance:["المظهر","Appearance"],auto:["تلقائي","Auto"],light:["فاتح","Light"],dark:["داكن","Dark"],languageLabel:["لغة الأداة","Tool language"],eta:["عدّاد يحشد (د:ث)","Rally countdown (m:ss)"],enemyMarch:["مسيرة الخصم (د:ث)","Enemy march (m:ss)"],start:["ابدأ","Start"],allArrival:["وصول الجميع UTC","Everyone arrives UTC"],player:["اللاعب","Player"],march:["مسيرة","March"],sendUtc:["أرسل UTC","Send UTC"],after:["بعد","In"],copy:["نسخ","Copy"],copyAll:["نسخ الكل","Copy all"]};
+function defaultName(name,kind,n){var s=String(name||""),m;if(kind==="rally"&&(m=s.match(/^حشد\s+(\d+)$/)))return tr(s,"Rally "+m[1]);if(kind==="player"&&(m=s.match(/^لاعب\s+(\d+)$/)))return tr(s,"Player "+m[1]);if(kind==="rally"&&(m=s.match(/^Rally\s+(\d+)$/)))return tr("حشد "+m[1],s);if(kind==="player"&&(m=s.match(/^Player\s+(\d+)$/)))return tr("لاعب "+m[1],s);return s}
+function setLanguage(code,persist){language=code==="ar"?"ar":"en";document.documentElement.lang=language;document.documentElement.dir=language==="ar"?"rtl":"ltr";document.body.dir=document.documentElement.dir;document.querySelectorAll("[data-i18n]").forEach(function(el){var v=I18N[el.dataset.i18n];if(v)el.textContent=tr(v[0],v[1])});$("c").setAttribute("aria-label",tr("فتح أو إغلاق حاسبة التوقيت","Open or close reinforcement calculator"));$("gear").setAttribute("aria-label",tr("الإعدادات","Settings"));$("pname").placeholder=tr("اسم الحشد","Rally name");$("pname").setAttribute("aria-label",tr("اسم الحشد","Rally name"));$("add").textContent=tr("+ لاعب","+ Player");document.querySelectorAll("#lang button").forEach(function(b){b.classList.toggle("on",b.dataset.lang===toolLanguageMode)});pages.forEach(function(g,i){g.n=defaultName(g.n,"rally",i+1);g.pl.forEach(function(p,j){p.n=defaultName(p.n,"player",j+1)})});if(persist){try{localStorage.setItem("rp4-language-mode",toolLanguageMode);if(window.RallyBridge)RallyBridge.setToolLanguage(toolLanguageMode)}catch(e){}}render()}
+function setAppLanguage(code){appLanguage=code==="ar"?"ar":"en";try{localStorage.setItem("rally-app-language",appLanguage)}catch(e){}if(toolLanguageMode==="app")setLanguage(appLanguage,false)}
+window.setAppLanguage=setAppLanguage;
 function pad(x){return String(x).padStart(2,"0")}
 function parseT(s){var d=String(s).replace(/\D/g,"");if(!d)return null;
   return d.length>2?parseInt(d.slice(0,-2),10)*60+parseInt(d.slice(-2),10):parseInt(d,10)}
@@ -145,21 +155,21 @@ function bindTime(el,cb){
 
 function tabs(){
   var t=$("tabs");t.innerHTML="";
-  pages.forEach(function(x,i){var b=document.createElement("button");b.className="tab"+(i===cur?" on":"");b.textContent=x.n||"حشد "+(i+1);
+  pages.forEach(function(x,i){var b=document.createElement("button");b.className="tab"+(i===cur?" on":"");b.textContent=defaultName(x.n||"حشد "+(i+1),"rally",i+1);
     b.onclick=function(){cur=i;save();render()};t.appendChild(b)});
-  if(pages.length<8){var a=document.createElement("button");a.className="tab add";a.textContent="+ حشد";a.setAttribute("aria-label","إضافة حشد جديد");
-    a.onclick=function(){pages.push(mk("حشد "+(pages.length+1),pg().em));pages[pages.length-1].pl=[{n:"لاعب 1",m:"0:45"}];cur=pages.length-1;save();render()};t.appendChild(a)}}
+  if(pages.length<8){var a=document.createElement("button");a.className="tab add";a.textContent=tr("+ حشد","+ Rally");a.setAttribute("aria-label","إضافة حشد جديد");
+    a.onclick=function(){pages.push(mk(tr("حشد "+(pages.length+1),"Rally "+(pages.length+1)),pg().em));pages[pages.length-1].pl=[{n:tr("لاعب 1","Player 1"),m:"0:45"}];cur=pages.length-1;save();render()};t.appendChild(a)}}
 function render(){
   tabs();var g=pg();
-  $("pname").value=g.n;$("eta").value=g.eta;$("em").value=g.em;markChips();draw();
+  $("pname").value=defaultName(g.n,"rally",cur+1);$("eta").value=g.eta;$("em").value=g.em;markChips();draw();
   $("ban").hidden=!g.ref;if(g.ref)$("arr").textContent=utc(g.ref);
   $("del").hidden=pages.length<2;$("cpa").hidden=pages.length<2;$("cps").textContent="";tick()}
 function draw(){
   var box=$("pls");box.innerHTML="";
   pg().pl.forEach(function(p,i){
     var d=document.createElement("div");d.className="r";
-    d.innerHTML='<input class="nm" aria-label="اسم اللاعب"><input aria-label="مدة المسيرة"><span class="at">--</span><span class="cd"></span><button class="x" aria-label="حذف">×</button>';
-    var ins=d.querySelectorAll("input");ins[0].value=p.n;ins[1].value=p.m;
+    d.innerHTML='<input class="nm" aria-label="'+tr("اسم اللاعب","Player name")+'"><input aria-label="'+tr("مدة المسيرة","March duration")+'"><span class="at">--</span><span class="cd"></span><button class="x" aria-label="'+tr("حذف","Delete")+'">×</button>';
+    var ins=d.querySelectorAll("input");ins[0].value=defaultName(p.n,"player",i+1);ins[1].value=p.m;
     ins[0].oninput=function(){p.n=ins[0].value;save()};
     bindTime(ins[1],function(){p.m=ins[1].value;save();tick()});
     d.querySelector("button").onclick=function(){pg().pl.splice(i,1);save();draw();tick()};
@@ -182,28 +192,28 @@ bindTime($("eta"),function(){pg().eta=$("eta").value;save();markChips()});
 bindTime($("em"),function(){pg().em=$("em").value;save()});
 $("pname").oninput=function(){pg().n=$("pname").value;save();tabs()};
 var PR=[1,3,4,5,10];
-PR.forEach(function(m){var b=document.createElement("button");b.className="chip";b.textContent=m+"د";b.dataset.s=m*60;
+PR.forEach(function(m){var b=document.createElement("button");b.className="chip";b.textContent=m+(language==="en"?"m":"د");b.dataset.s=m*60;
   b.onclick=function(){$("eta").value=m+":00";pg().eta=m+":00";save();markChips()};$("chips").appendChild(b)});
 function markChips(){var t=parseT($("eta").value);[].forEach.call($("chips").children,function(b){b.classList.toggle("on",Number(b.dataset.s)===t)})}
 
 $("go").onclick=function(){
   var e=parseT($("eta").value),em=parseT($("em").value);
-  if(e===null||!em){$("cps").textContent="القيم غير صحيحة";return}
+  if(e===null||!em){$("cps").textContent=tr("القيم غير صحيحة","Invalid values");return}
   pg().ref=Date.now()+(e+em)*1000;
   $("ban").hidden=false;$("arr").textContent=utc(pg().ref);$("cps").textContent="";tick()};
-$("add").onclick=function(){var l=pg().pl;l.push({n:"لاعب "+(l.length+1),m:"1:00"});save();draw();tick()};
+$("add").onclick=function(){var l=pg().pl;l.push({n:tr("لاعب "+(l.length+1),"Player "+(l.length+1)),m:"1:00"});save();draw();tick()};
 $("del").onclick=function(){pages.splice(cur,1);cur=Math.min(cur,pages.length-1);save();render()};
 function textFor(g,now){
-  var L=[(g.n||"حشد")+" — وقت وصول الجميع (UTC): "+utc(g.ref)];
+  var L=[(g.n||tr("حشد","Rally"))+" — "+tr("وقت وصول الجميع (UTC): ","Everyone arrives (UTC): ")+utc(g.ref)];
   g.pl.forEach(function(p){var at=atOf(g,p);
-    L.push(p.n+" — "+(at===null?"مدة غير صحيحة":at<=now?"فات الوقت":"أرسل في "+utc(at)))});
+    L.push(p.n+" — "+(at===null?tr("مدة غير صحيحة","Invalid duration"):at<=now?tr("فات","Passed"):tr("أرسل في ","Send at ")+utc(at)))});
   return L.join("\n")}
 function copy(t){
-  function ok(){$("cps").textContent="تم النسخ"}
-  function fb(){var ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");ok()}catch(e){$("cps").textContent="تعذّر النسخ"}document.body.removeChild(ta)}
+  function ok(){$("cps").textContent=tr("تم النسخ","Copied")}
+  function fb(){var ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand("copy");ok()}catch(e){$("cps").textContent=tr("تعذّر النسخ","Could not copy")}document.body.removeChild(ta)}
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fb)}else fb()}
 $("cpb").onclick=function(){
-  if(!pg().ref){$("cps").textContent="اضغط ابدأ أولاً";return}
+  if(!pg().ref){$("cps").textContent=tr("اضغط ابدأ أولاً","Press Start first");return}
   copy(textFor(pg(),Date.now()))};
 $("cpa").onclick=function(){
   var now=Date.now(),L=pages.filter(function(g){return g.ref}).map(function(g){return textFor(g,now)});
@@ -232,7 +242,9 @@ var ci=document.createElement("input");ci.type="color";ci.value=S.acc||"#1f5fff"
 ci.oninput=function(){S.acc=ci.value;applyS()};$("sw").appendChild(ci);
 [].forEach.call($("md").children,function(b){b.onclick=function(){S.mode=b.dataset.m;applyS()}});
 $("gear").onclick=function(){var o=$("set").hidden;$("set").hidden=!o;$("gear").setAttribute("aria-expanded",String(o))};
+document.querySelectorAll("#lang button").forEach(function(b){b.onclick=function(){toolLanguageMode=b.dataset.lang;setLanguage(toolLanguageMode==="app"?appLanguage:toolLanguageMode,true)}});
 applyS();
+setLanguage(toolLanguageMode==="app"?appLanguage:toolLanguageMode,false);
 
 /* floating orb */
 var w=$("w"),c=$("c"),p=$("p"),W=68,PAD=8,
