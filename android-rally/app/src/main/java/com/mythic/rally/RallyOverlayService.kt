@@ -328,8 +328,9 @@ class RallyOverlayService : Service() {
             capsule.translationX=shift; orb.translationX=shift; close.translationX=shift
         }
         orb.setOnClickListener { menuOpen=!menuOpen;persist();if(menuOpen)showMenu()else collapse() }
-        val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true};MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt();if(abs(dx)+abs(dy)>5)dragged=true;if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-104);bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-55);applyLayout();persist()};true};MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true};else->true} }
-        orb.setOnTouchListener(drag);f.setOnTouchListener(drag)
+        val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true};MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt();if(abs(dx)+abs(dy)>5)dragged=true;if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-104);bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-55);if(menuOpen){panelXdp=((dp(bubbleX+52)-panelWidthPx/2)/density).roundToInt();panelYdp=bubbleY};applyLayout();persist();if(menuOpen)prefs.edit().putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()};true};MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true};else->true} }
+        orb.setOnTouchListener(drag)
+        if(menuOpen)f.setOnTouchListener(null) else f.setOnTouchListener(drag)
     }
     private fun buildCollapsed() {
         if(focusable){focusedField?.clearFocus();setFocus(false)}
@@ -423,7 +424,7 @@ class RallyOverlayService : Service() {
         }
     }
     private fun collapse(){
-        if (focusable) { focusedField?.clearFocus(); setFocus(false) }
+        if (focusable) { dismissIme(focusedField);setFocus(false) }
         val panel=menuView
         if(panel!=null) {
             panel.animate().alpha(0f).setDuration(150).withEndAction {
@@ -525,9 +526,9 @@ class RallyOverlayService : Service() {
         val initial=RallyTime.preview(field.text.toString())
         if(initial!=field.text.toString()){field.setText(initial);field.setSelection(initial.length)}
         changed(initial)
-        field.setOnFocusChangeListener { v,has ->
-            if(has) { focusedField=field; setFocus(true); scroll?.post { ensureFocusedFieldVisible(field) } }
-            else finalizeTimeInput(field,changed)
+        field.setOnFocusChangeListener { _,has ->
+            if(has) { focusedField=field;setFocus(true);scroll?.post { ensureFocusedFieldVisible(field) } }
+            else { if(focusedField===field)focusedField=null;finalizeTimeInput(field,changed) }
         }
         field.setOnEditorActionListener { _,actionId,_ ->
             if(actionId==EditorInfo.IME_ACTION_NEXT)finalizeTimeInput(field,changed)
@@ -759,7 +760,7 @@ class RallyOverlayService : Service() {
     }
     private fun showConfirm() {
         if(confirming)return;confirming=true
-        if (focusable) { focusedField?.clearFocus(); setFocus(false) }
+        if (focusable) { dismissIme(focusedField);setFocus(false) }
         val dialog=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(16),dp(12),dp(16),dp(12))}
         dialog.addView(text(t("هل تريد إغلاق الأداة؟","Close the tool?"),13f,Color.WHITE,true))
         val actions=LinearLayout(uiContext).apply{gravity=Gravity.CENTER}
