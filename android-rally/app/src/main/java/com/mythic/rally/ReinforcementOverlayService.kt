@@ -61,8 +61,10 @@ class ReinforcementOverlayService : Service() {
     private var dragging = false
     private var downRawX = 0f
     private var downRawY = 0f
-    private var startWindowX = 0
+    private var startCircleX = 0
     private var startWindowY = 0
+    private var expandedPanelWidthPx = 0
+    private var expandedLayout = false
     private val touchSlop by lazy { ViewConfiguration.get(this).scaledTouchSlop }
 
     override fun onCreate() {
@@ -117,7 +119,7 @@ class ReinforcementOverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = ((screen.widthPixels - width) / 2).coerceAtLeast(0)
+            x = (((screen.widthPixels - width) / 2) - dp(INITIAL_CIRCLE_X_DP)).coerceAtLeast(0)
             y = dp(10).coerceIn(0, max(0, screen.heightPixels - height))
             softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
@@ -168,11 +170,14 @@ class ReinforcementOverlayService : Service() {
         val closedSize = dp(INITIAL_SIZE_DP).coerceAtMost(screen.widthPixels)
         val closedHeight = dp(INITIAL_SIZE_DP).coerceAtMost(screen.heightPixels)
         val closedCircleX = dp(INITIAL_CIRCLE_X_DP)
-        params.x = (params.x + oldCircleXPx - closedCircleX)
+        val circleScreenX = params.x + oldCircleXPx
+        params.x = (circleScreenX - closedCircleX)
             .coerceIn(0, max(0, screen.widthPixels - closedSize))
         params.y = params.y.coerceIn(0, max(0, screen.heightPixels - closedHeight))
         params.width = closedSize
         params.height = closedHeight
+        expandedLayout = false
+        expandedPanelWidthPx = 0
         params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
         params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         circleXdp = INITIAL_CIRCLE_X_DP
@@ -199,7 +204,7 @@ class ReinforcementOverlayService : Service() {
                 dragging = false
                 downRawX = event.rawX
                 downRawY = event.rawY
-                startWindowX = params.x
+                startCircleX = params.x + oldCircleXPx
                 startWindowY = params.y
                 return true
             }
@@ -213,7 +218,13 @@ class ReinforcementOverlayService : Service() {
                 }
                 if (dragging) {
                     val screen = resources.displayMetrics
-                    params.x = (startWindowX + dx).coerceIn(0, max(0, screen.widthPixels - params.width))
+                    val circleSize = dp(CIRCLE_SIZE_DP)
+                    val targetCircleX = if (expandedLayout) {
+                        (startCircleX + dx).coerceIn(0, max(0, screen.widthPixels - expandedPanelWidthPx))
+                    } else {
+                        (startCircleX + dx).coerceIn(0, max(0, screen.widthPixels - circleSize))
+                    }
+                    params.x = targetCircleX - oldCircleXPx
                     params.y = (startWindowY + dy).coerceIn(0, max(0, screen.heightPixels - params.height))
                     runCatching { windowManager.updateViewLayout(webView, params) }
                 }
@@ -250,14 +261,27 @@ class ReinforcementOverlayService : Service() {
                 if (!webViewCreated || !isOverlayAttached) return@post
 
                 val screen = resources.displayMetrics
-                val newWidth = dp(w).coerceIn(1, screen.widthPixels.coerceAtLeast(1))
                 val newHeight = dp(h).coerceIn(1, screen.heightPixels.coerceAtLeast(1))
                 val newCircleX = dp(circleX)
-                val proposedX = params.x + oldCircleXPx - newCircleX
+                val circleScreenX = params.x + oldCircleXPx
 
-                params.width = newWidth
+                if (open) {
+                    // The HTML panel is 300 CSS px wide and starts at the orb's left edge.
+                    // Give the WebView enough room to contain both the orb offset and the panel.
+                    val panelWidthCss = (w - 12).coerceAtLeast(1)
+                    expandedPanelWidthPx = dp(panelWidthCss)
+                    params.width = dp(circleX + panelWidthCss).coerceAtLeast(expandedPanelWidthPx)
+                    val safeCircleX = circleScreenX.coerceIn(0, max(0, screen.widthPixels - expandedPanelWidthPx))
+                    params.x = safeCircleX - newCircleX
+                    expandedLayout = true
+                } else {
+                    val closedSize = dp(INITIAL_SIZE_DP).coerceAtMost(screen.widthPixels)
+                    params.width = closedSize
+                    params.x = (circleScreenX - newCircleX).coerceIn(0, max(0, screen.widthPixels - closedSize))
+                    expandedPanelWidthPx = 0
+                    expandedLayout = false
+                }
                 params.height = newHeight
-                params.x = proposedX.coerceIn(0, max(0, screen.widthPixels - newWidth))
                 params.y = params.y.coerceIn(0, max(0, screen.heightPixels - newHeight))
                 params.flags = if (open) {
                     params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
