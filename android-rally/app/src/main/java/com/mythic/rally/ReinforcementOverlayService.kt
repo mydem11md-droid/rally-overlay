@@ -141,6 +141,12 @@ class ReinforcementOverlayService : Service() {
                 params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
                     WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
                 windowManager.updateViewLayout(webView, params)
+                webView.post {
+                    webView.evaluateJavascript(
+                        "(function(){var r=document.getElementById('w').getBoundingClientRect(),p=document.getElementById('p'),W=68,pw=Math.min(300,innerWidth-16),l=Math.min(Math.max(8,r.left+W/2-pw/2),innerWidth-pw-8);p.style.left=(l-r.left)+'px';p.style.right='auto';if(r.top+W/2>innerHeight/2){p.style.bottom=(W+8)+'px';p.style.top='auto'}else{p.style.top=(W+8)+'px';p.style.bottom='auto'}})()",
+                        null
+                    )
+                }
                 prefs.edit().putInt("x", params.x).putInt("y", params.y).apply()
             }
         }
@@ -148,7 +154,7 @@ class ReinforcementOverlayService : Service() {
 
     private fun expandedHeight(): Int {
         val available = resources.displayMetrics.heightPixels - dp(24)
-        return min(dp(EXPANDED_HEIGHT), max(dp(420), available))
+        return min(dp(EXPANDED_HEIGHT), max(dp(300), available))
     }
 
     private fun createNotificationChannel() {
