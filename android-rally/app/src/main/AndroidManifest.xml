@@ -17,6 +17,7 @@
         <service android:name=".ClockOverlayService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="floating_world_clock_overlay"/>
         </service>
+        <service android:name=".ReinforcementOverlayService" android:exported="false" android:foregroundServiceType="specialUse"><property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-requested floating reinforcement timing calculator overlay"/></service>
         <service android:name=".RallyOverlayService" android:exported="false" android:foregroundServiceType="specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE" android:value="User-requested interactive rally calculator overlay"/>
         </service>
