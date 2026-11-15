@@ -317,6 +317,8 @@ class ReinforcementOverlayService : Service() {
                     expandedPanelWidthPx = 0
                     expandedLayout = false
                     panelOnLeft = false
+                    circleXdp = circleX
+                    oldCircleXPx = newCircleX
                 }
                 params.height = newHeight
                 params.y = params.y.coerceIn(0, max(0, screen.heightPixels - newHeight))
@@ -327,8 +329,6 @@ class ReinforcementOverlayService : Service() {
                 }
                 params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
 
-                circleXdp = circleX
-                oldCircleXPx = newCircleX
                 runCatching { windowManager.updateViewLayout(webView, params) }
                 prefs.edit().putInt("x", params.x).putInt("y", params.y).apply()
             }
