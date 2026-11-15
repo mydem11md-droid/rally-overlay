@@ -107,8 +107,8 @@ html.ov #p .st{font-size:.66rem}
       <div class="sw" id="sw"></div>
       <label data-i18n="appearance">المظهر</label>
       <div class="md" id="md"><button data-m="auto" data-i18n="auto">تلقائي</button><button data-m="light" data-i18n="light">فاتح</button><button data-m="dark" data-i18n="dark">داكن</button></div>
-    </div>
       <label data-i18n="languageLabel">لغة الأداة</label><div class="md" id="lang"><button data-lang="app">لغة التطبيق</button><button data-lang="ar">العربية</button><button data-lang="en">English</button></div>
+    </div>
     <div class="tabs" id="tabs"></div>
     <div class="pn"><input class="nm" id="pname" aria-label="اسم الحشد" placeholder="اسم الحشد"><button class="x ic" id="del" aria-label="حذف هذا الحشد" hidden>×</button></div>
     <div class="top">
@@ -138,7 +138,7 @@ try{toolLanguageMode=window.RallyBridge?RallyBridge.getToolLanguage():(localStor
 function tr(ar,en){return language==="en"?en:ar}
 var I18N={note:["اضغط الدائرة لفتح الأداة، واسحبها لتغيير مكانها","Tap the circle to open the tool, and drag it to move"],title:["حاسبة التعزيز","Reinforcement Calculator"],color:["لون الأداة","Tool color"],appearance:["المظهر","Appearance"],auto:["تلقائي","Auto"],light:["فاتح","Light"],dark:["داكن","Dark"],languageLabel:["لغة الأداة","Tool language"],eta:["عدّاد يحشد (د:ث)","Rally countdown (m:ss)"],enemyMarch:["مسيرة الخصم (د:ث)","Enemy march (m:ss)"],start:["ابدأ","Start"],allArrival:["وصول الجميع UTC","Everyone arrives UTC"],player:["اللاعب","Player"],march:["مسيرة","March"],sendUtc:["أرسل UTC","Send UTC"],after:["بعد","In"],copy:["نسخ","Copy"],copyAll:["نسخ الكل","Copy all"]};
 function defaultName(name,kind,n){var s=String(name||""),m;if(kind==="rally"&&(m=s.match(/^حشد\s+(\d+)$/)))return tr(s,"Rally "+m[1]);if(kind==="player"&&(m=s.match(/^لاعب\s+(\d+)$/)))return tr(s,"Player "+m[1]);if(kind==="rally"&&(m=s.match(/^Rally\s+(\d+)$/)))return tr("حشد "+m[1],s);if(kind==="player"&&(m=s.match(/^Player\s+(\d+)$/)))return tr("لاعب "+m[1],s);return s}
-function setLanguage(code,persist){language=code==="ar"?"ar":"en";document.documentElement.lang=language;document.documentElement.dir=language==="ar"?"rtl":"ltr";document.body.dir=document.documentElement.dir;document.querySelectorAll("[data-i18n]").forEach(function(el){var v=I18N[el.dataset.i18n];if(v)el.textContent=tr(v[0],v[1])});$("c").setAttribute("aria-label",tr("فتح أو إغلاق حاسبة التوقيت","Open or close reinforcement calculator"));$("gear").setAttribute("aria-label",tr("الإعدادات","Settings"));$("pname").placeholder=tr("اسم الحشد","Rally name");$("pname").setAttribute("aria-label",tr("اسم الحشد","Rally name"));$("add").textContent=tr("+ لاعب","+ Player");document.querySelectorAll("#lang button").forEach(function(b){b.classList.toggle("on",b.dataset.lang===toolLanguageMode)});pages.forEach(function(g,i){g.n=defaultName(g.n,"rally",i+1);g.pl.forEach(function(p,j){p.n=defaultName(p.n,"player",j+1)})});if(persist){try{localStorage.setItem("rp4-language-mode",toolLanguageMode);if(window.RallyBridge)RallyBridge.setToolLanguage(toolLanguageMode)}catch(e){}}render()}
+function setLanguage(code,persist){language=code==="ar"?"ar":"en";document.documentElement.lang=language;document.documentElement.dir=language==="ar"?"rtl":"ltr";document.body.dir=document.documentElement.dir;document.querySelectorAll("[data-i18n]").forEach(function(el){var v=I18N[el.dataset.i18n];if(v)el.textContent=tr(v[0],v[1])});$("c").setAttribute("aria-label",tr("فتح أو إغلاق حاسبة التوقيت","Open or close reinforcement calculator"));$("gear").setAttribute("aria-label",tr("الإعدادات","Settings"));$("pname").placeholder=tr("اسم الحشد","Rally name");$("pname").setAttribute("aria-label",tr("اسم الحشد","Rally name"));$("add").textContent=tr("+ لاعب","+ Player");document.querySelectorAll("#lang button").forEach(function(b){b.classList.toggle("on",b.dataset.lang===toolLanguageMode);b.textContent=b.dataset.lang==="app"?tr("لغة التطبيق","App language"):b.dataset.lang==="ar"?"العربية":"English"});pages.forEach(function(g,i){g.n=defaultName(g.n,"rally",i+1);g.pl.forEach(function(p,j){p.n=defaultName(p.n,"player",j+1)})});if(persist){try{localStorage.setItem("rp4-language-mode",toolLanguageMode);if(window.RallyBridge)RallyBridge.setToolLanguage(toolLanguageMode)}catch(e){}}render()}
 function setAppLanguage(code){appLanguage=code==="ar"?"ar":"en";try{localStorage.setItem("rally-app-language",appLanguage)}catch(e){}if(toolLanguageMode==="app")setLanguage(appLanguage,false)}
 window.setAppLanguage=setAppLanguage;
 function pad(x){return String(x).padStart(2,"0")}
@@ -185,7 +185,7 @@ function tick(){
     if(at===null){a.textContent="--";c.textContent="";return}
     a.textContent=utc(at);
     var left=(at-now)/1000;
-    if(left<=0){c.textContent=left>-2?"الآن":"فات";c.className="cd late"}
+    if(left<=0){c.textContent=left>-2?tr("الآن","Now"):tr("فات","Passed");c.className="cd late"}
     else{c.textContent=fmtT(Math.ceil(left));c.className="cd "+(left<=10?"soon":"ok")}})}
 
 bindTime($("eta"),function(){pg().eta=$("eta").value;save();markChips()});
