@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feature/rally-overlay
+      - feature/reinforcement-overlay
     paths:
       - 'android-rally/**'
       - '.github/workflows/android-rally.yml'
