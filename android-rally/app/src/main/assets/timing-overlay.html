@@ -14,7 +14,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
 *{box-sizing:border-box}
 body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.45 Cairo,Tahoma,Arial,sans-serif;overflow:hidden}
 .note{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mute);padding:20px;text-align:center}
-#w{position:fixed;z-index:5;width:68px;height:68px}
+#w{position:fixed;z-index:5;inset:0;width:100%;height:100%}
 #c{width:68px;height:68px;border-radius:50%;border:3px solid #fff;padding:0;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;
 background:radial-gradient(circle at 32% 28%,var(--orb1),var(--orb2));color:var(--orbink);box-shadow:0 5px 14px rgba(0,0,0,.35),0 0 0 3px rgba(47,123,255,.35);box-shadow:0 5px 14px rgba(0,0,0,.35),0 0 0 3px color-mix(in srgb,var(--orb1) 35%,transparent);
 display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:inherit}
@@ -68,9 +68,9 @@ button.x{background:transparent;border:0;color:var(--mute);padding:0}
 html.ov{padding:0!important;background:transparent}
 html.ov body{background:transparent;font-size:11px;line-height:1.35}
 html.ov .note{display:none}
-html.ov #w{position:absolute}
-html.ov #c{cursor:default;box-shadow:0 2px 4px rgba(0,0,0,.4),0 0 0 3px rgba(47,123,255,.45);box-shadow:0 2px 4px rgba(0,0,0,.4),0 0 0 3px color-mix(in srgb,var(--orb1) 45%,transparent)}
-html.ov #p{width:260px;max-height:520px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:8px;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+html.ov #w{position:absolute;inset:0;width:100%;height:100%}
+html.ov #c{position:absolute;left:50%;top:0;transform:translateX(-50%);cursor:default;box-shadow:0 2px 4px rgba(0,0,0,.4),0 0 0 3px rgba(47,123,255,.45);box-shadow:0 2px 4px rgba(0,0,0,.4),0 0 0 3px color-mix(in srgb,var(--orb1) 45%,transparent)}
+html.ov #p{left:50%;top:76px;right:auto;bottom:auto;transform:translateX(-50%);width:calc(100% - 12px);max-width:260px;max-height:520px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:8px;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.35)}
 html.ov #p .hd{margin-bottom:5px}
 html.ov #p .hd b{font-size:.82rem}
 html.ov #p .ic{width:23px;height:23px}
@@ -239,9 +239,9 @@ var w=$("w"),c=$("c"),p=$("p"),W=68,PAD=8,
     PANEL_W=Math.max(80,Math.min(260,screen.width-W-16)),
     WW=PANEL_W+12,
     MAX_PANEL_H=Math.max(40,Math.min(520,screen.height-100)),lastKey="";
-if(OV){p.style.width=PANEL_W+"px";p.style.maxHeight=MAX_PANEL_H+"px";p.style.overflowY="auto";}
+if(OV){p.style.width="calc(100% - 12px)";p.style.maxWidth=PANEL_W+"px";p.style.maxHeight=MAX_PANEL_H+"px";p.style.overflowY="auto";}
 function place(){
-  if(OV){p.style.left=((WW-W)/2-w.offsetLeft)+"px";p.style.right="auto";p.style.top=(W+8)+"px";p.style.bottom="auto";return}
+  if(OV){p.style.left="50%";p.style.right="auto";p.style.top=(W+8)+"px";p.style.bottom="auto";p.style.transform="translateX(-50%)";return}
   var r=w.getBoundingClientRect(),pw=Math.min(300,innerWidth-16);
   var l=Math.min(Math.max(8,r.left+W/2-pw/2),innerWidth-pw-8);
   p.style.left=(l-r.left)+"px";p.style.right="auto";
@@ -251,7 +251,7 @@ function report(){
   var open=!p.hidden,cl=open?Math.round((WW-W)/2):PAD,ww=open?WW:W+2*PAD,
       hh=open?Math.round(Math.min(p.scrollHeight,MAX_PANEL_H)+PAD+W+8+PAD):W+2*PAD,key=[open,ww,hh,cl].join();
   if(key===lastKey)return;lastKey=key;
-  w.style.left=cl+"px";place();
+  w.style.left="0px";w.style.top="0px";place();
   try{window.RallyBridge.setLayout(open,ww,hh,cl)}catch(e){}}
 function toggle(){
   var open=p.hidden;p.hidden=!open;c.setAttribute("aria-expanded",String(open));
