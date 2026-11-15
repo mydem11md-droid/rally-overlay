@@ -135,7 +135,7 @@ class ReinforcementOverlayService : Service() {
         @JavascriptInterface
         fun setExpanded(open: Boolean) {
             mainHandler.post {
-                if (expanded == open || !::webView.isInitialized) return@runOnUiThread
+                if (expanded == open || !::webView.isInitialized) return@post
                 expanded = open
                 val centerX = params.x + if (open) dp(COLLAPSED_SIZE) / 2 else dp(EXPANDED_WIDTH) / 2
                 val topY = params.y
