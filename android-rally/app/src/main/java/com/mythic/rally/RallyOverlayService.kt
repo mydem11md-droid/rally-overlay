@@ -467,7 +467,7 @@ class RallyOverlayService : Service() {
     private fun label(parent:LinearLayout,s:String){parent.addView(text(s,11f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(23)))}
     private inner class OverlayEditText(context:Context):EditText(context) {
         override fun onKeyPreIme(keyCode:Int,event:KeyEvent):Boolean {
-            if(keyCode==KeyEvent.KEYCODE_BACK && focusable) {
+            if(keyCode==KeyEvent.KEYCODE_BACK && this@RallyOverlayService.focusable) {
                 if(event.action==KeyEvent.ACTION_UP)dismissIme(this)
                 return true
             }
@@ -498,7 +498,7 @@ class RallyOverlayService : Service() {
             else { inputType=android.text.InputType.TYPE_CLASS_TEXT; imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=if(ar())View.TEXT_DIRECTION_RTL else View.TEXT_DIRECTION_LTR }
             setOnTouchListener { v,event ->
                 if(event.actionMasked==MotionEvent.ACTION_DOWN) {
-                    if(!focusable)setFocus(true)
+                    if(!this@RallyOverlayService.focusable)setFocus(true)
                     v.post { if(v.isAttachedToWindow) { v.requestFocus();imm.showSoftInput(v,InputMethodManager.SHOW_IMPLICIT) } }
                 }
                 false
