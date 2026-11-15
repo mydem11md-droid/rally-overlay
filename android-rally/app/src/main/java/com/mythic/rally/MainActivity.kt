@@ -3,7 +3,9 @@ package com.mythic.rally
 import android.app.Activity
 import android.content.Context
 import android.content.ComponentName
+import android.content.BroadcastReceiver
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
@@ -26,6 +28,13 @@ class MainActivity : Activity() {
     private var updateCard: LinearLayout? = null
     private var currentUpdate: AvailableUpdate? = null
     private var utcClockButton: TextView? = null
+    private var reinforcementButton: TextView? = null
+    private var reinforcementReceiverRegistered = false
+    private val reinforcementStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            refreshReinforcementButton()
+        }
+    }
 
     override fun attachBaseContext(newBase: Context) {
         val saved = newBase.getSharedPreferences("rally_native", MODE_PRIVATE).getString("language", null)
@@ -51,10 +60,28 @@ class MainActivity : Activity() {
         super.onResume()
         refreshPermissionStatus()
         refreshUtcButton()
+        refreshReinforcementButton()
+        if (!reinforcementReceiverRegistered) {
+            val filter = IntentFilter(ReinforcementOverlayService.ACTION_STATE_CHANGED)
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(reinforcementStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            else registerReceiver(reinforcementStateReceiver, filter)
+            reinforcementReceiverRegistered = true
+        }
+        if (Settings.canDrawOverlays(this) && prefs.getBoolean("reinforcement_pending_start", false)) {
+            prefs.edit().putBoolean("reinforcement_pending_start", false).apply()
+            startReinforcementOverlay()
+        }
         if (::updater.isInitialized) {
             updater.resumePendingInstall()
             checkForUpdates(false)
         }
+    }
+    override fun onPause() {
+        if (reinforcementReceiverRegistered) {
+            runCatching { unregisterReceiver(reinforcementStateReceiver) }
+            reinforcementReceiverRegistered = false
+        }
+        super.onPause()
     }
     private fun render() {
         val rtl = language == "ar"
@@ -75,15 +102,15 @@ class MainActivity : Activity() {
             if(!Settings.canDrawOverlays(this)) startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:$packageName")))
             else { val i=Intent(this,RallyOverlayService::class.java);if(Build.VERSION.SDK_INT>=26)startForegroundService(i)else startService(i);Toast.makeText(this,R.string.started,Toast.LENGTH_SHORT).show() }
         },LinearLayout.LayoutParams(-1,dp(46)))
-        root.addView(actionButton("أداة التعزيزات",0xFF245C9A.toInt(),-1) {
+        reinforcementButton = actionButton("أداة التعزيزات",0xFF245C9A.toInt(),-1) {
             if (!Settings.canDrawOverlays(this)) {
+                prefs.edit().putBoolean("reinforcement_pending_start", true).apply()
                 startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             } else {
-                val service = Intent(this, ReinforcementOverlayService::class.java)
-                if (Build.VERSION.SDK_INT >= 26) startForegroundService(service) else startService(service)
-                Toast.makeText(this, "تم تشغيل أداة التعزيزات", Toast.LENGTH_SHORT).show()
+                startReinforcementOverlay()
             }
-        },LinearLayout.LayoutParams(-1,dp(46)).apply { topMargin=dp(10) })
+        }
+        root.addView(reinforcementButton,LinearLayout.LayoutParams(-1,dp(46)).apply { topMargin=dp(10) })
         utcClockButton = TextView(this).apply {
             text = getString(if (ClockOverlayService.running) R.string.utc_disable else R.string.utc_enable)
             textSize = 15f
@@ -115,10 +142,37 @@ class MainActivity : Activity() {
             }
         }
         root.addView(utcClockButton, LinearLayout.LayoutParams(-1, dp(56)).apply { topMargin = dp(16) })
-        root.addView(actionButton(getString(R.string.stop),0xFF2A3A2F.toInt(),-1) { stopService(Intent(this,RallyOverlayService::class.java));Toast.makeText(this,R.string.stopped,Toast.LENGTH_SHORT).show() },LinearLayout.LayoutParams(-1,dp(46)).apply { topMargin=dp(10) })
+        root.addView(actionButton(getString(R.string.stop),0xFF2A3A2F.toInt(),-1) {
+            stopService(Intent(this,RallyOverlayService::class.java))
+            stopService(Intent(this,ReinforcementOverlayService::class.java))
+            stopService(Intent(this,ClockOverlayService::class.java))
+            reinforcementButton?.let {
+                it.text = "أداة التعزيزات"
+                it.setTextColor(-1)
+                it.background = android.graphics.drawable.GradientDrawable().apply { setColor(0xFF245C9A.toInt()); cornerRadius=dp(9).toFloat() }
+            }
+            refreshUtcButton()
+            Toast.makeText(this,R.string.stopped,Toast.LENGTH_SHORT).show()
+        },LinearLayout.LayoutParams(-1,dp(46)).apply { topMargin=dp(10) })
         root.addView(actionButton(getString(R.string.check_update),0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()) { checkForUpdates(true) },LinearLayout.LayoutParams(-1,dp(42)).apply { topMargin=dp(10) })
         setContentView(root)
         refreshPermissionStatus()
+    }
+    private fun startReinforcementOverlay() {
+        val service = Intent(this, ReinforcementOverlayService::class.java).setAction(ReinforcementOverlayService.ACTION_TOGGLE)
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(service) else startService(service)
+    }
+    private fun refreshReinforcementButton() {
+        val active = ReinforcementOverlayService.isOverlayAttached
+        prefs.edit().putBoolean("reinforcement_overlay_active", active).apply()
+        reinforcementButton?.apply {
+            text = if (active) "✓ أداة التعزيزات: تعمل" else "أداة التعزيزات"
+            setTextColor(if (active) 0xFF102014.toInt() else -1)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(if (active) 0xFF4CAF50.toInt() else 0xFF245C9A.toInt())
+                cornerRadius = dp(9).toFloat()
+            }
+        }
     }
     private fun refreshUtcButton() {
         utcClockButton?.setText(if (ClockOverlayService.running) R.string.utc_disable else R.string.utc_enable)
