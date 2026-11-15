@@ -290,8 +290,11 @@ class RallyOverlayService : Service() {
             h=(h-dy).coerceIn(minH,sh.coerceAtLeast(minH))
             y=bottom-h
         }
-        x=x.coerceIn(0,(sw-w).coerceAtLeast(0))
-        y=y.coerceIn(0,(sh-h).coerceAtLeast(0))
+        if(x<0){w=(x+w).coerceIn(minW,sw.coerceAtLeast(minW));x=0}
+        if(y<0){h=(y+h).coerceIn(minH,sh.coerceAtLeast(minH));y=0}
+        if(x+w>sw)w=(sw-x).coerceAtLeast(minW)
+        if(y+h>sh)h=(sh-y).coerceAtLeast(minH)
+        x=x.coerceAtLeast(0);y=y.coerceAtLeast(0)
         p.width=w;p.height=h;p.x=x;p.y=y
         panelWidthPx=w;panelHeightPx=h
         panelXdp=(x/density).roundToInt();panelYdp=(y/density).roundToInt()
@@ -574,6 +577,7 @@ class RallyOverlayService : Service() {
             val fields=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
             val name=input(t("اسم اللاعب","Player name"),p.name)
             val duration=input("MM:SS",p.duration,true)
+            duration.imeOptions=if(index==people.lastIndex && p.kind!="rally")EditorInfo.IME_ACTION_DONE else EditorInfo.IME_ACTION_NEXT
             name.contentDescription=t("مشارك ${index+1} · الاسم","Participant ${index+1} · name")
             duration.contentDescription=t("مشارك ${index+1} · المدة","Participant ${index+1} · duration")
             name.addTextChangedListener(SimpleWatcher{p.name=it;persist();if(focusedField===name)miniEditorValue?.text=it})
@@ -600,6 +604,7 @@ class RallyOverlayService : Service() {
                     row.addView(durations,LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(3)})
                 }
                 val custom=input(uiContext.getString(R.string.minutes),if(p.rallyMinutes !in presets)p.rallyMinutes.toString() else "",true)
+                if(index==people.lastIndex)custom.imeOptions=EditorInfo.IME_ACTION_DONE
                 custom.visibility=View.GONE
                 val customToggle=fitControl(button(uiContext.getString(R.string.custom_minutes),if(p.rallyMinutes !in presets)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes !in presets)0xFF102014.toInt() else Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE})
                 row.addView(customToggle,LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(8)})
