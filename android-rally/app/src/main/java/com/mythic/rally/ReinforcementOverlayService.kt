@@ -14,6 +14,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import android.view.Choreographer
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ViewConfiguration
@@ -66,6 +67,17 @@ class ReinforcementOverlayService : Service() {
     private var expandedPanelWidthPx = 0
     private var expandedPanelWidthCss = 300
     private var expandedLayout = false
+    private var overlayFramePending = false
+    private var pendingOverlayX = 0
+    private var pendingOverlayY = 0
+    private val overlayFrameCallback = Choreographer.FrameCallback {
+        overlayFramePending = false
+        if (isOverlayAttached && webViewCreated) {
+            params.x = pendingOverlayX
+            params.y = pendingOverlayY
+            runCatching { windowManager.updateViewLayout(webView, params) }
+        }
+    }
     private val touchSlop by lazy { ViewConfiguration.get(this).scaledTouchSlop }
 
     override fun onCreate() {
@@ -156,6 +168,8 @@ class ReinforcementOverlayService : Service() {
 
     private fun detachWindow() {
         if (!isOverlayAttached) return
+        Choreographer.getInstance().removeFrameCallback(overlayFrameCallback)
+        overlayFramePending = false
 
         // Collapse the page before detaching, but retain this exact WebView and its localStorage state.
         if (pageLoaded) {
@@ -230,7 +244,7 @@ class ReinforcementOverlayService : Service() {
                         params.x = safeCircleX - oldCircleXPx
                     }
                     params.y = (startWindowY + dy).coerceIn(0, max(0, screen.heightPixels - params.height))
-                    runCatching { windowManager.updateViewLayout(webView, params) }
+                    scheduleOverlayLayout()
                 }
                 return true
             }
@@ -241,6 +255,7 @@ class ReinforcementOverlayService : Service() {
                 trackingCircle = false
                 dragging = false
                 if (wasDragging) {
+                    flushOverlayLayout()
                     prefs.edit().putInt("x", params.x).putInt("y", params.y).apply()
                 } else {
                     webView.evaluateJavascript("toggle()", null)
@@ -250,12 +265,36 @@ class ReinforcementOverlayService : Service() {
 
             MotionEvent.ACTION_CANCEL -> {
                 val wasTracking = trackingCircle
+                if (dragging) flushOverlayLayout()
                 trackingCircle = false
                 dragging = false
                 return wasTracking
             }
         }
         return trackingCircle
+    }
+
+    // Apply drag positions on display frames so the orb and its panel move as
+    // one WebView window, without queuing multiple WindowManager updates per frame.
+    private fun scheduleOverlayLayout() {
+        pendingOverlayX = params.x
+        pendingOverlayY = params.y
+        if (!overlayFramePending) {
+            overlayFramePending = true
+            Choreographer.getInstance().postFrameCallback(overlayFrameCallback)
+        }
+    }
+
+    private fun flushOverlayLayout() {
+        if (overlayFramePending) {
+            Choreographer.getInstance().removeFrameCallback(overlayFrameCallback)
+            overlayFramePending = false
+        }
+        pendingOverlayX = params.x
+        pendingOverlayY = params.y
+        if (isOverlayAttached && webViewCreated) {
+            runCatching { windowManager.updateViewLayout(webView, params) }
+        }
     }
 
     private fun updateExpandedGeometry(circleScreenX: Int, screenWidth: Int, forceStyle: Boolean = false) {
@@ -279,13 +318,14 @@ class ReinforcementOverlayService : Service() {
             mainHandler.post {
                 if (!webViewCreated || !isOverlayAttached) return@post
 
+                flushOverlayLayout()
                 val screen = resources.displayMetrics
                 val newHeight = dp(h).coerceIn(1, screen.heightPixels.coerceAtLeast(1))
                 val circleScreenX = params.x + oldCircleXPx
 
                 if (open) {
                     expandedPanelWidthCss = (w - 12).coerceAtLeast(1)
-                    expandedPanelWidthPx = dp(expandedPanelWidthCss)
+                    expandedPanelWidthPx = dp(w)
                     expandedLayout = true
                     updateExpandedGeometry(circleScreenX, screen.widthPixels)
                 } else {
@@ -359,6 +399,8 @@ class ReinforcementOverlayService : Service() {
     }
 
     override fun onDestroy() {
+        Choreographer.getInstance().removeFrameCallback(overlayFrameCallback)
+        overlayFramePending = false
         if (isOverlayAttached) {
             runCatching { windowManager.removeView(webView) }
         }
