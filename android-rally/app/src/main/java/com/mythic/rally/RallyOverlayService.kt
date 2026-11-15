@@ -114,8 +114,11 @@ class RallyOverlayService : Service() {
     private var globalLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
     private class CappedScrollView(context: Context) : ScrollView(context) {
         var maxHeightPx = Int.MAX_VALUE
-        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-            super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(maxHeightPx.coerceAtLeast(0), MeasureSpec.AT_MOST))
+        override fun onMeasure(widthMeasureSpec:Int,heightMeasureSpec:Int) {
+            val parentHeight=MeasureSpec.getSize(heightMeasureSpec)
+            val targetHeight=min(parentHeight,maxHeightPx.coerceAtLeast(0))
+            val mode=if(MeasureSpec.getMode(heightMeasureSpec)==MeasureSpec.EXACTLY)MeasureSpec.EXACTLY else MeasureSpec.AT_MOST
+            super.onMeasure(widthMeasureSpec,MeasureSpec.makeMeasureSpec(targetHeight,mode))
         }
     }
     private val density get() = resources.displayMetrics.density
@@ -772,7 +775,9 @@ class RallyOverlayService : Service() {
         actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(8),1))
         actions.addView(button(t("لا","No"),0xFFE57373.toInt(),Color.WHITE){confirming=false;buildCollapsed();applyLayout()})
         dialog.addView(actions)
-        val r=root?:return;r.removeAllViews();r.addView(dialog,FrameLayout.LayoutParams(dp(220),dp(100),Gravity.CENTER))
+        val r=root?:return
+        r.resizeEnabled=false
+        r.removeAllViews();r.addView(dialog,FrameLayout.LayoutParams(dp(220),dp(100),Gravity.CENTER))
         val p=params?:return;p.width=dp(240);p.height=dp(120);p.x=(resources.displayMetrics.widthPixels-p.width)/2;p.y=(resources.displayMetrics.heightPixels-p.height)/2
         runCatching{wm.updateViewLayout(r,p)}
     }
