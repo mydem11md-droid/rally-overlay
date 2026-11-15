@@ -93,6 +93,9 @@ class ReinforcementOverlayService : Service() {
                 @Suppress("DEPRECATION")
                 settings.forceDark = WebSettings.FORCE_DARK_OFF
             }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                settings.setAlgorithmicDarkeningAllowed(false)
+            }
             webChromeClient = WebChromeClient()
             webViewClient = WebViewClient()
             addJavascriptInterface(RallyBridge(), "RallyBridge")
