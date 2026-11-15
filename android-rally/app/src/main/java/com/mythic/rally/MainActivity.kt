@@ -98,6 +98,7 @@ class MainActivity : Activity() {
         root.addView(actionButton("ع | EN",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()) {
             language=if(language=="ar")"en" else "ar";prefs.edit().putString("language",language).apply();syncLauncherAlias()
             runCatching { sendBroadcast(Intent(RallyOverlayService.ACTION_LANGUAGE_CHANGED).setPackage(packageName)) }
+            runCatching { sendBroadcast(Intent(ReinforcementOverlayService.ACTION_LANGUAGE_CHANGED).setPackage(packageName).putExtra("language", language)) }
             recreate()
         },LinearLayout.LayoutParams(dp(76),dp(34)).apply { bottomMargin=dp(18) })
         val status = TextView(this).apply { tag="permission_status";textSize=12f;setTextColor(0xFFA5C4AA.toInt());gravity=Gravity.CENTER;setPadding(0,0,0,dp(14)) }
