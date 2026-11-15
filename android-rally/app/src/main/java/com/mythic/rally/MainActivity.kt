@@ -1,6 +1,9 @@
 package com.mythic.rally
 
 import android.app.Activity
+import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.ComponentName
 import android.content.BroadcastReceiver
@@ -50,6 +53,7 @@ class MainActivity : Activity() {
         syncLauncherAlias()
         updater = AppUpdater(this)
         render()
+        showLastCrashReport()
         checkForUpdates(false)
         if (!prefs.getBoolean("overlay_permission_prompted", false) && !Settings.canDrawOverlays(this)) {
             prefs.edit().putBoolean("overlay_permission_prompted", true).apply()
@@ -158,6 +162,31 @@ class MainActivity : Activity() {
         setContentView(root)
         refreshPermissionStatus()
     }
+
+    private fun showLastCrashReport() {
+        val reportFile = getFileStreamPath("last_crash.txt")
+        if (!reportFile.exists()) return
+        val report = runCatching { reportFile.readText() }.getOrNull()?.takeIf { it.isNotBlank() } ?: return
+        val reportView = TextView(this).apply {
+            text = report
+            textSize = 12f
+            setTextIsSelectable(true)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+        }
+        val scroll = android.widget.ScrollView(this).apply { addView(reportView) }
+        AlertDialog.Builder(this)
+            .setTitle("تقرير إغلاق التطبيق السابق")
+            .setView(scroll)
+            .setPositiveButton("نسخ التقرير") { _, _ ->
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("Crash report", report))
+                reportFile.delete()
+                Toast.makeText(this, "تم نسخ التقرير، أرسله هنا", Toast.LENGTH_LONG).show()
+            }
+            .setNegativeButton("إغلاق", null)
+            .show()
+    }
+
     private fun startReinforcementOverlay() {
         val service = Intent(this, ReinforcementOverlayService::class.java).setAction(ReinforcementOverlayService.ACTION_TOGGLE)
         if (Build.VERSION.SDK_INT >= 26) startForegroundService(service) else startService(service)
