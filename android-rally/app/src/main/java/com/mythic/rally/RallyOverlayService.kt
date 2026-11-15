@@ -273,6 +273,7 @@ class RallyOverlayService : Service() {
         handler.post(clockTick)
     }
     private fun resizePanelBy(dx:Int,dy:Int,edges:Int) {
+        val r=root?:return
         val p=params?:return
         val sw=resources.displayMetrics.widthPixels
         val sh=resources.displayMetrics.heightPixels
@@ -298,7 +299,7 @@ class RallyOverlayService : Service() {
         p.width=w;p.height=h;p.x=x;p.y=y
         panelWidthPx=w;panelHeightPx=h
         panelXdp=(x/density).roundToInt();panelYdp=(y/density).roundToInt()
-        runCatching { wm.updateViewLayout(root,p) }
+        runCatching { wm.updateViewLayout(r,p) }
     }
     private fun iconCircle():View = object:View(uiContext) {
         private val paint=Paint(3).apply { color=Color.WHITE; style=Paint.Style.STROKE; strokeWidth=dp(2).toFloat(); strokeCap=Paint.Cap.ROUND }
@@ -463,7 +464,10 @@ class RallyOverlayService : Service() {
     private fun label(parent:LinearLayout,s:String){parent.addView(text(s,11f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(23)))}
     private inner class OverlayEditText(context:Context):EditText(context) {
         override fun onKeyPreIme(keyCode:Int,event:KeyEvent):Boolean {
-            if(keyCode==KeyEvent.KEYCODE_BACK && event.action==KeyEvent.ACTION_UP && focusable) { dismissIme(this);return true }
+            if(keyCode==KeyEvent.KEYCODE_BACK && focusable) {
+                if(event.action==KeyEvent.ACTION_UP)dismissIme(this)
+                return true
+            }
             return super.onKeyPreIme(keyCode,event)
         }
     }
