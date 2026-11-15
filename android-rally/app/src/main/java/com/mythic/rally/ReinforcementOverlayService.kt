@@ -261,7 +261,7 @@ class ReinforcementOverlayService : Service() {
         return trackingCircle
     }
 
-    private fun updateExpandedGeometry(circleScreenX: Int, screenWidth: Int) {
+    private fun updateExpandedGeometry(circleScreenX: Int, screenWidth: Int, forceStyle: Boolean = false) {
         val circleSizePx = dp(CIRCLE_SIZE_DP)
         val rightMax = max(0, screenWidth - expandedPanelWidthPx)
         val leftMin = min(expandedPanelWidthPx, max(0, screenWidth - circleSizePx))
@@ -271,7 +271,7 @@ class ReinforcementOverlayService : Service() {
         val nextCircleCss = if (useLeft) expandedPanelWidthCss else expandedCircleXCss
         val nextCirclePx = dp(nextCircleCss)
 
-        if (panelOnLeft != useLeft) {
+        if (panelOnLeft != useLeft || forceStyle) {
             val panelOffset = if (useLeft) "-${expandedPanelWidthCss}px" else "0px"
             val orbOffset = if (useLeft) "${expandedPanelWidthCss}px" else "${expandedCircleXCss}px"
             webView.evaluateJavascript(
@@ -307,7 +307,7 @@ class ReinforcementOverlayService : Service() {
                     expandedCircleXCss = circleX
                     expandedPanelWidthPx = dp(expandedPanelWidthCss)
                     expandedLayout = true
-                    updateExpandedGeometry(circleScreenX, screen.widthPixels)
+                    updateExpandedGeometry(circleScreenX, screen.widthPixels, forceStyle = true)
                 } else {
                     val closedSize = dp(INITIAL_SIZE_DP).coerceAtMost(screen.widthPixels)
                     val newCircleX = dp(circleX)
