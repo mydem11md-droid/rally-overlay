@@ -35,6 +35,7 @@ class ReinforcementOverlayService : Service() {
         const val ACTION_TOGGLE = "com.mythic.rally.REINFORCEMENT_TOGGLE"
         const val ACTION_STOP = "com.mythic.rally.REINFORCEMENT_STOP"
         const val ACTION_STATE_CHANGED = "com.mythic.rally.REINFORCEMENT_STATE_CHANGED"
+        const val ACTION_LANGUAGE_CHANGED = "com.mythic.rally.REINFORCEMENT_LANGUAGE_CHANGED"
         private const val CHANNEL_ID = "reinforcement_overlay"
         private const val NOTIFICATION_ID = 4202
         private const val INITIAL_SIZE_DP = 84
@@ -79,6 +80,14 @@ class ReinforcementOverlayService : Service() {
         }
     }
     private val touchSlop by lazy { ViewConfiguration.get(this).scaledTouchSlop }
+    private val languageReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: Intent?) {
+            val code = intent?.getStringExtra("language") ?: return
+            if (prefs.getString("language_mode", "app") == "app" && pageLoaded) {
+                webView.evaluateJavascript("window.setAppLanguage && window.setAppLanguage(${org.json.JSONObject.quote(code)})", null)
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -93,6 +102,9 @@ class ReinforcementOverlayService : Service() {
             if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
         )
         createWebView()
+        val languageFilter = android.content.IntentFilter(ACTION_LANGUAGE_CHANGED)
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(languageReceiver, languageFilter, android.content.Context.RECEIVER_NOT_EXPORTED)
+        else registerReceiver(languageReceiver, languageFilter)
         prefs.edit().putBoolean("window_attached", false).apply()
         publishState()
     }
@@ -314,6 +326,18 @@ class ReinforcementOverlayService : Service() {
 
     private inner class RallyBridge {
         @JavascriptInterface
+        fun getAppLanguage(): String = getSharedPreferences("rally_native", MODE_PRIVATE).getString("language", null)
+            ?: if (java.util.Locale.getDefault().language.equals("ar", true)) "ar" else "en"
+
+        @JavascriptInterface
+        fun getToolLanguage(): String = prefs.getString("language_mode", "app") ?: "app"
+
+        @JavascriptInterface
+        fun setToolLanguage(value: String) {
+            if (value == "app" || value == "ar" || value == "en") prefs.edit().putString("language_mode", value).apply()
+        }
+
+        @JavascriptInterface
         fun setLayout(open: Boolean, w: Int, h: Int, circleX: Int) {
             mainHandler.post {
                 if (!webViewCreated || !isOverlayAttached) return@post
@@ -401,6 +425,7 @@ class ReinforcementOverlayService : Service() {
     override fun onDestroy() {
         Choreographer.getInstance().removeFrameCallback(overlayFrameCallback)
         overlayFramePending = false
+        runCatching { unregisterReceiver(languageReceiver) }
         if (isOverlayAttached) {
             runCatching { windowManager.removeView(webView) }
         }
