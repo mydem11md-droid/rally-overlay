@@ -151,7 +151,7 @@ class MainActivity : Activity() {
                 it.setTextColor(-1)
                 it.background = android.graphics.drawable.GradientDrawable().apply { setColor(0xFF245C9A.toInt()); cornerRadius=dp(9).toFloat() }
             }
-            refreshUtcButton()
+            utcClockButton?.setText(R.string.utc_enable)
             Toast.makeText(this,R.string.stopped,Toast.LENGTH_SHORT).show()
         },LinearLayout.LayoutParams(-1,dp(46)).apply { topMargin=dp(10) })
         root.addView(actionButton(getString(R.string.check_update),0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()) { checkForUpdates(true) },LinearLayout.LayoutParams(-1,dp(42)).apply { topMargin=dp(10) })
