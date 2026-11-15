@@ -23,7 +23,7 @@ private class EdgeResizeLayout(context: Context) : FrameLayout(context) {
     var onResize: ((dx:Int,dy:Int,edges:Int)->Unit)?=null
     var onResizeEnd: (() -> Unit)?=null
     private val edge=(20*resources.displayMetrics.density).roundToInt()
-    private val handlePaint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0x668FA493; strokeWidth=(2*resources.displayMetrics.density).coerceAtLeast(1f) }
+    private val handlePaint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0x666B95FF; strokeWidth=(2*resources.displayMetrics.density).coerceAtLeast(1f) }
     private var edges=0
     private var lastX=0f
     private var lastY=0f
@@ -125,6 +125,15 @@ class RallyOverlayService : Service() {
     private fun dp(v: Int) = (v * density).roundToInt()
     private fun dp(v: Float) = (v * density).roundToInt()
     private fun ar() = language == "ar"
+    private val C_PANEL = Color.rgb(23, 30, 39)
+    private val C_FIELD = Color.rgb(14, 19, 25)
+    private val C_TEXT = Color.rgb(232, 237, 243)
+    private val C_MUTED = Color.rgb(134, 150, 168)
+    private val C_BORDER = Color.rgb(42, 52, 65)
+    private val C_ACCENT = Color.rgb(107, 149, 255)
+    private val C_ACCENT_TEXT = Color.rgb(11, 18, 32)
+    private val C_DANGER = Color.rgb(255, 140, 128)
+    private val C_WARNING = Color.rgb(240, 193, 90)
     private fun t(a: String, e: String) = if (ar()) a else e
     private fun localizedContext(): Context {
         language = prefs.getString("language", null) ?: if (Locale.getDefault().language.equals("ar", true)) "ar" else "en"
@@ -152,13 +161,23 @@ class RallyOverlayService : Service() {
         view.layoutDirection = if (ar()) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
     }
     private fun bg(color: Int, radius: Float): GradientDrawable =
-        GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
+        GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radius).toFloat()
+            setStroke(dp(1), C_BORDER)
+        }
+    private fun orbBackground() = GradientDrawable(
+        GradientDrawable.Orientation.TL_BR,
+        intArrayOf(Color.rgb(47, 123, 255), Color.rgb(10, 63, 209))
+    ).apply { shape = GradientDrawable.OVAL; setStroke(dp(2), C_TEXT) }
     private fun text(value: String, size: Float, color: Int, bold: Boolean = false) =
         TextView(uiContext).apply { text=value; textSize=size; setTextColor(color); gravity=Gravity.CENTER_VERTICAL; direction(this)
             if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD) }
     private fun button(value: String, color: Int, fg: Int, action: () -> Unit) =
         TextView(uiContext).apply { text=value; textSize=13f; gravity=Gravity.CENTER; setTextColor(fg); direction(this)
-            background=bg(color,9f); setPadding(dp(10),dp(7),dp(10),dp(7)); setOnClickListener { action() } }
+            background=android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x226B95FF), bg(color,9f), null
+            ); setPadding(dp(10),dp(7),dp(10),dp(7)); minHeight=dp(36); setOnClickListener { action() } }
     private fun fitControl(v: TextView) = v.apply { includeFontPadding=false; isSingleLine=true; gravity=Gravity.CENTER; minHeight=dp(40); setPadding(paddingLeft,dp(5),paddingRight,dp(5)) }
     private data class Person(val id:Int,var name:String,var duration:String,var kind:String="solo",var rallyMinutes:Int=5)
     private data class ResultRow(val id:Int,val name:String,val isRally:Boolean,val rallySeconds:Int,val marchSeconds:Int,val actionAt:Long,val departAt:Long,val arrivalAt:Long)
@@ -305,21 +324,21 @@ class RallyOverlayService : Service() {
         runCatching { wm.updateViewLayout(r,p) }
     }
     private fun iconCircle():View = object:View(uiContext) {
-        private val paint=Paint(3).apply { color=Color.WHITE; style=Paint.Style.STROKE; strokeWidth=dp(2).toFloat(); strokeCap=Paint.Cap.ROUND }
+        private val paint=Paint(3).apply { color=C_TEXT; style=Paint.Style.STROKE; strokeWidth=dp(2).toFloat(); strokeCap=Paint.Cap.ROUND }
         override fun onDraw(c:Canvas) { super.onDraw(c); val x=width/2f;val y=height/2f
             c.drawCircle(x,y,dp(9).toFloat(),paint);c.drawLine(x,y,x,y-dp(5),paint);c.drawLine(x,y,x+dp(4),y+dp(3),paint) }
     }.apply { contentDescription=t("الوقت","Clock") }
     private fun addPinnedControls(f: FrameLayout) {
-        val capsule=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),10f);setPadding(dp(12),dp(5),dp(12),dp(5));minimumWidth=dp(104);direction(this) }
-        val clock=TextView(uiContext).apply { tag="utc_time";text=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(System.currentTimeMillis()));textSize=15f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
-        val utc=TextView(uiContext).apply { text="UTC";textSize=11f;setTextColor(0xFFA5C4AA.toInt());includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR }
+        val capsule=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=bg(C_PANEL,10f);setPadding(dp(12),dp(6),dp(12),dp(6));minimumWidth=dp(104);direction(this) }
+        val clock=TextView(uiContext).apply { tag="utc_time";text=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(System.currentTimeMillis()));textSize=15f;setTextColor(C_TEXT);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
+        val utc=TextView(uiContext).apply { text="UTC";textSize=11f;setTextColor(C_MUTED);includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR }
         capsule.addView(clock);capsule.addView(utc,LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(4)})
         f.addView(capsule,FrameLayout.LayoutParams(-2,-2,Gravity.TOP or Gravity.CENTER_HORIZONTAL))
-        val orb=FrameLayout(uiContext).apply { background=bg(0xFF2E7D32.toInt(),50f);addView(iconCircle(),FrameLayout.LayoutParams(dp(24),dp(24),Gravity.CENTER)) }
+        val orb=FrameLayout(uiContext).apply { background=orbBackground();addView(iconCircle(),FrameLayout.LayoutParams(dp(24),dp(24),Gravity.CENTER)) }
         f.addView(orb,FrameLayout.LayoutParams(dp(46),dp(46),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(34)})
         val close=object:View(uiContext) {
             private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
-            override fun onDraw(canvas:Canvas) { super.onDraw(canvas);val cx=width/2f;val cy=height/2f;paint.style=Paint.Style.FILL;paint.color=0xFF1E2A22.toInt();canvas.drawCircle(cx,cy,dp(10).toFloat(),paint);paint.color=if(isPressed)0xFFE57373.toInt() else 0xFF2A3A2F.toInt();canvas.drawCircle(cx,cy,dp(8).toFloat(),paint);paint.color=Color.WHITE;paint.style=Paint.Style.STROKE;paint.strokeWidth=dp(1.5f).toFloat();paint.strokeCap=Paint.Cap.ROUND;val d=dp(3).toFloat();canvas.drawLine(cx-d,cy-d,cx+d,cy+d,paint);canvas.drawLine(cx+d,cy-d,cx-d,cy+d,paint) }
+            override fun onDraw(canvas:Canvas) { super.onDraw(canvas);val cx=width/2f;val cy=height/2f;paint.style=Paint.Style.FILL;paint.color=C_PANEL;canvas.drawCircle(cx,cy,dp(10).toFloat(),paint);paint.color=if(isPressed)C_DANGER else C_FIELD;canvas.drawCircle(cx,cy,dp(8).toFloat(),paint);paint.color=C_TEXT;paint.style=Paint.Style.STROKE;paint.strokeWidth=dp(1.5f).toFloat();paint.strokeCap=Paint.Cap.ROUND;val d=dp(3).toFloat();canvas.drawLine(cx-d,cy-d,cx+d,cy+d,paint);canvas.drawLine(cx+d,cy-d,cx-d,cy+d,paint) }
             override fun onTouchEvent(event:MotionEvent):Boolean { when(event.actionMasked){MotionEvent.ACTION_DOWN->{isPressed=true;invalidate();return true};MotionEvent.ACTION_UP->{isPressed=false;invalidate();performClick();return true};MotionEvent.ACTION_CANCEL->{isPressed=false;invalidate();return true}};return true }
             override fun performClick():Boolean { super.performClick();showConfirm();return true }
         }
@@ -440,31 +459,31 @@ class RallyOverlayService : Service() {
         val f=root?:return
         f.resizeEnabled=true
         f.removeAllViews();f.clipChildren=true;f.clipToPadding=true;addPinnedControls(f)
-        val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(12),dp(12),dp(12),dp(12));clipChildren=true;clipToPadding=true;direction(this)}
+        val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(C_PANEL,12f);setPadding(dp(10),dp(10),dp(10),dp(10));clipChildren=true;clipToPadding=true;direction(this)}
         menuView=panel
         val header=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL;orientation=LinearLayout.HORIZONTAL;direction(this)}
-        header.addView(text(if(settingsMode)t("الإعدادات","Settings")else if(resultsMode)t("نتائج التنسيق","Rally results")else t("أداة تنسيق الحشود","Rally Coordinator"),14f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(34),1f))
-        header.addView(button("ع | EN",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){changeLanguage()},LinearLayout.LayoutParams(dp(58),dp(32)))
+        header.addView(text(if(settingsMode)t("الإعدادات","Settings")else if(resultsMode)t("نتائج التنسيق","Rally results")else t("أداة تنسيق الحشود","Rally Coordinator"),14f,C_TEXT,true),LinearLayout.LayoutParams(0,dp(34),1f))
+        header.addView(button("ع | EN",C_FIELD,C_MUTED){changeLanguage()},LinearLayout.LayoutParams(dp(58),dp(32)))
         header.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
-        header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(dp(34),dp(32)))
+        header.addView(button("⚙",C_FIELD,C_MUTED){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(dp(34),dp(32)))
         panel.addView(header)
-        miniEditor=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;visibility=View.GONE;background=bg(0xFF2A3A2F.toInt(),9f);setPadding(dp(9),dp(5),dp(9),dp(5))}
-        miniEditorTitle=text("",10f,0xFFA5C4AA.toInt(),true)
-        miniEditorValue=text("",18f,Color.WHITE,true)
+        miniEditor=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;visibility=View.GONE;background=bg(C_FIELD,9f);setPadding(dp(10),dp(7),dp(10),dp(7))}
+        miniEditorTitle=text("",10f,C_MUTED,true)
+        miniEditorValue=text("",18f,C_TEXT,true)
         miniEditor?.addView(miniEditorTitle);miniEditor?.addView(miniEditorValue)
         panel.addView(miniEditor,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(5)})
         val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=true;clipToPadding=true;direction(this)};scroll=sc
         val content=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=true;clipToPadding=true;direction(this)}
         sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,0,1f))
         if(resultsMode)buildResults(content)else buildEditor(content)
-        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(12)})
+        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),C_ACCENT,C_ACCENT_TEXT){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(12)})
         panel.alpha=0f
         f.addView(panel,FrameLayout.LayoutParams(-1,-1).apply{leftMargin=dp(20);rightMargin=dp(20);topMargin=dp(88);bottomMargin=dp(12)})
         applyLayout()
         panel.animate().alpha(1f).setDuration(150).start()
     }
     private fun renderMenu(){showMenu()}
-    private fun label(parent:LinearLayout,s:String){parent.addView(text(s,11f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(23)))}
+    private fun label(parent:LinearLayout,s:String){parent.addView(text(s,11f,C_MUTED,true),LinearLayout.LayoutParams(-1,dp(23)))}
     private inner class OverlayEditText(context:Context):EditText(context) {
         override fun onKeyPreIme(keyCode:Int,event:KeyEvent):Boolean {
             if(keyCode==KeyEvent.KEYCODE_BACK && this@RallyOverlayService.focusable) {
@@ -492,8 +511,8 @@ class RallyOverlayService : Service() {
     }
     private fun input(hint:String,value:String,numeric:Boolean=false):EditText {
         return OverlayEditText(uiContext).apply {
-            setSingleLine(true); textSize=13f; setTextColor(Color.WHITE); setHintTextColor(0xFFA5C4AA.toInt()); setHint(hint); setText(value); contentDescription=hint
-            background=bg(0xFF2A3A2F.toInt(),9f); setPadding(dp(9),0,dp(9),0)
+            setSingleLine(true); textSize=13f; setTextColor(C_TEXT); setHintTextColor(C_MUTED); setHint(hint); setText(value); contentDescription=hint
+            background=bg(C_FIELD,9f); setPadding(dp(9),0,dp(9),0)
             if(numeric) { inputType=android.text.InputType.TYPE_CLASS_NUMBER; keyListener=android.text.method.DigitsKeyListener.getInstance("0123456789"); imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=View.TEXT_DIRECTION_LTR; textAlignment=View.TEXT_ALIGNMENT_CENTER }
             else { inputType=android.text.InputType.TYPE_CLASS_TEXT; imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=if(ar())View.TEXT_DIRECTION_RTL else View.TEXT_DIRECTION_LTR }
             setOnTouchListener { v,event ->
@@ -551,20 +570,20 @@ class RallyOverlayService : Service() {
     private fun buildEditor(c:LinearLayout) {
         if(settingsMode) {
             label(c,t("الإعدادات","Settings"))
-            c.addView(button(if(vibrationEnabled)uiContext.getString(R.string.vibration_on)else uiContext.getString(R.string.vibration_off),0xFF2A3A2F.toInt(),Color.WHITE){vibrationEnabled=!vibrationEnabled;persist();renderMenu()})
-            c.addView(button(uiContext.getString(R.string.back),0xFF4CAF50.toInt(),0xFF102014.toInt()){settingsMode=false;persist();renderMenu()})
+            c.addView(button(if(vibrationEnabled)uiContext.getString(R.string.vibration_on)else uiContext.getString(R.string.vibration_off),C_FIELD,C_TEXT){vibrationEnabled=!vibrationEnabled;persist();renderMenu()})
+            c.addView(button(uiContext.getString(R.string.back),C_ACCENT,C_ACCENT_TEXT){settingsMode=false;persist();renderMenu()})
             return
         }
         val modes=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;direction(this)}
-        modes.addView(button(uiContext.getString(R.string.mode_now),if(calculationMode=="now")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(calculationMode=="now")0xFF102014.toInt() else Color.WHITE){calculationMode="now";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
+        modes.addView(button(uiContext.getString(R.string.mode_now),if(calculationMode=="now")C_ACCENT else C_FIELD,if(calculationMode=="now")C_ACCENT_TEXT else C_TEXT){calculationMode="now";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
         modes.addView(Space(uiContext),LinearLayout.LayoutParams(dp(6),1))
-        modes.addView(button(uiContext.getString(R.string.mode_target),if(calculationMode=="target")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(calculationMode=="target")0xFF102014.toInt() else Color.WHITE){calculationMode="target";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
+        modes.addView(button(uiContext.getString(R.string.mode_target),if(calculationMode=="target")C_ACCENT else C_FIELD,if(calculationMode=="target")C_ACCENT_TEXT else C_TEXT){calculationMode="target";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
         c.addView(modes)
         if(calculationMode=="now") {
             label(c,uiContext.getString(R.string.prep_delay))
             val delays=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
             listOf(5,10,20,30).forEach { value ->
-                delays.addView(button(value.toString(),if(prepSeconds==value)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(prepSeconds==value)0xFF102014.toInt() else Color.WHITE){prepSeconds=value;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(30),1f))
+                delays.addView(button(value.toString(),if(prepSeconds==value)C_ACCENT else C_FIELD,if(prepSeconds==value)C_ACCENT_TEXT else C_TEXT){prepSeconds=value;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(30),1f))
                 if(value!=30)delays.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
             }
             c.addView(delays)
@@ -580,8 +599,8 @@ class RallyOverlayService : Service() {
         }
         label(c,t("المشاركون","Participants")+" · ${people.size}")
         people.forEachIndexed{index,p->
-            val row=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;setPadding(0,dp(5),0,dp(5))}
-            row.addView(text(t("مشارك","Participant")+" ${index+1}",11f,0xFFA5C4AA.toInt(),true))
+            val row=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(C_FIELD,9f);setPadding(dp(8),dp(8),dp(8),dp(8))}
+            row.addView(text(t("مشارك","Participant")+" ${index+1}",11f,C_MUTED,true))
             val fields=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
             val name=input(t("اسم اللاعب","Player name"),p.name)
             val duration=input("MM:SS",p.duration,true)
@@ -595,9 +614,9 @@ class RallyOverlayService : Service() {
             fields.addView(duration,LinearLayout.LayoutParams(dp(82),dp(38)))
             row.addView(fields)
             val kindRow=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
-            kindRow.addView(fitControl(button(uiContext.getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(40),1f))
+            kindRow.addView(fitControl(button(uiContext.getString(R.string.solo),if(p.kind=="solo")C_ACCENT else C_FIELD,if(p.kind=="solo")C_ACCENT_TEXT else C_TEXT){p.kind="solo";persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(40),1f))
             kindRow.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
-            kindRow.addView(fitControl(button(uiContext.getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(40),1f))
+            kindRow.addView(fitControl(button(uiContext.getString(R.string.rally),if(p.kind=="rally")C_ACCENT else C_FIELD,if(p.kind=="rally")C_ACCENT_TEXT else C_TEXT){p.kind="rally";persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(40),1f))
             row.addView(kindRow,LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(4)})
             if(p.kind=="rally") {
                 duration.hint="MM:SS";duration.contentDescription=uiContext.getString(R.string.rally_march_arrival)
@@ -606,7 +625,7 @@ class RallyOverlayService : Service() {
                 presets.chunked(4).forEach { group ->
                     val durations=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
                     group.forEach { mins ->
-                        durations.addView(fitControl(button(if(ar())"${mins}د" else "${mins}m",if(p.rallyMinutes==mins)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes==mins)0xFF102014.toInt() else Color.WHITE){p.rallyMinutes=mins;persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(40),1f))
+                        durations.addView(fitControl(button(if(ar())"${mins}د" else "${mins}m",if(p.rallyMinutes==mins)C_ACCENT else C_FIELD,if(p.rallyMinutes==mins)C_ACCENT_TEXT else C_TEXT){p.rallyMinutes=mins;persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(40),1f))
                         if(mins!=group.last())durations.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
                     }
                     row.addView(durations,LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(3)})
@@ -614,20 +633,20 @@ class RallyOverlayService : Service() {
                 val custom=input(uiContext.getString(R.string.minutes),if(p.rallyMinutes !in presets)p.rallyMinutes.toString() else "",true)
                 if(index==people.lastIndex)custom.imeOptions=EditorInfo.IME_ACTION_DONE
                 custom.visibility=View.GONE
-                val customToggle=fitControl(button(uiContext.getString(R.string.custom_minutes),if(p.rallyMinutes !in presets)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes !in presets)0xFF102014.toInt() else Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE})
+                val customToggle=fitControl(button(uiContext.getString(R.string.custom_minutes),if(p.rallyMinutes !in presets)C_ACCENT else C_FIELD,if(p.rallyMinutes !in presets)C_ACCENT_TEXT else C_TEXT){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE})
                 row.addView(customToggle,LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(8)})
-                custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it > 0 && it <= Int.MAX_VALUE/60}?.let{p.rallyMinutes=it;persist();customToggle.setBackground(bg(0xFF4CAF50.toInt(),9f));customToggle.setTextColor(0xFF102014.toInt())}})
+                custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it > 0 && it <= Int.MAX_VALUE/60}?.let{p.rallyMinutes=it;persist();customToggle.setBackground(bg(C_ACCENT,9f));customToggle.setTextColor(C_ACCENT_TEXT)}})
                 row.addView(custom,LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(4)})
             }
             val actions=LinearLayout(uiContext).apply{gravity=if(ar())Gravity.END else Gravity.START}
-            actions.addView(button(t("تعديل","Edit"),0xFF2A3A2F.toInt(),Color.WHITE){name.requestFocus();name.setSelection(name.text.length);setFocus(true)})
+            actions.addView(button(t("تعديل","Edit"),C_FIELD,C_TEXT){name.requestFocus();name.setSelection(name.text.length);setFocus(true)})
             actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
-            actions.addView(button(t("حذف","Delete"),0xFFE57373.toInt(),Color.WHITE){people.removeAll{it.id==p.id};if(people.isEmpty())people.add(Person(nextId++,"",""));persist();renderMenu()})
+            actions.addView(button(t("حذف","Delete"),C_DANGER,C_TEXT){people.removeAll{it.id==p.id};if(people.isEmpty())people.add(Person(nextId++,"",""));persist();renderMenu()})
             row.addView(actions,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(8)});c.addView(row)
-            if(index<people.lastIndex)c.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
+            if(index<people.lastIndex)c.addView(View(uiContext).apply{setBackgroundColor(C_BORDER)},LinearLayout.LayoutParams(-1,dp(1)))
         }
-        c.addView(button(t("+ إضافة مشارك","+ Add participant"),0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){people.add(Person(nextId++,"",""));persist();renderMenu();scroll?.post{scroll?.fullScroll(View.FOCUS_DOWN)}})
-        errors.forEach{c.addView(text(it,11f,0xFFE57373.toInt()))}
+        c.addView(button(t("+ إضافة مشارك","+ Add participant"),C_FIELD,C_MUTED){people.add(Person(nextId++,"",""));persist();renderMenu();scroll?.post{scroll?.fullScroll(View.FOCUS_DOWN)}})
+        errors.forEach{c.addView(text(it,11f,C_DANGER))}
     }
     private fun utcTime(epoch:Long):String = SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(epoch))
     private fun countdown(ms:Long):String {
@@ -648,11 +667,11 @@ class RallyOverlayService : Service() {
             val remaining=r.actionAt-now
             if(remaining>0) {
                 label.text=String.format(Locale.US,uiContext.getString(R.string.countdown_in),countdown(remaining))
-                label.setTextColor(if(remaining<=10_000L)0xFFFF9100.toInt() else 0xFFA5C4AA.toInt())
+                label.setTextColor(if(remaining<=10_000L)C_WARNING else C_MUTED)
             } else {
                 val zeroAt=resultZeroAt.getOrPut(r.id){now}
                 label.text=uiContext.getString(R.string.now_label)
-                label.setTextColor(if(now-zeroAt<3000L)0xFF4CAF50.toInt() else 0xFF78907D.toInt())
+                label.setTextColor(if(now-zeroAt<3000L)C_ACCENT else C_MUTED)
                 resultRowsViews[r.id]?.alpha=if(now-zeroAt<3000L)1f else 0.55f
                 if(vibrationEnabled&&vibratedIds.add(r.id)) {
                     runCatching {
@@ -667,39 +686,39 @@ class RallyOverlayService : Service() {
         resultCountdowns.clear();resultRowsViews.clear()
         label(c,uiContext.getString(R.string.execution_schedule))
         results.forEachIndexed { index,r ->
-            val wrap=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;setPadding(0,dp(5),0,dp(5));direction(this)}
+            val wrap=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(C_FIELD,9f);setPadding(dp(8),dp(7),dp(8),dp(7));direction(this)}
             resultRowsViews[r.id]=wrap
             val top=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
             val info=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL}
-            info.addView(text(r.name,12f,Color.WHITE,true))
-            info.addView(text(if(r.isRally)String.format(Locale.US,uiContext.getString(R.string.rally_badge),r.rallySeconds/60) else uiContext.getString(R.string.solo),10f,0xFFA5C4AA.toInt()))
+            info.addView(text(r.name,12f,C_TEXT,true))
+            info.addView(text(if(r.isRally)String.format(Locale.US,uiContext.getString(R.string.rally_badge),r.rallySeconds/60) else uiContext.getString(R.string.solo),10f,C_MUTED))
             top.addView(info,LinearLayout.LayoutParams(0,-2,1f))
-            top.addView(text(if(r.isRally)uiContext.getString(R.string.start_rally) else uiContext.getString(R.string.send_action),11f,0xFFA5C4AA.toInt(),true))
+            top.addView(text(if(r.isRally)uiContext.getString(R.string.start_rally) else uiContext.getString(R.string.send_action),11f,C_MUTED,true))
             val time=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;layoutDirection=View.LAYOUT_DIRECTION_LTR}
-            time.addView(text(utcTime(r.actionAt).substring(0,2),11f,0xFFA5C4AA.toInt()))
-            time.addView(text(utcTime(r.actionAt).substring(2),17f,Color.WHITE,true))
+            time.addView(text(utcTime(r.actionAt).substring(0,2),11f,C_MUTED))
+            time.addView(text(utcTime(r.actionAt).substring(2),17f,C_TEXT,true))
             top.addView(time,LinearLayout.LayoutParams(-2,dp(34)).apply{marginStart=dp(7)})
-            top.addView(button(t("نسخ","Copy"),0xFF2A3A2F.toInt(),Color.WHITE){copyRow(r)})
+            top.addView(button(t("نسخ","Copy"),C_FIELD,C_TEXT){copyRow(r)})
             wrap.addView(top)
-            val timer=text("",11f,0xFFA5C4AA.toInt(),true).apply{textDirection=View.TEXT_DIRECTION_LTR}
+            val timer=text("",11f,C_MUTED,true).apply{textDirection=View.TEXT_DIRECTION_LTR}
             resultCountdowns[r.id]=timer
             wrap.addView(timer,LinearLayout.LayoutParams(-1,dp(22)))
-            if(r.isRally)wrap.addView(text(t("ينطلق ","Departs ")+utcTime(r.departAt),10f,0xFFA5C4AA.toInt()))
+            if(r.isRally)wrap.addView(text(t("ينطلق ","Departs ")+utcTime(r.departAt),10f,C_MUTED))
             c.addView(wrap)
             if(index<results.lastIndex) {
                 val next=results[index+1]
                 val gap=((next.actionAt-r.actionAt)/1000L).coerceAtLeast(0L)
-                c.addView(text(String.format(Locale.US,uiContext.getString(R.string.after_player_by),r.name,countdown(gap*1000)),9f,0xFFA5C4AA.toInt()))
-                c.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
+                c.addView(text(String.format(Locale.US,uiContext.getString(R.string.after_player_by),r.name,countdown(gap*1000)),9f,C_MUTED))
+                c.addView(View(uiContext).apply{setBackgroundColor(C_BORDER)},LinearLayout.LayoutParams(-1,dp(1)))
             }
         }
-        errors.forEach{c.addView(text(it,10f,0xFFE57373.toInt()))}
+        errors.forEach{c.addView(text(it,10f,C_DANGER))}
         results.firstOrNull()?.let { r ->
-            c.addView(text(String.format(Locale.US,uiContext.getString(R.string.everyone_arrives),utcTime(r.arrivalAt)),11f,0xFF4CAF50.toInt(),true))
+            c.addView(text(String.format(Locale.US,uiContext.getString(R.string.everyone_arrives),utcTime(r.arrivalAt)),11f,C_ACCENT,true))
         }
-        c.addView(button(t("نسخ الكل","Copy all"),0xFF2A3A2F.toInt(),Color.WHITE){copy(results.joinToString("\n"){r->copyRowText(r)})})
-        c.addView(button(uiContext.getString(R.string.recalculate_now),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()})
-        c.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()})
+        c.addView(button(t("نسخ الكل","Copy all"),C_FIELD,C_TEXT){copy(results.joinToString("\n"){r->copyRowText(r)})})
+        c.addView(button(uiContext.getString(R.string.recalculate_now),C_ACCENT,C_ACCENT_TEXT){calculationMode="now";resultsMode=false;calculate()})
+        c.addView(button(t("رجوع للتعديل","Back to edit"),C_FIELD,C_TEXT){resultsMode=false;persist();renderMenu()})
         updateResultCountdowns()
         val now=System.currentTimeMillis()
         results.forEach { r ->
@@ -740,7 +759,7 @@ class RallyOverlayService : Service() {
             if(late.isNotEmpty()) {
                 results=rows.map{ResultRow(it.id,it.name,it.isRally,it.rallySeconds,it.marchSeconds,it.actionAtMillis,it.departAtMillis,it.arrivalAtMillis)}.toMutableList()
                 resultsMode=true;persist();renderMenu()
-                val postpone=button(uiContext.getString(R.string.postpone_target_hour),0xFF4CAF50.toInt(),0xFF102014.toInt()){
+                val postpone=button(uiContext.getString(R.string.postpone_target_hour),C_ACCENT,C_ACCENT_TEXT){
                     val shifted=Calendar.getInstance(TimeZone.getTimeZone("UTC"),Locale.US).apply{timeInMillis=targetAt+3600000L}
                     targetHour=String.format(Locale.US,"%02d",shifted.get(Calendar.HOUR_OF_DAY))
                     target=String.format(Locale.US,"%d:%02d",shifted.get(Calendar.MINUTE),shifted.get(Calendar.SECOND))
@@ -768,12 +787,12 @@ class RallyOverlayService : Service() {
     private fun showConfirm() {
         if(confirming)return;confirming=true
         if (focusable) { dismissIme(focusedField);setFocus(false) }
-        val dialog=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(16),dp(12),dp(16),dp(12))}
-        dialog.addView(text(t("هل تريد إغلاق الأداة؟","Close the tool?"),13f,Color.WHITE,true))
+        val dialog=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=bg(C_PANEL,12f);setPadding(dp(16),dp(12),dp(16),dp(12))}
+        dialog.addView(text(t("هل تريد إغلاق الأداة؟","Close the tool?"),13f,C_TEXT,true))
         val actions=LinearLayout(uiContext).apply{gravity=Gravity.CENTER}
-        actions.addView(button(t("نعم","Yes"),0xFF4CAF50.toInt(),Color.WHITE){confirming=false;stopSelf()})
+        actions.addView(button(t("نعم","Yes"),C_ACCENT,C_ACCENT_TEXT){confirming=false;stopSelf()})
         actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(8),1))
-        actions.addView(button(t("لا","No"),0xFFE57373.toInt(),Color.WHITE){confirming=false;buildCollapsed();applyLayout()})
+        actions.addView(button(t("لا","No"),C_DANGER,C_TEXT){confirming=false;buildCollapsed();applyLayout()})
         dialog.addView(actions)
         val r=root?:return
         r.resizeEnabled=false
