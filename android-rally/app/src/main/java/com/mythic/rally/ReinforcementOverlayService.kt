@@ -291,7 +291,7 @@ class ReinforcementOverlayService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat_rally)
             .setContentTitle("أداة التعزيزات")
             .setContentText("خدمة الأداة جاهزة")
             .setOngoing(true)
