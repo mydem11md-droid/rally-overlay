@@ -23,7 +23,7 @@ private class EdgeResizeLayout(context: Context) : FrameLayout(context) {
     var onResize: ((dx:Int,dy:Int,edges:Int)->Unit)?=null
     var onResizeEnd: (() -> Unit)?=null
     private val edge=(20*resources.displayMetrics.density).roundToInt()
-    private val handlePaint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0x668FA493; strokeWidth=(2*resources.displayMetrics.density).coerceAtLeast(1f) }
+    private val handlePaint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0x666B95FF; strokeWidth=(2*resources.displayMetrics.density).coerceAtLeast(1f) }
     private var edges=0
     private var lastX=0f
     private var lastY=0f
@@ -790,7 +790,7 @@ class RallyOverlayService : Service() {
         val dialog=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=bg(C_PANEL,12f);setPadding(dp(16),dp(12),dp(16),dp(12))}
         dialog.addView(text(t("هل تريد إغلاق الأداة؟","Close the tool?"),13f,C_TEXT,true))
         val actions=LinearLayout(uiContext).apply{gravity=Gravity.CENTER}
-        actions.addView(button(t("نعم","Yes"),C_ACCENT,C_TEXT){confirming=false;stopSelf()})
+        actions.addView(button(t("نعم","Yes"),C_ACCENT,C_ACCENT_TEXT){confirming=false;stopSelf()})
         actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(8),1))
         actions.addView(button(t("لا","No"),C_DANGER,C_TEXT){confirming=false;buildCollapsed();applyLayout()})
         dialog.addView(actions)
