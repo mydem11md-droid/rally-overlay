@@ -66,11 +66,33 @@ button.x{background:transparent;border:0;color:var(--mute);padding:0}
 .bar{display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
 .st{color:var(--mute);font-size:.72rem}
 html.ov{padding:0!important;background:transparent}
-html.ov body{background:transparent}
+html.ov body{background:transparent;font-size:11px;line-height:1.35}
 html.ov .note{display:none}
 html.ov #w{position:absolute}
 html.ov #c{cursor:default;box-shadow:0 2px 4px rgba(0,0,0,.4),0 0 0 3px rgba(47,123,255,.45);box-shadow:0 2px 4px rgba(0,0,0,.4),0 0 0 3px color-mix(in srgb,var(--orb1) 45%,transparent)}
-html.ov #p{width:300px;max-height:none;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+html.ov #p{width:260px;max-height:520px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:8px;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+html.ov #p .hd{margin-bottom:5px}
+html.ov #p .hd b{font-size:.82rem}
+html.ov #p .ic{width:23px;height:23px}
+html.ov #p #set{padding:6px;margin-bottom:6px}
+html.ov #p .sw{gap:5px;margin:3px 0 6px}
+html.ov #p .sw button{width:19px;height:19px}
+html.ov #p .md{gap:3px;margin-top:3px}
+html.ov #p .md button{padding:2px 0;font-size:.7rem}
+html.ov #p .tabs{gap:3px;margin-bottom:5px}
+html.ov #p .tab{padding:2px 7px;font-size:.7rem;max-width:82px}
+html.ov #p .pn{gap:3px;margin-bottom:6px}
+html.ov #p .top{gap:4px}
+html.ov #p .chips{gap:3px;margin-top:5px}
+html.ov #p .chip{padding:2px 0;font-size:.7rem}
+html.ov #p .ban{padding:4px 7px;margin:6px 0}
+html.ov #p .ban b{font-size:1.25rem}
+html.ov #p .r{grid-template-columns:minmax(0,1fr) 40px 56px 32px 12px;gap:3px;margin-bottom:3px}
+html.ov #p .r input{padding:2px 3px;font-size:10px}
+html.ov #p .at,html.ov #p .cd{font-size:10px}
+html.ov #p .bar{gap:4px;margin-top:5px}
+html.ov #p button.b{padding:4px 8px;font-size:.72rem}
+html.ov #p .st{font-size:.66rem}
 </style>
 </head>
 <body>
@@ -213,7 +235,11 @@ $("gear").onclick=function(){var o=$("set").hidden;$("set").hidden=!o;$("gear").
 applyS();
 
 /* floating orb */
-var w=$("w"),c=$("c"),p=$("p"),W=68,PAD=8,WW=312,lastKey="";
+var w=$("w"),c=$("c"),p=$("p"),W=68,PAD=8,
+    PANEL_W=Math.max(80,Math.min(260,screen.width-W-16)),
+    WW=PANEL_W+12,
+    MAX_PANEL_H=Math.max(40,Math.min(520,screen.height-100)),lastKey="";
+if(OV){p.style.width=PANEL_W+"px";p.style.maxHeight=MAX_PANEL_H+"px";p.style.overflowY="auto";}
 function place(){
   if(OV){p.style.left=((WW-W)/2-w.offsetLeft)+"px";p.style.right="auto";p.style.top=(W+8)+"px";p.style.bottom="auto";return}
   var r=w.getBoundingClientRect(),pw=Math.min(300,innerWidth-16);
@@ -223,7 +249,7 @@ function place(){
 function fit(){if(OV&&!p.hidden)p.style.maxHeight=Math.max(120,innerHeight-PAD-W-8-PAD)+"px"}
 function report(){
   var open=!p.hidden,cl=open?Math.round((WW-W)/2):PAD,ww=open?WW:W+2*PAD,
-      hh=open?Math.round(Math.min(p.scrollHeight+2,600)+PAD+W+8+PAD):W+2*PAD,key=[open,ww,hh,cl].join();
+      hh=open?Math.round(Math.min(p.scrollHeight,MAX_PANEL_H)+PAD+W+8+PAD):W+2*PAD,key=[open,ww,hh,cl].join();
   if(key===lastKey)return;lastKey=key;
   w.style.left=cl+"px";place();
   try{window.RallyBridge.setLayout(open,ww,hh,cl)}catch(e){}}
