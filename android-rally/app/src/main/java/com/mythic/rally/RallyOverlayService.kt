@@ -17,19 +17,72 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.*
 
+private class EdgeResizeLayout(context: Context) : FrameLayout(context) {
+    companion object { const val L=1; const val T=2; const val R=4; const val B=8 }
+    var resizeEnabled=false
+    var onResize: ((dx:Int,dy:Int,edges:Int)->Unit)?=null
+    var onResizeEnd: (() -> Unit)?=null
+    private val edge=(20*resources.displayMetrics.density).roundToInt()
+    private val handlePaint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0x668FA493; strokeWidth=(2*resources.displayMetrics.density).coerceAtLeast(1f) }
+    private var edges=0
+    private var lastX=0f
+    private var lastY=0f
+    init { setWillNotDraw(false) }
+    override fun onDraw(canvas:Canvas) {
+        super.onDraw(canvas)
+        if(!resizeEnabled)return
+        val d=resources.displayMetrics.density
+        val cx=width/2f;val cy=height/2f
+        canvas.drawLine(cx-12*d,2*d,cx+12*d,2*d,handlePaint)
+        canvas.drawLine(cx-12*d,height-2*d,cx+12*d,height-2*d,handlePaint)
+        canvas.drawLine(2*d,cy-12*d,2*d,cy+12*d,handlePaint)
+        canvas.drawLine(width-2*d,cy-12*d,width-2*d,cy+12*d,handlePaint)
+    }
+    override fun onInterceptTouchEvent(event:MotionEvent):Boolean {
+        if(!resizeEnabled)return false
+        if(event.actionMasked==MotionEvent.ACTION_DOWN) {
+            edges=0
+            if(event.x<edge)edges=edges or L
+            if(event.x>width-edge)edges=edges or R
+            if(event.y<edge)edges=edges or T
+            if(event.y>height-edge)edges=edges or B
+            lastX=event.rawX;lastY=event.rawY
+            return edges!=0
+        }
+        return edges!=0
+    }
+    override fun onTouchEvent(event:MotionEvent):Boolean {
+        if(!resizeEnabled||edges==0)return false
+        when(event.actionMasked) {
+            MotionEvent.ACTION_MOVE -> {
+                val dx=(event.rawX-lastX).roundToInt();val dy=(event.rawY-lastY).roundToInt()
+                lastX=event.rawX;lastY=event.rawY
+                if(dx!=0||dy!=0)onResize?.invoke(dx,dy,edges)
+            }
+            MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL -> { edges=0;onResizeEnd?.invoke() }
+        }
+        return true
+    }
+}
+
 class RallyOverlayService : Service() {
     private val prefs by lazy { getSharedPreferences("rally_native", MODE_PRIVATE) }
     private lateinit var uiContext: Context
     private var language = "en"
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var wm: WindowManager
-    private var root: FrameLayout? = null
+    private var root: EdgeResizeLayout? = null
+    private var panelWidthPx = 0
+    private var panelHeightPx = 0
+    private var panelXdp = -1
+    private var panelYdp = 180
     private var params: WindowManager.LayoutParams? = null
     private var menuOpen = false
     private var resultsMode = false
     private var settingsMode = false
     private var confirming = false
     private var focusable = false
+    private val imm by lazy { getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager }
     private var target = ""
     private var targetHour = ""
     private var calculationMode = "now"
@@ -138,6 +191,9 @@ class RallyOverlayService : Service() {
         prepSeconds=prefs.getInt("prep_seconds",10)
         vibrationEnabled=prefs.getBoolean("vibration_enabled",true)
         bubbleX=prefs.getInt("x",24); bubbleY=prefs.getInt("y",180)
+        panelWidthPx=dp(prefs.getInt("panel_w",320)).coerceAtLeast(dp(240))
+        panelHeightPx=dp(prefs.getInt("panel_h",520)).coerceAtLeast(dp(280))
+        panelXdp=prefs.getInt("panel_x",-1); panelYdp=prefs.getInt("panel_y",bubbleY)
         menuOpen=prefs.getBoolean("open",false); resultsMode=prefs.getBoolean("results",false); settingsMode=prefs.getBoolean("settings",false)
         nextId=prefs.getInt("next",1)
         runCatching {
@@ -169,22 +225,77 @@ class RallyOverlayService : Service() {
             .addAction(Notification.Action.Builder(null,t("إيقاف","Stop"),stop).build()).build()
     }
     private fun createOverlay() {
-        statusInsetPx=dp(24); navInsetPx=dp(24)
-        val screenW=(resources.displayMetrics.widthPixels/density).toInt()
-        val screenH=(resources.displayMetrics.heightPixels/density).toInt()
-        bubbleX=bubbleX.coerceIn(0,(screenW-104).coerceAtLeast(0)); bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),(screenH-55).coerceAtLeast(((statusInsetPx+dp(50))/density).roundToInt()))
-        val frame=FrameLayout(uiContext).apply { clipChildren=true; clipToPadding=true; direction(this) }
+        statusInsetPx=dp(24);navInsetPx=dp(24)
+        val screenW=resources.displayMetrics.widthPixels
+        val screenH=resources.displayMetrics.heightPixels
+        panelWidthPx=panelWidthPx.takeIf{it>0} ?: dp(320)
+        panelHeightPx=panelHeightPx.takeIf{it>0} ?: dp(520)
+        panelWidthPx=panelWidthPx.coerceIn(dp(240),screenW.coerceAtLeast(dp(240)))
+        panelHeightPx=panelHeightPx.coerceIn(dp(280),screenH.coerceAtLeast(dp(280)))
+        bubbleX=bubbleX.coerceIn(0,((screenW-dp(104))/density).roundToInt().coerceAtLeast(0))
+        bubbleY=bubbleY.coerceAtLeast(((statusInsetPx+dp(8))/density).roundToInt())
+        if(panelXdp<0)panelXdp=((dp(bubbleX+52)-panelWidthPx/2)/density).roundToInt()
+        panelXdp=panelXdp.coerceIn(0,((screenW-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
+        panelYdp=panelYdp.coerceIn(0,((screenH-panelHeightPx).coerceAtLeast(0)/density).roundToInt())
+        val frame=EdgeResizeLayout(uiContext).apply { clipChildren=true;clipToPadding=true;direction(this);isFocusableInTouchMode=true }
         root=frame
-        val p=WindowManager.LayoutParams(dp(58),WindowManager.LayoutParams.WRAP_CONTENT,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+        val p=WindowManager.LayoutParams(
+            if(menuOpen)panelWidthPx else dp(104),
+            if(menuOpen)panelHeightPx else dp(80),
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT).apply { gravity=Gravity.TOP or Gravity.START; x=dp(bubbleX); y=dp(bubbleY)
-                softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN }
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity=Gravity.TOP or Gravity.START
+            x=if(menuOpen)dp(panelXdp) else dp(bubbleX)
+            y=if(menuOpen)dp(panelYdp) else dp(bubbleY)
+            softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
+        }
         params=p
+        frame.resizeEnabled=menuOpen
+        frame.onResize={dx,dy,edges -> resizePanelBy(dx,dy,edges)}
+        frame.onResizeEnd={
+            prefs.edit()
+                .putInt("panel_w",(panelWidthPx/density).roundToInt())
+                .putInt("panel_h",(panelHeightPx/density).roundToInt())
+                .putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()
+        }
+        frame.setOnKeyListener { _,code,event ->
+            if(code==KeyEvent.KEYCODE_BACK && event.action==KeyEvent.ACTION_UP && focusable) {
+                focusedField?.let { dismissIme(it) } ?: dismissIme(null)
+                true
+            } else false
+        }
         wm.addView(frame,p)
         buildCollapsed()
         installInsetsTracking(frame)
-        if(menuOpen) showMenu()
+        if(menuOpen)showMenu()
         handler.post(clockTick)
+    }
+    private fun resizePanelBy(dx:Int,dy:Int,edges:Int) {
+        val p=params?:return
+        val sw=resources.displayMetrics.widthPixels
+        val sh=resources.displayMetrics.heightPixels
+        val minW=dp(240);val minH=dp(280)
+        var x=p.x;var y=p.y;var w=p.width;var h=p.height
+        if(edges and EdgeResizeLayout.R!=0)w=(w+dx).coerceIn(minW,(sw-x).coerceAtLeast(minW))
+        if(edges and EdgeResizeLayout.L!=0) {
+            val right=x+w
+            w=(w-dx).coerceIn(minW,sw.coerceAtLeast(minW))
+            x=right-w
+        }
+        if(edges and EdgeResizeLayout.B!=0)h=(h+dy).coerceIn(minH,(sh-y).coerceAtLeast(minH))
+        if(edges and EdgeResizeLayout.T!=0) {
+            val bottom=y+h
+            h=(h-dy).coerceIn(minH,sh.coerceAtLeast(minH))
+            y=bottom-h
+        }
+        x=x.coerceIn(0,(sw-w).coerceAtLeast(0))
+        y=y.coerceIn(0,(sh-h).coerceAtLeast(0))
+        p.width=w;p.height=h;p.x=x;p.y=y
+        panelWidthPx=w;panelHeightPx=h
+        panelXdp=(x/density).roundToInt();panelYdp=(y/density).roundToInt()
+        runCatching { wm.updateViewLayout(root,p) }
     }
     private fun iconCircle():View = object:View(uiContext) {
         private val paint=Paint(3).apply { color=Color.WHITE; style=Paint.Style.STROKE; strokeWidth=dp(2).toFloat(); strokeCap=Paint.Cap.ROUND }
@@ -217,7 +328,14 @@ class RallyOverlayService : Service() {
         val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true};MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt();if(abs(dx)+abs(dy)>5)dragged=true;if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-104);bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-55);applyLayout();persist()};true};MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true};else->true} }
         orb.setOnTouchListener(drag);f.setOnTouchListener(drag)
     }
-    private fun buildCollapsed() { if (focusable) { focusedField?.clearFocus(); setFocus(false) }; val f=root?:return;f.removeAllViews();f.clipChildren=true;f.clipToPadding=true;addPinnedControls(f);updateClock();applyLayout() }
+    private fun buildCollapsed() {
+        if(focusable){focusedField?.clearFocus();setFocus(false)}
+        val f=root?:return
+        f.resizeEnabled=false
+        f.removeAllViews();f.clipChildren=true;f.clipToPadding=true
+        menuView=null;scroll=null;miniEditor=null;miniEditorTitle=null;miniEditorValue=null
+        addPinnedControls(f);updateClock();applyLayout()
+    }
     private var downX=0f;private var downY=0f;private var startX=0;private var startY=0;private var dragged=false
     private fun updateClock() {
         val c=root?.findViewWithTag<TextView>("utc_time")?:return
@@ -225,8 +343,9 @@ class RallyOverlayService : Service() {
         c.text=formatter.format(Date())
     }
     private fun availableOverlayHeight(): Int {
-        val full = if (Build.VERSION.SDK_INT >= 30) wm.currentWindowMetrics.bounds.height() else resources.displayMetrics.heightPixels
-        return (full - max(statusInsetPx,dp(bubbleY)) - navInsetPx - imeHeightPx - dp(16)).coerceAtLeast(dp(120))
+        val full=if(Build.VERSION.SDK_INT>=30)wm.currentWindowMetrics.bounds.height() else resources.displayMetrics.heightPixels
+        val top=if(menuOpen)dp(panelYdp) else dp(bubbleY)
+        return (full-max(statusInsetPx,top)-navInsetPx-imeHeightPx-dp(16)).coerceAtLeast(dp(120))
     }
     private fun installInsetsTracking(view: View) {
         statusInsetPx=dp(24); navInsetPx=dp(24)
@@ -267,7 +386,13 @@ class RallyOverlayService : Service() {
             }
         }
     }
-    private fun resizeForInsets() { if(root!=null){applyLayout();focusedField?.post{ensureFocusedFieldVisible(focusedField!!)}} }
+    private fun resizeForInsets() {
+        if(root==null)return
+        val cap=(availableOverlayHeight()-dp(88+34+17+38+12)).coerceAtLeast(dp(72))
+        (scroll as? CappedScrollView)?.maxHeightPx=if(resultsMode)(availableOverlayHeight()-dp(88+34+17)).coerceAtLeast(dp(72)) else cap
+        scroll?.requestLayout()
+        focusedField?.let { field -> field.post { if(field.hasFocus())ensureFocusedFieldVisible(field) } }
+    }
     private fun ensureFocusedFieldVisible(field: EditText) {
         val sc=scroll?:return
         val rect=Rect();field.getDrawingRect(rect);sc.offsetDescendantRectToMyCoords(field,rect)
@@ -280,20 +405,19 @@ class RallyOverlayService : Service() {
         if(needsMini)lastScrollMode="mini-editor"
     }
     private fun applyLayout() {
-        val r=root?:return;val p=params?:return;val sw=resources.displayMetrics.widthPixels
-        val width=if(menuOpen&&menuView!=null)dp(280) else dp(104)
-        p.width=width;p.height=WindowManager.LayoutParams.WRAP_CONTENT
-        p.x=if(menuOpen&&menuView!=null)(dp(bubbleX+52)-width/2).coerceIn(0,(sw-width).coerceAtLeast(0))else dp(bubbleX)
-        p.y=dp(bubbleY.coerceAtLeast(((statusInsetPx+dp(50))/density).roundToInt()))
-        p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
-        val cap=(availableOverlayHeight()-dp(88+34+17+38+12)).coerceAtLeast(dp(72))
-        (scroll as? CappedScrollView)?.maxHeightPx=if(resultsMode)(availableOverlayHeight()-dp(88+34+17)).coerceAtLeast(dp(72))else cap
-        r.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(availableOverlayHeight(),View.MeasureSpec.AT_MOST))
-        runCatching {
-            wm.updateViewLayout(r,p)
-            val mode=if((scroll?.getChildAt(0)?.height?:0)>(scroll?.height?:0))"scroll" else "content"
-            Log.d("RallyLayout","windowHeight=${r.measuredHeight}px availableHeight=${availableOverlayHeight()}px keyboardHeight=${imeHeightPx}px scrollMode=$mode")
-        }.onFailure{Log.e("RallyLayout","update failed",it)}
+        val r=root?:return
+        val p=params?:return
+        val expanded=menuOpen && menuView!=null
+        val width=if(expanded)panelWidthPx else dp(104)
+        val height=if(expanded)panelHeightPx else dp(80)
+        val x=if(expanded)dp(panelXdp.coerceAtLeast(0)) else dp(bubbleX)
+        val y=if(expanded)dp(panelYdp.coerceAtLeast(0)) else dp(bubbleY)
+        val changed=p.width!=width || p.height!=height || p.x!=x || p.y!=y
+        p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
+        if(changed) {
+            p.width=width;p.height=height;p.x=x;p.y=y
+            runCatching { wm.updateViewLayout(r,p) }.onFailure { Log.e("RallyLayout","update failed",it) }
+        }
     }
     private fun collapse(){
         if (focusable) { focusedField?.clearFocus(); setFocus(false) }
@@ -305,8 +429,10 @@ class RallyOverlayService : Service() {
         } else { menuOpen=false;persist();buildCollapsed();applyLayout() }
     }
     private fun showMenu() {
-        val f=root?:return;f.removeAllViews();f.clipChildren=true;f.clipToPadding=true;addPinnedControls(f)
-        val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(10),dp(8),dp(10),dp(9));clipChildren=true;clipToPadding=true;direction(this)}
+        val f=root?:return
+        f.resizeEnabled=true
+        f.removeAllViews();f.clipChildren=true;f.clipToPadding=true;addPinnedControls(f)
+        val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(12),dp(12),dp(12),dp(12));clipChildren=true;clipToPadding=true;direction(this)}
         menuView=panel
         val header=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL;orientation=LinearLayout.HORIZONTAL;direction(this)}
         header.addView(text(if(settingsMode)t("الإعدادات","Settings")else if(resultsMode)t("نتائج التنسيق","Rally results")else t("أداة تنسيق الحشود","Rally Coordinator"),14f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(34),1f))
@@ -321,28 +447,61 @@ class RallyOverlayService : Service() {
         panel.addView(miniEditor,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(5)})
         val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=true;clipToPadding=true;direction(this)};scroll=sc
         val content=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=true;clipToPadding=true;direction(this)}
-        sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,-2))
+        sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,0,1f))
         if(resultsMode)buildResults(content)else buildEditor(content)
         if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(12)})
         panel.alpha=0f
-        f.addView(panel,FrameLayout.LayoutParams(dp(280),-2).apply{topMargin=dp(88)})
+        f.addView(panel,FrameLayout.LayoutParams(-1,-1).apply{leftMargin=dp(20);rightMargin=dp(20);topMargin=dp(88);bottomMargin=dp(12)})
         applyLayout()
         panel.animate().alpha(1f).setDuration(150).start()
     }
     private fun renderMenu(){showMenu()}
     private fun label(parent:LinearLayout,s:String){parent.addView(text(s,11f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(23)))}
+    private inner class OverlayEditText(context:Context):EditText(context) {
+        override fun onKeyPreIme(keyCode:Int,event:KeyEvent):Boolean {
+            if(keyCode==KeyEvent.KEYCODE_BACK && event.action==KeyEvent.ACTION_UP && focusable) { dismissIme(this);return true }
+            return super.onKeyPreIme(keyCode,event)
+        }
+    }
+    private fun dismissIme(field:EditText?) {
+        val token=field?.windowToken ?: root?.windowToken
+        if(token!=null)imm.hideSoftInputFromWindow(token,0)
+        field?.clearFocus()
+        if(focusedField===field)focusedField=null
+    }
+    private fun handleEditorAction(field:EditText,actionId:Int):Boolean {
+        if(actionId==EditorInfo.IME_ACTION_DONE) { dismissIme(field);return true }
+        if(actionId==EditorInfo.IME_ACTION_NEXT) {
+            val next=field.focusSearch(View.FOCUS_FORWARD)
+            if(next!=null) { next.requestFocus();if(next is EditText)next.post { if(next.hasFocus())imm.showSoftInput(next,InputMethodManager.SHOW_IMPLICIT) } }
+            else dismissIme(field)
+            return true
+        }
+        return false
+    }
     private fun input(hint:String,value:String,numeric:Boolean=false):EditText {
-        return EditText(uiContext).apply {
+        return OverlayEditText(uiContext).apply {
             setSingleLine(true); textSize=13f; setTextColor(Color.WHITE); setHintTextColor(0xFFA5C4AA.toInt()); setHint(hint); setText(value); contentDescription=hint
             background=bg(0xFF2A3A2F.toInt(),9f); setPadding(dp(9),0,dp(9),0)
             if(numeric) { inputType=android.text.InputType.TYPE_CLASS_NUMBER; keyListener=android.text.method.DigitsKeyListener.getInstance("0123456789"); imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=View.TEXT_DIRECTION_LTR; textAlignment=View.TEXT_ALIGNMENT_CENTER }
             else { inputType=android.text.InputType.TYPE_CLASS_TEXT; imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=if(ar())View.TEXT_DIRECTION_RTL else View.TEXT_DIRECTION_LTR }
-            setOnFocusChangeListener { v,has ->
-                if(has) { focusedField=this; setFocus(true); scroll?.post { ensureFocusedFieldVisible(this) } } else if(numeric) finalizeTimeInput(this) {}
+            setOnTouchListener { v,event ->
+                if(event.actionMasked==MotionEvent.ACTION_DOWN) {
+                    if(!focusable)setFocus(true)
+                    v.post { if(v.isAttachedToWindow) { v.requestFocus();imm.showSoftInput(v,InputMethodManager.SHOW_IMPLICIT) } }
+                }
+                false
             }
-            setOnEditorActionListener { v,actionId,_ ->
-                if(actionId==EditorInfo.IME_ACTION_NEXT) { if(numeric)finalizeTimeInput(this){}; v.focusSearch(View.FOCUS_FORWARD)?.requestFocus(); true } else false
+            setOnFocusChangeListener { _,has ->
+                if(has) {
+                    focusedField=this;setFocus(true)
+                    post { if(hasFocus()) { imm.showSoftInput(this,InputMethodManager.SHOW_IMPLICIT);scroll?.post { ensureFocusedFieldVisible(this) } } }
+                } else {
+                    if(focusedField===this)focusedField=null
+                    if(numeric)finalizeTimeInput(this) {}
+                }
             }
+            setOnEditorActionListener { _,actionId,_ -> if(actionId==EditorInfo.IME_ACTION_NEXT && numeric)finalizeTimeInput(this) {};handleEditorAction(this,actionId) }
         }
     }
     private fun timePreview(digits: String): String = RallyTime.preview(digits)
@@ -367,8 +526,9 @@ class RallyOverlayService : Service() {
             if(has) { focusedField=field; setFocus(true); scroll?.post { ensureFocusedFieldVisible(field) } }
             else finalizeTimeInput(field,changed)
         }
-        field.setOnEditorActionListener { v,actionId,_ ->
-            if(actionId==EditorInfo.IME_ACTION_NEXT) { finalizeTimeInput(field,changed); v.focusSearch(View.FOCUS_FORWARD)?.requestFocus(); true } else false
+        field.setOnEditorActionListener { _,actionId,_ ->
+            if(actionId==EditorInfo.IME_ACTION_NEXT)finalizeTimeInput(field,changed)
+            handleEditorAction(field,actionId)
         }
     }
     private fun finalizeTimeInput(field: EditText, changed: (String) -> Unit) {
@@ -588,10 +748,9 @@ class RallyOverlayService : Service() {
         if(focusable==on)return
         focusable=on
         p.flags=if(on)p.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv() else p.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-        p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
-        runCatching{wm.updateViewLayout(r,p)}
-        if(on){handler.postDelayed({val focused=r.findFocus()?:r;(getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(focused,InputMethodManager.SHOW_IMPLICIT)},120)}
-        else{(getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(r.windowToken,0)}
+        p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
+        runCatching { wm.updateViewLayout(r,p) }
+        if(on)focusedField?.let { field -> field.post { if(field.hasFocus())imm.showSoftInput(field,InputMethodManager.SHOW_IMPLICIT) } }
     }
     private fun showConfirm() {
         if(confirming)return;confirming=true
