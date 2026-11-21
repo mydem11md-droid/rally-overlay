@@ -207,6 +207,7 @@ class RallyOverlayService : Service() {
             for(i in 0 until a.length()){val o=a.getJSONObject(i);people.add(Person(o.getInt("id"),o.optString("name"),o.optString("duration"),o.optString("kind","solo"),o.optInt("rally_minutes",5)))}
         }
         if(people.isEmpty()) people.add(Person(nextId++,"",""))
+        if(!prefs.contains("rally_duration_minutes")) rallyDurationMinutes=people.firstOrNull{it.kind=="rally"}?.rallyMinutes ?: 5
         runCatching {
             val a=JSONArray(prefs.getString("result_rows","[]"))
             for(i in 0 until a.length()){val o=a.getJSONObject(i);results.add(ResultRow(o.getInt("id"),o.optString("name"),o.optBoolean("is_rally"),o.optInt("rally_seconds"),o.optInt("march_seconds"),o.optLong("action_at"),o.optLong("depart_at"),o.optLong("arrival_at")))}
