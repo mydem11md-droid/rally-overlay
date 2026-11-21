@@ -307,14 +307,10 @@ class RallyOverlayService : Service() {
         panelXdp=(x/density).roundToInt();panelYdp=(y/density).roundToInt()
         runCatching { wm.updateViewLayout(r,p) }
     }
-    private fun orbBackground() = GradientDrawable(
-        GradientDrawable.Orientation.TL_BR,
-        intArrayOf(Color.rgb(46, 180, 94), Color.rgb(16, 112, 57))
-    ).apply { shape=GradientDrawable.OVAL; setStroke(dp(2),Color.WHITE) }
     private fun addPinnedControls(f: FrameLayout) {
         val clock=TextView(uiContext).apply {
             tag="utc_time"; text=RallyTime.utcClock(UtcClockTicker.currentTimeMillis())
-            textSize=11.5f; setTextColor(Color.WHITE)
+            textSize=12f; setTextColor(Color.WHITE)
             setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD)
             fontFeatureSettings="tnum"; includeFontPadding=false; isSingleLine=true
             gravity=Gravity.CENTER; textDirection=View.TEXT_DIRECTION_LTR
@@ -328,8 +324,29 @@ class RallyOverlayService : Service() {
             addView(clock,LinearLayout.LayoutParams(-1,dp(19)))
             addView(utc,LinearLayout.LayoutParams(-1,dp(12)))
         }
-        val orb=FrameLayout(uiContext).apply {
-            background=orbBackground()
+        val orb=object:FrameLayout(uiContext) {
+            private val fill=Paint(Paint.ANTI_ALIAS_FLAG)
+            private val border=Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color=Color.WHITE; style=Paint.Style.STROKE; strokeWidth=dp(3).toFloat()
+            }
+            private val glow=Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color=0x5541B86C; style=Paint.Style.STROKE; strokeWidth=dp(3).toFloat()
+            }
+            init { setWillNotDraw(false); setLayerType(View.LAYER_TYPE_SOFTWARE,null) }
+            override fun onSizeChanged(w:Int,h:Int,oldw:Int,oldh:Int) {
+                super.onSizeChanged(w,h,oldw,oldh)
+                fill.shader=RadialGradient(w*.32f,h*.28f,max(w,h)*.9f,
+                    intArrayOf(Color.rgb(65,174,96),Color.rgb(10,94,48)),null,Shader.TileMode.CLAMP)
+                fill.setShadowLayer(dp(14).toFloat(),0f,dp(5).toFloat(),0x59000000)
+            }
+            override fun onDraw(canvas:Canvas) {
+                super.onDraw(canvas)
+                val cx=width/2f; val cy=height/2f; val radius=width/2f-dp(1.5f)
+                canvas.drawCircle(cx,cy,radius,glow)
+                canvas.drawCircle(cx,cy,radius,fill)
+                canvas.drawCircle(cx,cy,radius,border)
+            }
+        }.apply {
             addView(clockStack,FrameLayout.LayoutParams(dp(62),dp(34),Gravity.CENTER))
             contentDescription=t("فتح أو إغلاق أداة تنسيق الحشود","Open or close Rally Coordinator")
         }
