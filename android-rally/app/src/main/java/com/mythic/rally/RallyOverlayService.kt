@@ -103,6 +103,7 @@ class RallyOverlayService : Service() {
     private var menuView: LinearLayout? = null
     private var popupRef: PopupWindow? = null
     private var scroll: ScrollView? = null
+    private var participantRowsScroll: CappedScrollView? = null
     private var targetInput: EditText? = null
     private var imeHeightPx = 0
     private var imeWasVisible = false
@@ -503,20 +504,26 @@ class RallyOverlayService : Service() {
         miniEditorTitle=text("",10f,0xFFA5C4AA.toInt(),true);miniEditorValue=text("",18f,Color.WHITE,true)
         miniEditor?.addView(miniEditorTitle);miniEditor?.addView(miniEditorValue)
         panel.addView(miniEditor,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(5)})
-        val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=true;clipToPadding=true;direction(this)};scroll=sc
         val content=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=true;clipToPadding=true;direction(this)}
-        sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,-2))
-        if(resultsMode)buildResults(content)else buildEditor(content)
+        if(resultsMode) {
+            val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=true;clipToPadding=true;direction(this)}
+            scroll=sc;participantRowsScroll=null;sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,-2))
+            buildResults(content)
+        } else {
+            scroll=null
+            panel.addView(content,LinearLayout.LayoutParams(-1,-2))
+            buildEditor(content)
+        }
         if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(6)})
         val screenH=resources.displayMetrics.heightPixels
-        val contentWidth=(panelWidthPx-dp(64)).coerceAtLeast(dp(120))
-        content.measure(View.MeasureSpec.makeMeasureSpec(contentWidth,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED))
         val below=(screenH-dp(bubbleY+84)-navInsetPx-dp(12)).coerceAtLeast(0)
         val above=(dp(bubbleY)-statusInsetPx-dp(12)).coerceAtLeast(0)
-        val naturalPanel=dp(34+24+(if(resultsMode)0 else 44))+content.measuredHeight
+        val estimatedRows=if(resultsMode)results.size*dp(78)+dp(52+90) else people.size*dp(49)+dp(120)+(if(calculationMode=="target")dp(110) else 0)
+        val naturalPanel=dp(34+24+44)+estimatedRows
         panelAbove=below<naturalPanel && above>below
         val available=(if(panelAbove)above else below).coerceAtLeast(dp(160))
-        sc.maxHeightPx=(available-dp(34+24+(if(resultsMode)0 else 44))).coerceAtLeast(dp(72))
+        if(resultsMode) scroll?.let { (it as? CappedScrollView)?.maxHeightPx=(available-dp(58)).coerceAtLeast(dp(72)) }
+        else participantRowsScroll?.maxHeightPx=(available-dp(34+24+44+38+21+41+(if(calculationMode=="target")110 else 0))).coerceAtLeast(dp(72))
         val widthSpec=View.MeasureSpec.makeMeasureSpec((panelWidthPx-dp(40)).coerceAtLeast(dp(200)),View.MeasureSpec.EXACTLY)
         panel.measure(widthSpec,View.MeasureSpec.makeMeasureSpec(available,View.MeasureSpec.AT_MOST))
         panelContentHeightPx=panel.measuredHeight.coerceAtLeast(dp(140))
@@ -740,6 +747,10 @@ class RallyOverlayService : Service() {
             targetHourInput?.addTextChangedListener(SimpleWatcher{targetHour=it.filter{ch->ch.isDigit()}.take(2);persist()})
         }
         label(c,t("المشاركون · الاسم · وقت المسير · النوع","Participants · Name · March time · Type"))
+        val participantRows=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=true;clipToPadding=true;direction(this)}
+        val participantScroll=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=true;clipToPadding=true;direction(this)}
+        participantScroll.addView(participantRows);participantRowsScroll=participantScroll;scroll=participantScroll
+        c.addView(participantScroll,LinearLayout.LayoutParams(-1,-2))
         people.forEachIndexed { index,p ->
             val row=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
             val name=input(t("الاسم","Name"),p.name).apply { textSize=11f; contentDescription=t("مشارك ${index+1} · الاسم","Participant ${index+1} · name") }
@@ -763,8 +774,8 @@ class RallyOverlayService : Service() {
             actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(10),1))
             actions.addView(miniIconButton("×", { people.removeAll{it.id==p.id}; if(people.isEmpty())people.add(Person(nextId++,"","")); persist(); renderMenu() },0xFFFF7777.toInt()),LinearLayout.LayoutParams(dp(44),dp(44)))
             row.addView(actions,LinearLayout.LayoutParams(dp(98),dp(44)))
-            c.addView(row,LinearLayout.LayoutParams(-1,dp(48)))
-            if(index<people.lastIndex)c.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
+            participantRows.addView(row,LinearLayout.LayoutParams(-1,dp(48)))
+            if(index<people.lastIndex)participantRows.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
         }
         c.addView(dottedButton(t("+ إضافة مشارك","+ Add participant")) {
             people.add(Person(nextId++,"","")); persist(); renderMenu()
