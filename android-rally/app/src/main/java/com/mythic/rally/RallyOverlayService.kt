@@ -168,7 +168,10 @@ class RallyOverlayService : Service() {
             if(root!=null){if(menuOpen)showMenu()else buildCollapsed();startForeground(27,notification())}
         }
     }
-    private val clockTick = object: Runnable { override fun run() { updateClock(); updateResultCountdowns(); handler.postDelayed(this,1000) } }
+    private val clockListener: (Long) -> Unit = { epochMillis ->
+        updateClock(epochMillis)
+        updateResultCountdowns(epochMillis)
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -273,7 +276,7 @@ class RallyOverlayService : Service() {
         buildCollapsed()
         installInsetsTracking(frame)
         if(menuOpen)showMenu()
-        handler.post(clockTick)
+        RallyTime.addClockListener(clockListener)
     }
     private fun resizePanelBy(dx:Int,dy:Int,edges:Int) {
         val r=root?:return
@@ -311,7 +314,7 @@ class RallyOverlayService : Service() {
     }.apply { contentDescription=t("الوقت","Clock") }
     private fun addPinnedControls(f: FrameLayout) {
         val capsule=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),10f);setPadding(dp(12),dp(5),dp(12),dp(5));minimumWidth=dp(104);direction(this) }
-        val clock=TextView(uiContext).apply { tag="utc_time";text=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(System.currentTimeMillis()));textSize=15f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
+        val clock=TextView(uiContext).apply { tag="utc_time";text=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(RallyTime.nowMillis()));textSize=15f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
         val utc=TextView(uiContext).apply { text="UTC";textSize=11f;setTextColor(0xFFA5C4AA.toInt());includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR }
         capsule.addView(clock);capsule.addView(utc,LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(4)})
         f.addView(capsule,FrameLayout.LayoutParams(-2,-2,Gravity.TOP or Gravity.CENTER_HORIZONTAL))
@@ -345,10 +348,9 @@ class RallyOverlayService : Service() {
         addPinnedControls(f);updateClock();applyLayout()
     }
     private var downX=0f;private var downY=0f;private var startX=0;private var startY=0;private var dragged=false
-    private fun updateClock() {
+    private fun updateClock(epochMillis: Long = RallyTime.nowMillis()) {
         val c=root?.findViewWithTag<TextView>("utc_time")?:return
-        val formatter=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}
-        c.text=formatter.format(Date())
+        c.text=RallyTime.utcClock(epochMillis)
     }
     private fun availableOverlayHeight(): Int {
         val full=if(Build.VERSION.SDK_INT>=30)wm.currentWindowMetrics.bounds.height() else resources.displayMetrics.heightPixels
@@ -640,7 +642,7 @@ class RallyOverlayService : Service() {
         return "${r.name} — ${verb} ${utcTime(r.actionAt)} UTC${extra}"
     }
     private fun copyRow(r:ResultRow) = copy(copyRowText(r))
-    private fun updateResultCountdowns() {
+    private fun updateResultCountdowns(now: Long = RallyTime.nowMillis()) {
         if(!resultsMode||resultCountdowns.isEmpty())return
         val now=System.currentTimeMillis()
         results.forEach { r ->
@@ -781,7 +783,7 @@ class RallyOverlayService : Service() {
         val p=params?:return;p.width=dp(240);p.height=dp(120);p.x=(resources.displayMetrics.widthPixels-p.width)/2;p.y=(resources.displayMetrics.heightPixels-p.height)/2
         runCatching{wm.updateViewLayout(r,p)}
     }
-    override fun onDestroy(){runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};root?.let{runCatching{wm.removeView(it)}};root=null
+    override fun onDestroy(){RallyTime.removeClockListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};root?.let{runCatching{wm.removeView(it)}};root=null
         if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
     companion object { const val ACTION_STOP="com.mythic.rally.STOP"; const val ACTION_LANGUAGE_CHANGED="com.mythic.rally.LANGUAGE_CHANGED"; private const val TAG="RallyOverlay" }
     private class SimpleWatcher(val changed:(String)->Unit):android.text.TextWatcher{
