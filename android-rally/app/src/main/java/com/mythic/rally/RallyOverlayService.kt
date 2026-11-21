@@ -487,7 +487,65 @@ class RallyOverlayService : Service() {
         panel.animate().alpha(1f).setDuration(150).start()
     }
     private fun renderMenu(){showMenu()}
-    private fun label(parent:LinearLayout,s:String){parent.addView(text(s,11f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(23)))}
+    private fun label(parent:LinearLayout,s:String){parent.addView(text(s,10f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(21)))}
+    private fun dropdown(selected:String, options:List<Pair<String,()->Unit>>):TextView {
+        val anchor=button("$selected  ▾",0xFF2A3A2F.toInt(),0xFFE7F0EA.toInt()) {}
+        anchor.textSize=10f; anchor.includeFontPadding=false
+        anchor.setPadding(dp(3),dp(4),dp(3),dp(4))
+        anchor.setOnClickListener {
+            val popup=PopupMenu(uiContext,anchor)
+            options.forEach { (title,_) -> popup.menu.add(title) }
+            popup.setOnMenuItemClickListener { item ->
+                options.firstOrNull { it.first==item.title.toString() }?.second?.invoke()
+                true
+            }
+            popup.show()
+        }
+        return anchor
+    }
+    private fun miniIconButton(symbol:String, action:()->Unit):TextView =
+        TextView(uiContext).apply {
+            text=symbol; textSize=16f; gravity=Gravity.CENTER; setTextColor(0xFFE7F0EA.toInt())
+            background=bg(0xFF2A3A2F.toInt(),7f); includeFontPadding=false
+            setPadding(0,0,0,0); minWidth=dp(24); minHeight=dp(32)
+            setOnClickListener { action() }
+        }
+    private fun dottedButton(value:String, action:()->Unit):TextView =
+        TextView(uiContext).apply {
+            text=value; textSize=12f; gravity=Gravity.CENTER; setTextColor(0xFFA5C4AA.toInt())
+            background=GradientDrawable().apply {
+                setColor(Color.TRANSPARENT); cornerRadius=dp(8).toFloat()
+                setStroke(dp(1),0xFF78907D.toInt(),dp(3).toFloat(),dp(3).toFloat())
+            }
+            setPadding(dp(8),dp(5),dp(8),dp(5)); minHeight=dp(36)
+            setOnClickListener { action() }
+        }
+    private fun editRallyDuration() {
+        val field=EditText(uiContext).apply {
+            inputType=android.text.InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true); setText(rallyDurationMinutes.toString())
+            setSelection(text.length); textDirection=View.TEXT_DIRECTION_LTR
+        }
+        AlertDialog.Builder(uiContext)
+            .setTitle(t("مدة حشد مخصصة بالدقائق","Custom rally duration in minutes"))
+            .setView(field)
+            .setNegativeButton(t("إلغاء","Cancel"),null)
+            .setPositiveButton(t("حفظ","Save")) { _,_ ->
+                field.text.toString().toIntOrNull()?.takeIf { it>0 && it<=Int.MAX_VALUE/60 }?.let {
+                    rallyDurationMinutes=it; persist(); renderMenu()
+                }
+            }.show()
+    }
+    private fun timelineRail(dotColor:Int=0xFF4CAF50.toInt()):View = object:View(uiContext) {
+        private val line=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0xFF42634B.toInt(); strokeWidth=dp(1.5f).toFloat() }
+        private val dot=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=dotColor; style=Paint.Style.FILL }
+        override fun onDraw(canvas:Canvas) {
+            super.onDraw(canvas)
+            val x=width/2f
+            canvas.drawLine(x,0f,x,height.toFloat(),line)
+            canvas.drawCircle(x,dp(15).toFloat(),dp(4.5f).toFloat(),dot)
+        }
+    }
     private inner class OverlayEditText(context:Context):EditText(context) {
         override fun onKeyPreIme(keyCode:Int,event:KeyEvent):Boolean {
             if(keyCode==KeyEvent.KEYCODE_BACK && this@RallyOverlayService.focusable) {
