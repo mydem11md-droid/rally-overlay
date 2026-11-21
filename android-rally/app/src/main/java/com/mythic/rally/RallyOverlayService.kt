@@ -475,10 +475,27 @@ class RallyOverlayService : Service() {
     }
     private fun ensureFocusedFieldVisible(field: EditText) {
         val sc=scroll?:return
-        val rect=Rect();field.getDrawingRect(rect);sc.offsetDescendantRectToMyCoords(field,rect)
-        val visibleBottom=sc.scrollY+sc.height-dp(12)
-        if(rect.bottom>visibleBottom)sc.smoothScrollTo(0,(rect.bottom-sc.height+dp(18)).coerceAtLeast(0))
-        val needsMini=imeHeightPx>dp(80) && (sc.height<dp(90) || rect.height()>sc.height)
+        // Some editor fields (for example the target-time controls) live outside
+        // the participant-list ScrollView. Only convert coordinates when the
+        // focused field is actually a descendant of this scroll container.
+        var ancestor: ViewParent? = field.parent
+        var isDescendant = false
+        while (ancestor != null) {
+            if (ancestor === sc) {
+                isDescendant = true
+                break
+            }
+            ancestor = ancestor.parent
+        }
+        val rect=Rect()
+        var needsMini = imeHeightPx>dp(80) && sc.height<dp(90)
+        if (isDescendant) {
+            field.getDrawingRect(rect)
+            sc.offsetDescendantRectToMyCoords(field,rect)
+            val visibleBottom=sc.scrollY+sc.height-dp(12)
+            if(rect.bottom>visibleBottom)sc.smoothScrollTo(0,(rect.bottom-sc.height+dp(18)).coerceAtLeast(0))
+            needsMini = needsMini || (imeHeightPx>dp(80) && rect.height()>sc.height)
+        }
         miniEditorTitle?.text=field.contentDescription?.toString() ?: field.hint?.toString().orEmpty()
         miniEditorValue?.text=field.text?.toString().orEmpty()
         miniEditor?.visibility=if(needsMini)View.VISIBLE else View.GONE
