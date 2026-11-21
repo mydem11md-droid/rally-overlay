@@ -18,12 +18,14 @@ import java.util.Locale
 object UtcClockTicker {
     private val handler = Handler(Looper.getMainLooper())
     private val listeners = LinkedHashSet<(Long) -> Unit>()
+    @Volatile private var currentTimestamp = RallyTime.nowMillis()
     private var scheduled = false
 
     private val tick = object : Runnable {
         override fun run() {
             scheduled = false
             val now = RallyTime.nowMillis()
+            currentTimestamp = now
             listeners.toList().forEach { listener -> runCatching { listener(now) } }
             schedule(now)
         }
@@ -31,11 +33,15 @@ object UtcClockTicker {
 
     fun addListener(listener: (Long) -> Unit) {
         onMain {
+            val firstListener = listeners.isEmpty()
+            if (firstListener) currentTimestamp = RallyTime.nowMillis()
             listeners.add(listener)
-            listener(RallyTime.nowMillis())
-            schedule(RallyTime.nowMillis())
+            runCatching { listener(currentTimestamp) }
+            schedule(currentTimestamp)
         }
     }
+
+    fun currentTimeMillis(): Long = currentTimestamp
 
     fun removeListener(listener: (Long) -> Unit) {
         onMain {
