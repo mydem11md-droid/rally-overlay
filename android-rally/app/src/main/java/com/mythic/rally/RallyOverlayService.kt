@@ -1,6 +1,7 @@
 package com.mythic.rally
 
 import android.app.*
+import android.animation.ValueAnimator
 import android.content.*
 import android.content.res.Configuration
 import android.graphics.*
@@ -538,10 +539,23 @@ class RallyOverlayService : Service() {
         val panelTop=if(panelAbove)dp(4) else dp(88)
         val panelBottom=if(panelAbove)dp(88) else dp(12)
         f.addView(panel,FrameLayout.LayoutParams(-1,panelContentHeightPx).apply{leftMargin=dp(20);rightMargin=dp(20);topMargin=panelTop;bottomMargin=panelBottom})
-        f.layoutParams?.let{lp->lp.width=panelWidthPx;lp.height=panelHeightPx;f.layoutParams=lp}
-        applyLayout()
+        val layout=params?:return
+        val oldHeight=layout.height.coerceAtLeast(dp(84));val oldY=layout.y
+        val targetY=dp(panelYdp);val targetHeight=panelHeightPx;val targetX=dp(panelXdp)
+        layout.width=panelWidthPx;layout.height=oldHeight;layout.x=targetX;layout.y=oldY
+        runCatching{wm.updateViewLayout(f,layout)}
+        ValueAnimator.ofFloat(0f,1f).apply {
+            duration=250
+            addUpdateListener { animator ->
+                val fraction=animator.animatedValue as Float
+                layout.height=(oldHeight+(targetHeight-oldHeight)*fraction).roundToInt()
+                layout.y=(oldY+(targetY-oldY)*fraction).roundToInt()
+                runCatching{wm.updateViewLayout(f,layout)}
+            }
+            start()
+        }
         panel.pivotY=if(panelAbove)0f else panel.height.toFloat()
-        panel.scaleY=0.96f
+        panel.scaleY=0.98f
         panel.animate().scaleY(1f).setDuration(250).start()
     }
     private fun renderMenu(){showMenu()}
