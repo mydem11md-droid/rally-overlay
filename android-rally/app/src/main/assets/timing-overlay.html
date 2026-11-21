@@ -107,7 +107,6 @@ html.ov #p .st{font-size:.66rem}
       <div class="sw" id="sw"></div>
       <label data-i18n="appearance">المظهر</label>
       <div class="md" id="md"><button data-m="auto" data-i18n="auto">تلقائي</button><button data-m="light" data-i18n="light">فاتح</button><button data-m="dark" data-i18n="dark">داكن</button></div>
-      <label data-i18n="languageLabel">لغة الأداة</label><div class="md" id="lang"><button data-lang="app">لغة التطبيق</button><button data-lang="ar">العربية</button><button data-lang="en">English</button></div>
     </div>
     <div class="tabs" id="tabs"></div>
     <div class="pn"><input class="nm" id="pname" aria-label="اسم الحشد" placeholder="اسم الحشد"><button class="x ic" id="del" aria-label="حذف هذا الحشد" hidden>×</button></div>
@@ -134,12 +133,12 @@ function pg(){return pages[cur]}
 function $(i){return document.getElementById(i)}
 var appLanguage="en",toolLanguageMode="app",language="en";
 try{appLanguage=window.RallyBridge?RallyBridge.getAppLanguage():(localStorage.getItem("rally-app-language")||"en")}catch(e){}
-try{toolLanguageMode=window.RallyBridge?RallyBridge.getToolLanguage():(localStorage.getItem("rp4-language-mode")||"app")}catch(e){}
+try{localStorage.removeItem("rp4-language-mode");if(window.RallyBridge)RallyBridge.setToolLanguage("app")}catch(e){}
 function tr(ar,en){return language==="en"?en:ar}
 var I18N={note:["اضغط الدائرة لفتح الأداة، واسحبها لتغيير مكانها","Tap the circle to open the tool, and drag it to move"],title:["حاسبة التعزيز","Reinforcement Calculator"],color:["لون الأداة","Tool color"],appearance:["المظهر","Appearance"],auto:["تلقائي","Auto"],light:["فاتح","Light"],dark:["داكن","Dark"],languageLabel:["لغة الأداة","Tool language"],eta:["عدّاد يحشد (د:ث)","Rally countdown (m:ss)"],enemyMarch:["مسيرة الخصم (د:ث)","Enemy march (m:ss)"],start:["ابدأ","Start"],allArrival:["وصول الجميع UTC","Everyone arrives UTC"],player:["اللاعب","Player"],march:["مسيرة","March"],sendUtc:["أرسل UTC","Send UTC"],after:["بعد","In"],copy:["نسخ","Copy"],copyAll:["نسخ الكل","Copy all"]};
 function defaultName(name,kind,n,enabled){var s=String(name||""),m;if(enabled===false)return s;if(kind==="rally"&&(m=s.match(/^حشد\s+(\d+)$/)))return tr(s,"Rally "+m[1]);if(kind==="player"&&(m=s.match(/^لاعب\s+(\d+)$/)))return tr(s,"Player "+m[1]);if(kind==="rally"&&(m=s.match(/^Rally\s+(\d+)$/)))return tr("حشد "+m[1],s);if(kind==="player"&&(m=s.match(/^Player\s+(\d+)$/)))return tr("لاعب "+m[1],s);return s}
-function setLanguage(code,persist){language=code==="ar"?"ar":"en";document.documentElement.lang=language;document.documentElement.dir=language==="ar"?"rtl":"ltr";document.body.dir=document.documentElement.dir;document.querySelectorAll("[data-i18n]").forEach(function(el){var v=I18N[el.dataset.i18n];if(v)el.textContent=tr(v[0],v[1])});$("c").setAttribute("aria-label",tr("فتح أو إغلاق حاسبة التوقيت","Open or close reinforcement calculator"));$("gear").setAttribute("aria-label",tr("الإعدادات","Settings"));$("del").setAttribute("aria-label",tr("حذف هذا الحشد","Delete this rally"));$("pname").placeholder=tr("اسم الحشد","Rally name");$("pname").setAttribute("aria-label",tr("اسم الحشد","Rally name"));$("add").textContent=tr("+ لاعب","+ Player");var addRally=document.querySelector(".tab.add");if(addRally)addRally.setAttribute("aria-label",tr("إضافة حشد جديد","Add new rally"));document.querySelectorAll("#lang button").forEach(function(b){b.classList.toggle("on",b.dataset.lang===toolLanguageMode);b.textContent=b.dataset.lang==="app"?tr("لغة التطبيق","App language"):b.dataset.lang==="ar"?"العربية":"English"});pages.forEach(function(g,i){g.n=defaultName(g.n,"rally",i+1,g.defaultRallyName!==false);if(g.defaultRallyName===undefined)g.defaultRallyName=/^(حشد|Rally)\s+\d+$/.test(String(g.n||""));g.pl.forEach(function(p,j){p.n=defaultName(p.n,"player",j+1,p.defaultName!==false);if(p.defaultName===undefined)p.defaultName=/^(لاعب|Player)\s+\d+$/.test(String(p.n||""))})});if(persist){try{localStorage.setItem("rp4-language-mode",toolLanguageMode);if(window.RallyBridge)RallyBridge.setToolLanguage(toolLanguageMode)}catch(e){}}render()}
-function setAppLanguage(code){appLanguage=code==="ar"?"ar":"en";try{localStorage.setItem("rally-app-language",appLanguage)}catch(e){}if(toolLanguageMode==="app")setLanguage(appLanguage,false)}
+function setLanguage(code,persist){language=code==="ar"?"ar":"en";document.documentElement.lang=language;document.documentElement.dir=language==="ar"?"rtl":"ltr";document.body.dir=document.documentElement.dir;document.title=tr("حاسبة توقيت التعزيز","Reinforcement Timer");document.querySelectorAll("[data-i18n]").forEach(function(el){var v=I18N[el.dataset.i18n];if(v)el.textContent=tr(v[0],v[1])});$("c").setAttribute("aria-label",tr("فتح أو إغلاق حاسبة التوقيت","Open or close reinforcement calculator"));$("gear").setAttribute("aria-label",tr("الإعدادات","Settings"));$("del").setAttribute("aria-label",tr("حذف هذا الحشد","Delete this rally"));$("pname").placeholder=tr("اسم الحشد","Rally name");$("pname").setAttribute("aria-label",tr("اسم الحشد","Rally name"));$("add").textContent=tr("+ لاعب","+ Player");var addRally=document.querySelector(".tab.add");if(addRally)addRally.setAttribute("aria-label",tr("إضافة حشد جديد","Add new rally"));document.querySelectorAll("#sw button[data-color-index]").forEach(function(b){var names=[["أزرق","Blue"],["بنفسجي","Purple"],["فيروزي","Turquoise"],["برتقالي","Orange"],["أحمر","Red"],["وردي","Pink"]],v=names[Number(b.dataset.colorIndex)];if(v)b.setAttribute("aria-label",tr(v[0],v[1]))});if(typeof ci!=="undefined"&&ci)ci.setAttribute("aria-label",tr("لون مخصص","Custom color"));pages.forEach(function(g,i){g.n=defaultName(g.n,"rally",i+1,g.defaultRallyName!==false);if(g.defaultRallyName===undefined)g.defaultRallyName=/^(حشد|Rally)\s+\d+$/.test(String(g.n||""));g.pl.forEach(function(p,j){p.n=defaultName(p.n,"player",j+1,p.defaultName!==false);if(p.defaultName===undefined)p.defaultName=/^(لاعب|Player)\s+\d+$/.test(String(p.n||""))})});if(persist){try{localStorage.removeItem("rp4-language-mode");if(window.RallyBridge)RallyBridge.setToolLanguage("app")}catch(e){}}render()}
+function setAppLanguage(code){appLanguage=code==="ar"?"ar":"en";try{localStorage.setItem("rally-app-language",appLanguage)}catch(e){}toolLanguageMode="app";setLanguage(appLanguage,false)}
 window.setAppLanguage=setAppLanguage;
 function pad(x){return String(x).padStart(2,"0")}
 function parseT(s){var d=String(s).replace(/\D/g,"");if(!d)return null;
@@ -217,7 +216,7 @@ $("cpb").onclick=function(){
   copy(textFor(pg(),Date.now()))};
 $("cpa").onclick=function(){
   var now=Date.now(),L=pages.filter(function(g){return g.ref}).map(function(g){return textFor(g,now)});
-  if(!L.length){$("cps").textContent="اضغط ابدأ أولاً";return}
+  if(!L.length){$("cps").textContent=tr("اضغط ابدأ أولاً","Press Start first");return}
   copy(L.join("\n\n"))};
 
 /* settings */
@@ -236,13 +235,13 @@ function applyS(){
   [].forEach.call($("sw").querySelectorAll("button"),function(b){b.classList.toggle("on",(b.dataset.c||null)===S.acc)});
   try{localStorage.setItem("rp3s",JSON.stringify(S))}catch(e){}}
 [["#1f5fff","أزرق"],["#7c3aed","بنفسجي"],["#0891b2","فيروزي"],["#f97316","برتقالي"],["#e11d48","أحمر"],["#db2777","وردي"]].forEach(function(c,i){
-  var b=document.createElement("button");b.style.background=c[0];b.setAttribute("aria-label",c[1]);
+  var b=document.createElement("button");b.style.background=c[0];b.dataset.colorIndex=i;b.setAttribute("aria-label",c[1]);
   if(i)b.dataset.c=c[0];b.onclick=function(){S.acc=i?c[0]:null;applyS()};$("sw").appendChild(b)});
 var ci=document.createElement("input");ci.type="color";ci.value=S.acc||"#1f5fff";ci.setAttribute("aria-label","لون مخصص");
 ci.oninput=function(){S.acc=ci.value;applyS()};$("sw").appendChild(ci);
 [].forEach.call($("md").children,function(b){b.onclick=function(){S.mode=b.dataset.m;applyS()}});
 $("gear").onclick=function(){var o=$("set").hidden;$("set").hidden=!o;$("gear").setAttribute("aria-expanded",String(o))};
-document.querySelectorAll("#lang button").forEach(function(b){b.onclick=function(){toolLanguageMode=b.dataset.lang;setLanguage(toolLanguageMode==="app"?appLanguage:toolLanguageMode,true)}});
+
 applyS();
 setLanguage(toolLanguageMode==="app"?appLanguage:toolLanguageMode,false);
 
