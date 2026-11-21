@@ -116,7 +116,7 @@ class ReinforcementOverlayService : Service() {
         val languageFilter = android.content.IntentFilter(ACTION_LANGUAGE_CHANGED)
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(languageReceiver, languageFilter, android.content.Context.RECEIVER_NOT_EXPORTED)
         else registerReceiver(languageReceiver, languageFilter)
-        RallyTime.addClockListener(utcTimeListener)
+        UtcClockTicker.addListener(utcTimeListener)
         prefs.edit().remove("language_mode").putBoolean("window_attached", false).apply()
         publishState()
     }
@@ -455,7 +455,7 @@ class ReinforcementOverlayService : Service() {
         Choreographer.getInstance().removeFrameCallback(overlayFrameCallback)
         overlayFramePending = false
         runCatching { unregisterReceiver(languageReceiver) }
-        RallyTime.removeClockListener(utcTimeListener)
+        UtcClockTicker.removeListener(utcTimeListener)
         if (isOverlayAttached) {
             runCatching { windowManager.removeView(webView) }
         }
