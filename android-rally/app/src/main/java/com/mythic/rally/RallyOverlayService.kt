@@ -572,7 +572,7 @@ class RallyOverlayService : Service() {
                 isFillViewport=false;clipChildren=true;clipToPadding=true
                 maxHeightPx=dp(260)
                 background=bg(0xFF1E2A22.toInt(),10f)
-                addView(rows,ScrollView.LayoutParams(-1,-2))
+                addView(rows,FrameLayout.LayoutParams(-1,-2))
                 isVerticalScrollBarEnabled=options.size>5
                 overScrollMode=View.OVER_SCROLL_IF_CONTENT_SCROLLS
             }
