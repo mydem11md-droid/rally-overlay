@@ -245,11 +245,11 @@ class RallyOverlayService : Service() {
         val sh=resources.displayMetrics.heightPixels
         val maxW=(sw*0.80f).roundToInt().coerceAtLeast(dp(1))
         panelWidthPx=(panelWidthPx.takeIf{it>0} ?: min(dp(320),maxW)).coerceIn(min(dp(240),maxW),maxW)
-        bubbleX=bubbleX.coerceIn(0,((sw-dp(88))/density).roundToInt().coerceAtLeast(0))
-        bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((sh-dp(88)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
+        bubbleX=bubbleX.coerceIn(0,((sw-dp(84))/density).roundToInt().coerceAtLeast(0))
+        bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((sh-dp(84)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
         val frame=EdgeResizeLayout(uiContext).apply{clipChildren=true;clipToPadding=true;direction(this);isFocusableInTouchMode=true}
         root=frame
-        val p=WindowManager.LayoutParams(dp(88),dp(88),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+        val p=WindowManager.LayoutParams(dp(84),dp(84),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT).apply{
             gravity=Gravity.TOP or Gravity.START;x=dp(bubbleX);y=dp(bubbleY)
@@ -323,9 +323,9 @@ class RallyOverlayService : Service() {
                 if(!draggingCircle&&(abs(dx)>touchSlop||abs(dy)>touchSlop))draggingCircle=true
                 if(draggingCircle){
                     val screen=resources.displayMetrics;val p=params?:return true
-                    val height=dp(88)
+                    val height=dp(84)
                     val maxY=(screen.heightPixels-(if(menuOpen)dp(88)+panelHeightPx else height)-navInsetPx).coerceAtLeast(statusInsetPx+dp(8))
-                    p.x=(startWindowX+dx).coerceIn(0,(screen.widthPixels-dp(88)).coerceAtLeast(0))
+                    p.x=(startWindowX+dx).coerceIn(0,(screen.widthPixels-dp(84)).coerceAtLeast(0))
                     p.y=(startWindowY+dy).coerceIn(statusInsetPx+dp(8),maxY)
                     bubbleX=(p.x/density).roundToInt();bubbleY=(p.y/density).roundToInt()
                     if(!dragFramePending){dragFramePending=true;Choreographer.getInstance().postFrameCallback(dragFrameCallback)}
@@ -431,7 +431,7 @@ class RallyOverlayService : Service() {
     private fun applyLayout(){
         val r=root?:return;val p=params?:return
         val screen=resources.displayMetrics
-        val width=dp(76);val height=dp(88)
+        val width=dp(76);val height=dp(84)
         val x=dp(bubbleX).coerceIn(0,(screen.widthPixels-width).coerceAtLeast(0))
         val maxY=(screen.heightPixels-(if(menuOpen)dp(88)+panelHeightPx else height)-navInsetPx).coerceAtLeast(statusInsetPx+dp(8))
         val y=dp(bubbleY).coerceIn(statusInsetPx+dp(8),maxY)
