@@ -342,16 +342,13 @@ class RallyOverlayService : Service() {
         menuView=null;scroll=null;miniEditor=null;miniEditorTitle=null;miniEditorValue=null
         addPinnedControls(f);updateClock();applyLayout()
     }
-    private var downX=0f;private var downY=0f;private var startX=0;private var startY=0;private var dragged=false
-    private var dragFramePending=false
-    private val dragFrameCallback=Choreographer.FrameCallback { dragFramePending=false;applyLayout() }
     private fun updateClock(epochMillis: Long = UtcClockTicker.currentTimeMillis()) {
         val c=root?.findViewWithTag<TextView>("utc_time")?:return
         c.text=RallyTime.utcClock(epochMillis)
     }
     private fun availableOverlayHeight(): Int {
         val full=if(Build.VERSION.SDK_INT>=30)wm.currentWindowMetrics.bounds.height() else resources.displayMetrics.heightPixels
-        val top=if(menuOpen)dp(panelYdp) else dp(bubbleY)
+        val top=dp(bubbleY)+(if(menuOpen)dp(88) else 0)
         return (full-max(statusInsetPx,top)-navInsetPx-imeHeightPx-dp(16)).coerceAtLeast(dp(120))
     }
     private fun installInsetsTracking(view: View) {
@@ -442,10 +439,22 @@ class RallyOverlayService : Service() {
         val panel=menuView
         if(panel==null){menuOpen=false;persist();buildCollapsed();applyLayout();return}
         panel.animate().scaleY(.98f).setDuration(250).withEndAction{
-            menuOpen=false;persist();menuView=null;panelHeightPx=0;panelContentHeightPx=0;buildCollapsed()
             val p=params?:return@withEndAction;val r=root?:return@withEndAction
-            val sx=p.x;val sy=p.y;val sh=p.height;val tx=dp(bubbleX);val ty=dp(bubbleY)
-            ValueAnimator.ofFloat(0f,1f).apply{duration=250;addUpdateListener{a->val q=a.animatedValue as Float;p.width=dp(84);p.height=(sh+(dp(84)-sh)*q).roundToInt();p.x=(sx+(tx-sx)*q).roundToInt();p.y=(sy+(ty-sy)*q).roundToInt();runCatching{wm.updateViewLayout(r,p)}};start()}
+            val sx=p.x;val sy=p.y;val sw=p.width;val sh=p.height;val center=sx+sw/2
+            menuOpen=false;persist();menuView=null;panelHeightPx=0;panelContentHeightPx=0;buildCollapsed()
+            p.width=sw;p.height=sh;p.x=sx;p.y=sy
+            runCatching{wm.updateViewLayout(r,p)}
+            ValueAnimator.ofFloat(0f,1f).apply{
+                duration=250
+                addUpdateListener{a->
+                    val q=a.animatedValue as Float
+                    val width=(sw+(dp(84)-sw)*q).roundToInt()
+                    p.width=width;p.height=(sh+(dp(84)-sh)*q).roundToInt()
+                    p.x=center-width/2;p.y=(sy+(dp(bubbleY)-sy)*q).roundToInt()
+                    runCatching{wm.updateViewLayout(r,p)}
+                }
+                start()
+            }
         }.start()
     }
     private fun showMenu(){
@@ -453,7 +462,7 @@ class RallyOverlayService : Service() {
         f.resizeEnabled=false;f.removeAllViews();f.clipChildren=true;f.clipToPadding=true
         val screen=resources.displayMetrics
         val maxPanel=(screen.heightPixels*.65f).roundToInt().coerceAtLeast(dp(180))
-        val below=(screen.heightPixels-dp(bubbleY)-dp(88)-navInsetPx-dp(8)).coerceAtLeast(dp(120))
+        val below=(screen.heightPixels-dp(bubbleY)-dp(88)-navInsetPx-dp(8)).coerceAtLeast(dp(160))
         val panelCap=min(maxPanel,below)
         val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(10),dp(9),dp(10),dp(9));clipChildren=true;clipToPadding=true;direction(this)}
         menuView=panel
@@ -473,7 +482,7 @@ class RallyOverlayService : Service() {
         if(resultsMode)buildResults(content)else buildEditor(content)
         if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()}.apply{textSize=12f},LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(5)})
         panel.measure(View.MeasureSpec.makeMeasureSpec(panelWidthPx,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(panelCap,View.MeasureSpec.AT_MOST))
-        panelContentHeightPx=panel.measuredHeight.coerceIn(dp(130),panelCap);panelHeightPx=panelContentHeightPx
+        panelContentHeightPx=panel.measuredHeight.coerceAtMost(panelCap).coerceAtLeast(min(dp(100),panelCap));panelHeightPx=panelContentHeightPx
         bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((screen.heightPixels-panelHeightPx-dp(88)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
         f.addView(panel,FrameLayout.LayoutParams(-1,panelContentHeightPx,Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(88)})
         val p=params?:return;val targetH=dp(88)+panelHeightPx;val targetX=(dp(bubbleX+42)-panelWidthPx/2).coerceIn(0,(screen.widthPixels-panelWidthPx).coerceAtLeast(0));val targetY=dp(bubbleY)
