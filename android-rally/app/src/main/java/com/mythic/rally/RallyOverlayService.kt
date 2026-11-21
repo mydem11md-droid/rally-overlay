@@ -358,7 +358,7 @@ class RallyOverlayService : Service() {
             else->true
         } }
         orb.setOnTouchListener(drag)
-        if(menuOpen)f.setOnTouchListener(null) else f.setOnTouchListener(drag)
+        f.setOnTouchListener(null)
     }
     private fun buildCollapsed() {
         if(focusable){focusedField?.clearFocus();setFocus(false)}
@@ -706,7 +706,7 @@ class RallyOverlayService : Service() {
         return String.format(Locale.US,"%02d:%02d",sec/60,sec%60)
     }
     private fun copyRowText(r:ResultRow):String =
-        "${r.name} — ${uiContext.getString(R.string.start_rally)} ${utcTime(r.actionAt)} UTC"
+        "${r.name} — ابدأ الحشد ${utcTime(r.actionAt)} UTC"
     private fun copyRow(r:ResultRow) = copy(copyRowText(r))
     private fun updateResultCountdowns(now: Long = UtcClockTicker.currentTimeMillis()) {
         if(!resultsMode||resultCountdowns.isEmpty())return
@@ -772,7 +772,7 @@ class RallyOverlayService : Service() {
         }
         c.addView(button(t("نسخ الكل","Copy all"),0xFF4CAF50.toInt(),0xFF102014.toInt()){copy(results.joinToString("\n"){r->copyRowText(r)})},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(8)})
         val actions=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER; direction(this) }
-        actions.addView(button(uiContext.getString(R.string.recalculate_now),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()},LinearLayout.LayoutParams(0,dp(36),1f))
+        actions.addView(button(t("حساب من جديد","Calculate again"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()},LinearLayout.LayoutParams(0,dp(36),1f))
         actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(6),1))
         actions.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(36),1f))
         c.addView(actions,LinearLayout.LayoutParams(-1,dp(36)).apply{topMargin=dp(6)})
