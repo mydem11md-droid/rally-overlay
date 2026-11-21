@@ -434,6 +434,7 @@ class RallyOverlayService : Service() {
         val y=dp(bubbleY).coerceIn(statusInsetPx+dp(8),(resources.displayMetrics.heightPixels-height-navInsetPx).coerceAtLeast(statusInsetPx+dp(8)))
         if(p.width!=width||p.height!=height||p.x!=x||p.y!=y){p.width=width;p.height=height;p.x=x;p.y=y;p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED;runCatching{wm.updateViewLayout(r,p)}.onFailure{Log.e("RallyLayout","update failed",it)}}
     }
+    private var panelAnimator:ValueAnimator?=null
     private fun collapse(){
         if(focusable){dismissIme(focusedField);setFocus(false)}
         val panel=menuView
