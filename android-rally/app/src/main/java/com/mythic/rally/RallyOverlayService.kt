@@ -102,7 +102,9 @@ class RallyOverlayService : Service() {
     private var bubbleX = 24
     private var bubbleY = 180
     private var menuView: LinearLayout? = null
-    private var popupRef: PopupWindow? = null
+    private var activeDropdownAnchor: View? = null
+    private var activeDropdownView: View? = null
+    private var activeDropdownHost: LinearLayout? = null
     private var scroll: ScrollView? = null
     private var participantRowsScroll: CappedScrollView? = null
     private var targetInput: EditText? = null
@@ -117,6 +119,12 @@ class RallyOverlayService : Service() {
     private var miniEditorValue: TextView? = null
     private var globalLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
     private var panelParams: WindowManager.LayoutParams? = null
+    private class DropdownPanelLayout(context: Context, private val onDown: (MotionEvent) -> Unit) : LinearLayout(context) {
+        override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) onDown(event)
+            return super.dispatchTouchEvent(event)
+        }
+    }
     private class CappedScrollView(context: Context) : ScrollView(context) {
         var maxHeightPx = Int.MAX_VALUE
         override fun onMeasure(widthMeasureSpec:Int,heightMeasureSpec:Int) {
@@ -447,6 +455,7 @@ class RallyOverlayService : Service() {
     }
     private var panelAnimator:ValueAnimator?=null
     private fun collapse(){
+        dismissDropdown()
         if(focusable){dismissIme(focusedField);setFocus(false)}
         val panel=menuView
         if(panel==null){menuOpen=false;persist();buildCollapsed();applyLayout();return}
@@ -461,6 +470,7 @@ class RallyOverlayService : Service() {
         val panel=menuView
         globalLayoutListener?.let{l->panel?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}}
         globalLayoutListener=null
+        dismissDropdown()
         if(panel!=null)runCatching{wm.removeView(panel)}
         menuView=null;panelParams=null
     }
@@ -474,7 +484,7 @@ class RallyOverlayService : Service() {
         val maxPanel=(screen.heightPixels*.65f).roundToInt().coerceAtLeast(dp(180))
         val below=(screen.heightPixels-dp(bubbleY)-dp(88)-navInsetPx-dp(8)).coerceAtLeast(dp(160))
         val panelCap=min(maxPanel,below)
-        val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(10),dp(9),dp(10),dp(9));clipChildren=true;clipToPadding=true;direction(this);isFocusable=true;isFocusableInTouchMode=true}
+        val panel=DropdownPanelLayout(uiContext,::onPanelTouchDown).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(10),dp(9),dp(10),dp(9));clipChildren=true;clipToPadding=true;direction(this);isFocusable=true;isFocusableInTouchMode=true}
         menuView=panel
         panel.setOnKeyListener{_,code,event->if(code==KeyEvent.KEYCODE_BACK&&event.action==KeyEvent.ACTION_UP&&focusable){focusedField?.let{dismissIme(it)}?:dismissIme(null);true}else false}
         val header=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL;orientation=LinearLayout.HORIZONTAL;direction(this)}
@@ -517,10 +527,34 @@ class RallyOverlayService : Service() {
     }
     private fun renderMenu(){showMenu()}
     private fun label(parent:LinearLayout,s:String){parent.addView(text(s,10f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(21)))}
-    private fun dropdown(selected:String, options:List<Pair<String,()->Unit>>):TextView {
+    private fun onPanelTouchDown(event: MotionEvent) {
+        val anchor = activeDropdownAnchor ?: return
+        val menu = activeDropdownView
+        val x = event.rawX.toInt()
+        val y = event.rawY.toInt()
+        val anchorRect = Rect()
+        val menuRect = Rect()
+        val insideAnchor = anchor.getGlobalVisibleRect(anchorRect) && anchorRect.contains(x,y)
+        val insideMenu = menu?.getGlobalVisibleRect(menuRect) == true && menuRect.contains(x,y)
+        if (!insideAnchor && !insideMenu) dismissDropdown()
+    }
+    private fun dismissDropdown() {
+        val host = activeDropdownHost
+        val menu = activeDropdownView
+        if (host != null && menu != null) runCatching { host.removeView(menu) }
+        activeDropdownAnchor = null
+        activeDropdownView = null
+        activeDropdownHost = null
+    }
+    private fun dropdown(selected:String, options:List<Pair<String,()->Unit>>, host:LinearLayout):TextView {
         val anchor=button("$selected  ▾",0xFF2A3A2F.toInt(),0xFFE7F0EA.toInt()) {}
         anchor.textSize=10f;anchor.includeFontPadding=false;anchor.setPadding(dp(3),dp(4),dp(3),dp(4))
         anchor.setOnClickListener {
+            if (activeDropdownAnchor === anchor) {
+                dismissDropdown()
+                return@setOnClickListener
+            }
+            dismissDropdown()
             val rows=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(5),dp(5),dp(5),dp(5))}
             val selectedIndex=options.indexOfFirst{(title,_)->title==selected||selected.startsWith("$title ·")}
             options.forEachIndexed{index,entry->
@@ -529,23 +563,38 @@ class RallyOverlayService : Service() {
                     text=if(chosen)"$title   ✓" else title;textSize=12f;gravity=Gravity.CENTER_VERTICAL
                     setTextColor(Color.WHITE);includeFontPadding=false;setPadding(dp(12),dp(5),dp(12),dp(5))
                     background=bg(if(chosen)0xFF347B4A.toInt() else Color.TRANSPARENT,8f);minHeight=dp(42);isSingleLine=true
-                    setOnClickListener{popupRef?.dismiss();action()}
+                    setOnClickListener{dismissDropdown();action()}
                 },LinearLayout.LayoutParams(-1,dp(42)))
                 if(index<options.lastIndex)rows.addView(View(uiContext).apply{setBackgroundColor(0xFF39483E.toInt())},LinearLayout.LayoutParams(-1,dp(1)).apply{topMargin=dp(2);bottomMargin=dp(2)})
             }
-            val scroller=ScrollView(uiContext).apply{isFillViewport=true;addView(rows)}
-            val loc=IntArray(2);anchor.getLocationOnScreen(loc);val screen=resources.displayMetrics
-            val maxHeight=(screen.heightPixels-statusInsetPx-navInsetPx-dp(16)).coerceAtLeast(dp(100))
-            val height=min(dp(options.size*46+10),min(dp(340),maxHeight))
-            val popup=PopupWindow(scroller,anchor.width.coerceAtLeast(dp(80)),height,true).apply{
-                isOutsideTouchable=true;setBackgroundDrawable(bg(0xFF1E2A22.toInt(),12f));elevation=dp(10).toFloat();isClippingEnabled=true
+            val desiredHeight=min(dp(options.size*46+10),dp(260))
+            val scroller=CappedScrollView(uiContext).apply{
+                isFillViewport=false;clipChildren=true;clipToPadding=true
+                maxHeightPx=dp(260)
+                background=bg(0xFF1E2A22.toInt(),10f)
+                addView(rows,FrameLayout.LayoutParams(-1,-2))
+                isVerticalScrollBarEnabled=options.size>5
+                overScrollMode=View.OVER_SCROLL_IF_CONTENT_SCROLLS
             }
-            popupRef=popup
-            val belowY=loc[1]+anchor.height
-            val y=if(belowY+height<=screen.heightPixels-navInsetPx)belowY else(loc[1]-height).coerceAtLeast(statusInsetPx)
-            val x=loc[0].coerceIn(0,(screen.widthPixels-anchor.width).coerceAtLeast(0))
-            val parent=root ?: return@setOnClickListener
-            popup.showAtLocation(parent,Gravity.TOP or Gravity.LEFT,x,y)
+            val anchorLoc=IntArray(2);val hostLoc=IntArray(2)
+            anchor.getLocationOnScreen(anchorLoc);host.getLocationOnScreen(hostLoc)
+            val available=host.width.takeIf{it>0} ?: (panelWidthPx-dp(20)).coerceAtLeast(dp(80))
+            val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{textSize=12f*resources.displayMetrics.scaledDensity}
+            val textWidth=options.maxOfOrNull{paint.measureText(it.first).roundToInt()} ?: 0
+            val menuWidth=min(available,max(anchor.width, textWidth+dp(34))).coerceAtLeast(min(dp(80),available))
+            val rtl=host.layoutDirection==View.LAYOUT_DIRECTION_RTL
+            val anchorStart=anchorLoc[0]-hostLoc[0]
+            val desiredStart=if(rtl)anchorStart+anchor.width-menuWidth else anchorStart
+            val left=desiredStart.coerceIn(0,(available-menuWidth).coerceAtLeast(0))
+            val insertion=(host.indexOfChild(anchor.parent as? View ?: return@setOnClickListener)+1).coerceIn(0,host.childCount)
+            host.addView(scroller,insertion,LinearLayout.LayoutParams(menuWidth,desiredHeight).apply{
+                gravity=Gravity.LEFT
+                leftMargin=left
+                topMargin=dp(6)
+            })
+            activeDropdownAnchor=anchor
+            activeDropdownView=scroller
+            activeDropdownHost=host
         }
         return anchor
     }
@@ -694,18 +743,18 @@ class RallyOverlayService : Service() {
         selectors.addView(dropdown(if(calculationMode=="now")modeNow else modeTarget,listOf(
             modeNow to { calculationMode="now"; persist(); renderMenu() },
             modeTarget to { calculationMode="target"; persist(); renderMenu() }
-        )),LinearLayout.LayoutParams(0,dp(42),1f))
+        ),c),LinearLayout.LayoutParams(0,dp(42),1f))
         selectors.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
         selectors.addView(dropdown(prepLabels[prepSeconds] ?: (if(ar())"تجهيز ${prepSeconds}ث" else "Prep ${prepSeconds}s"),prepOptions.map { value ->
             prepLabels.getValue(value) to { prepSeconds=value; persist(); renderMenu() }
-        }),LinearLayout.LayoutParams(0,dp(42),1f))
+        },c),LinearLayout.LayoutParams(0,dp(42),1f))
         selectors.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
         val customLabel=if(ar())"مخصص" else "Custom"
         val selectedRally=rallyLabels[rallyDurationMinutes] ?: (if(ar())"مخصص · ${rallyDurationMinutes}د" else "Custom · ${rallyDurationMinutes}m")
         val rallyOptions=rallyPresets.map { value ->
             rallyLabels.getValue(value) to { rallyDurationMinutes=value; persist(); renderMenu() }
         } + (customLabel to { editRallyDuration() })
-        selectors.addView(dropdown(selectedRally,rallyOptions),LinearLayout.LayoutParams(0,dp(42),1f))
+        selectors.addView(dropdown(selectedRally,rallyOptions,c),LinearLayout.LayoutParams(0,dp(42),1f))
         c.addView(selectors)
         if(calculationMode=="target") {
             val targetRow=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
