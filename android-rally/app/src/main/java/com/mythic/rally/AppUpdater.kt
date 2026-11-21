@@ -93,9 +93,12 @@ class AppUpdater(private val activity: MainActivity) {
                 if (metaConnection.responseCode !in 200..299) throw IllegalStateException(activity.getString(R.string.update_metadata_missing))
                 val meta = JSONObject(metaConnection.inputStream.bufferedReader().use { it.readText() })
                 val remoteCode = meta.getInt("versionCode")
-                val installedVersionCode = activity.packageManager.getPackageInfo(activity.packageName, 0).let { if (Build.VERSION.SDK_INT >= 28) it.longVersionCode.toInt() else @Suppress("DEPRECATION") it.versionCode }
-                val update = if (remoteCode > installedVersionCode) AvailableUpdate(
-                    remoteCode, meta.getString("versionName"), meta.optString("notes", release.optString("body")), apkUrl
+                val remoteName = meta.getString("versionName")
+                val installedInfo = activity.packageManager.getPackageInfo(activity.packageName, 0)
+                val installedVersionCode = if (Build.VERSION.SDK_INT >= 28) installedInfo.longVersionCode.toInt() else @Suppress("DEPRECATION") installedInfo.versionCode
+                val installedVersionName = installedInfo.versionName ?: "0.0.0"
+                val update = if (remoteCode > installedVersionCode && isNewerVersion(remoteName, installedVersionName)) AvailableUpdate(
+                    remoteCode, remoteName, meta.optString("notes", release.optString("body")), apkUrl
                 ) else null
                 main.post {
                     lastResult = update
@@ -109,6 +112,22 @@ class AppUpdater(private val activity: MainActivity) {
                 main.post { error(message) }
             }
         }
+    }
+
+    private fun isNewerVersion(remote: String, installed: String): Boolean {
+        fun parts(value: String): List<Int>? {
+            val normalized = value.trim().removePrefix("v")
+            if (normalized.isEmpty()) return null
+            val values = normalized.split(".").map { it.toIntOrNull() ?: return null }
+            return values
+        }
+        val remoteParts = parts(remote) ?: return false
+        val installedParts = parts(installed) ?: return false
+        for (index in 0 until maxOf(remoteParts.size, installedParts.size)) {
+            val comparison = (remoteParts.getOrElse(index) { 0 }).compareTo(installedParts.getOrElse(index) { 0 })
+            if (comparison != 0) return comparison > 0
+        }
+        return false
     }
 
     fun download(update: AvailableUpdate, progress: (Int) -> Unit, error: (String) -> Unit, ready: () -> Unit) {
