@@ -375,6 +375,11 @@ class RallyOverlayService : Service() {
                     val above=(dp(bubbleY)-statusInsetPx-dp(12)).coerceAtLeast(0)
                     val wasAbove=panelAbove
                     panelAbove=menuOpen && below<panelContentHeightPx && above>below
+                    if(menuOpen) {
+                        val safeMin=((statusInsetPx+dp(12)+panelContentHeightPx)/density).roundToInt()
+                        val safeMax=((resources.displayMetrics.heightPixels-navInsetPx-dp(112)-panelContentHeightPx)/density).roundToInt()
+                        if(safeMin<=safeMax)bubbleY=if(panelAbove)bubbleY.coerceAtLeast(safeMin) else bubbleY.coerceAtMost(safeMax)
+                    }
                     if(menuOpen && wasAbove!=panelAbove) {
                         val frame=root
                         (frame?.getChildAt(0)?.layoutParams as? FrameLayout.LayoutParams)?.let { lp ->
