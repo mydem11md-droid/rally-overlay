@@ -116,7 +116,7 @@ class RallyOverlayService : Service() {
     private var lastScrollMode = "idle"
     private var miniEditorValue: TextView? = null
     private var globalLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
-    private var touchRegionListener: ViewTreeObserver.OnComputeInternalInsetsListener? = null
+    private var panelParams: WindowManager.LayoutParams? = null
     private class CappedScrollView(context: Context) : ScrollView(context) {
         var maxHeightPx = Int.MAX_VALUE
         override fun onMeasure(widthMeasureSpec:Int,heightMeasureSpec:Int) {
@@ -257,7 +257,7 @@ class RallyOverlayService : Service() {
         }
         params=p;frame.resizeEnabled=false
         frame.setOnKeyListener{_,code,event->if(code==KeyEvent.KEYCODE_BACK&&event.action==KeyEvent.ACTION_UP&&focusable){focusedField?.let{dismissIme(it)}?:dismissIme(null);true}else false}
-        wm.addView(frame,p);buildCollapsed();installInsetsTracking(frame);installTouchableRegion(frame)
+        wm.addView(frame,p);buildCollapsed()
         if(menuOpen)showMenu()
         UtcClockTicker.addListener(clockListener)
     }
@@ -323,11 +323,11 @@ class RallyOverlayService : Service() {
                 if(!draggingCircle&&(abs(dx)>touchSlop||abs(dy)>touchSlop))draggingCircle=true
                 if(draggingCircle){
                     val screen=resources.displayMetrics;val p=params?:return true
-                    val width=if(menuOpen)panelWidthPx else dp(84);val height=if(menuOpen)dp(88)+panelHeightPx else dp(84)
-                    val center=startWindowX+(if(menuOpen)panelWidthPx else dp(84))/2+dx
-                    p.x=(center-width/2).coerceIn(0,(screen.widthPixels-width).coerceAtLeast(0))
-                    p.y=(startWindowY+dy).coerceIn(statusInsetPx+dp(8),(screen.heightPixels-height-navInsetPx).coerceAtLeast(statusInsetPx+dp(8)))
-                    bubbleX=((p.x+(if(menuOpen)panelWidthPx else dp(84))/2-dp(42))/density).roundToInt();bubbleY=(p.y/density).roundToInt()
+                    val height=dp(84)
+                    val maxY=(screen.heightPixels-(if(menuOpen)dp(88)+panelHeightPx else height)-navInsetPx).coerceAtLeast(statusInsetPx+dp(8))
+                    p.x=(startWindowX+dx).coerceIn(0,(screen.widthPixels-dp(84)).coerceAtLeast(0))
+                    p.y=(startWindowY+dy).coerceIn(statusInsetPx+dp(8),maxY)
+                    bubbleX=(p.x/density).roundToInt();bubbleY=(p.y/density).roundToInt()
                     if(!dragFramePending){dragFramePending=true;Choreographer.getInstance().postFrameCallback(dragFrameCallback)}
                 };return true
             }
@@ -343,27 +343,6 @@ class RallyOverlayService : Service() {
         f.removeAllViews();f.clipChildren=true;f.clipToPadding=true
         menuView=null;scroll=null;miniEditor=null;miniEditorTitle=null;miniEditorValue=null
         addPinnedControls(f);updateClock();applyLayout()
-    }
-    private fun installTouchableRegion(frame: EdgeResizeLayout) {
-        val listener = ViewTreeObserver.OnComputeInternalInsetsListener { info ->
-            info.setTouchableInsets(ViewTreeObserver.InternalInsetsInfo.TOUCHABLE_INSETS_REGION)
-            info.touchableRegion.setEmpty()
-            frame.findViewWithTag<View>("rally_orb")?.takeIf { it.visibility == View.VISIBLE && it.width > 0 && it.height > 0 }?.let { orb ->
-                val circle = Path().apply {
-                    addCircle(orb.left + orb.width / 2f, orb.top + orb.height / 2f,
-                        min(orb.width, orb.height) / 2f, Path.Direction.CW)
-                }
-                val clip = Region(orb.left, orb.top, orb.right, orb.bottom)
-                info.touchableRegion.union(Region().apply { setPath(circle, clip) })
-            }
-            menuView?.takeIf { it.visibility == View.VISIBLE && it.width > 0 && it.height > 0 }?.let { panel ->
-                val rect = Rect()
-                panel.getHitRect(rect)
-                info.touchableRegion.union(rect)
-            }
-        }
-        touchRegionListener = listener
-        frame.viewTreeObserver.addOnComputeInternalInsetsListener(listener)
     }
     private fun updateClock(epochMillis: Long = UtcClockTicker.currentTimeMillis()) {
         val c=root?.findViewWithTag<TextView>("utc_time")?:return
@@ -451,46 +430,53 @@ class RallyOverlayService : Service() {
     }
     private fun applyLayout(){
         val r=root?:return;val p=params?:return
-        val expanded=menuOpen&&menuView!=null
-        val width=if(expanded)panelWidthPx else dp(84);val height=if(expanded)dp(88)+panelHeightPx else dp(84)
-        val x=if(expanded)(dp(bubbleX+42)-width/2).coerceIn(0,(resources.displayMetrics.widthPixels-width).coerceAtLeast(0)) else dp(bubbleX)
-        val y=dp(bubbleY).coerceIn(statusInsetPx+dp(8),(resources.displayMetrics.heightPixels-height-navInsetPx).coerceAtLeast(statusInsetPx+dp(8)))
-        if(p.width!=width||p.height!=height||p.x!=x||p.y!=y){p.width=width;p.height=height;p.x=x;p.y=y;p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED;runCatching{wm.updateViewLayout(r,p)}.onFailure{Log.e("RallyLayout","update failed",it)}}
+        val screen=resources.displayMetrics
+        val width=dp(84);val height=dp(84)
+        val x=dp(bubbleX).coerceIn(0,(screen.widthPixels-width).coerceAtLeast(0))
+        val maxY=(screen.heightPixels-(if(menuOpen)dp(88)+panelHeightPx else height)-navInsetPx).coerceAtLeast(statusInsetPx+dp(8))
+        val y=dp(bubbleY).coerceIn(statusInsetPx+dp(8),maxY)
+        if(p.width!=width||p.height!=height||p.x!=x||p.y!=y){p.width=width;p.height=height;p.x=x;p.y=y;runCatching{wm.updateViewLayout(r,p)}}
+        if(menuOpen){
+            val panel=menuView;val pp=panelParams
+            if(panel!=null&&pp!=null){
+                val panelX=(x+dp(42)-panelWidthPx/2).coerceIn(0,(screen.widthPixels-panelWidthPx).coerceAtLeast(0))
+                val panelY=y+dp(88)
+                if(pp.x!=panelX||pp.y!=panelY){pp.x=panelX;pp.y=panelY;runCatching{wm.updateViewLayout(panel,pp)}}
+            }
+        }
     }
     private var panelAnimator:ValueAnimator?=null
     private fun collapse(){
         if(focusable){dismissIme(focusedField);setFocus(false)}
         val panel=menuView
         if(panel==null){menuOpen=false;persist();buildCollapsed();applyLayout();return}
-        panel.animate().scaleY(.98f).setDuration(250).withEndAction{
-            val p=params?:return@withEndAction;val r=root?:return@withEndAction
-            val sx=p.x;val sy=p.y;val sw=p.width;val sh=p.height;val center=sx+sw/2
-            menuOpen=false;persist();menuView=null;panelHeightPx=0;panelContentHeightPx=0;buildCollapsed()
-            p.width=sw;p.height=sh;p.x=sx;p.y=sy
-            runCatching{wm.updateViewLayout(r,p)}
-            ValueAnimator.ofFloat(0f,1f).apply{
-                duration=250
-                addUpdateListener{a->
-                    val q=a.animatedValue as Float
-                    val width=(sw+(dp(84)-sw)*q).roundToInt()
-                    p.width=width;p.height=(sh+(dp(84)-sh)*q).roundToInt()
-                    p.x=center-width/2;p.y=(sy+(dp(bubbleY)-sy)*q).roundToInt()
-                    runCatching{wm.updateViewLayout(r,p)}
-                }
-                start()
-            }
+        panel.animate().scaleY(.96f).setDuration(180).withEndAction{
+            menuOpen=false;persist()
+            removePanelWindow()
+            panelHeightPx=0;panelContentHeightPx=0
+            buildCollapsed();applyLayout()
         }.start()
+    }
+    private fun removePanelWindow(){
+        val panel=menuView
+        globalLayoutListener?.let{l->panel?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}}
+        globalLayoutListener=null
+        if(panel!=null)runCatching{wm.removeView(panel)}
+        menuView=null;panelParams=null
     }
     private fun showMenu(){
         val f=root?:return
-        f.resizeEnabled=false;f.removeAllViews();f.clipChildren=true;f.clipToPadding=true
+        if(focusable){dismissIme(focusedField);setFocus(false)}
+        removePanelWindow()
+        f.removeAllViews();f.clipChildren=true;f.clipToPadding=true
         addPinnedControls(f)
         val screen=resources.displayMetrics
         val maxPanel=(screen.heightPixels*.65f).roundToInt().coerceAtLeast(dp(180))
         val below=(screen.heightPixels-dp(bubbleY)-dp(88)-navInsetPx-dp(8)).coerceAtLeast(dp(160))
         val panelCap=min(maxPanel,below)
-        val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(10),dp(9),dp(10),dp(9));clipChildren=true;clipToPadding=true;direction(this)}
+        val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(10),dp(9),dp(10),dp(9));clipChildren=true;clipToPadding=true;direction(this);isFocusable=true;isFocusableInTouchMode=true}
         menuView=panel
+        panel.setOnKeyListener{_,code,event->if(code==KeyEvent.KEYCODE_BACK&&event.action==KeyEvent.ACTION_UP&&focusable){focusedField?.let{dismissIme(it)}?:dismissIme(null);true}else false}
         val header=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL;orientation=LinearLayout.HORIZONTAL;direction(this)}
         header.addView(text(if(settingsMode)t("الإعدادات","Settings")else if(resultsMode)t("نتائج التنسيق","Rally results")else t("أداة تنسيق الحشود","Rally Coordinator"),13f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(32),1f))
         header.addView(button("EN | ع",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){changeLanguage()}.apply{textDirection=View.TEXT_DIRECTION_LTR;textSize=10f},LinearLayout.LayoutParams(dp(54),dp(30)))
@@ -509,14 +495,24 @@ class RallyOverlayService : Service() {
         panel.measure(View.MeasureSpec.makeMeasureSpec(panelWidthPx,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(panelCap,View.MeasureSpec.AT_MOST))
         panelContentHeightPx=panel.measuredHeight.coerceAtMost(panelCap).coerceAtLeast(min(dp(100),panelCap));panelHeightPx=panelContentHeightPx
         bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((screen.heightPixels-panelHeightPx-dp(88)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
-        f.addView(panel,FrameLayout.LayoutParams(-1,panelContentHeightPx,Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(88)})
-        val p=params?:return;val targetH=dp(88)+panelHeightPx;val targetX=(dp(bubbleX+42)-panelWidthPx/2).coerceIn(0,(screen.widthPixels-panelWidthPx).coerceAtLeast(0));val targetY=dp(bubbleY)
+        val panelX=(dp(bubbleX+42)-panelWidthPx/2).coerceIn(0,(screen.widthPixels-panelWidthPx).coerceAtLeast(0))
+        val panelY=dp(bubbleY)+dp(88)
+        val pp=WindowManager.LayoutParams(panelWidthPx,panelHeightPx,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT).apply{
+            gravity=Gravity.TOP or Gravity.START;x=panelX;y=panelY
+            softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
+        }
+        panelParams=pp
+        runCatching{wm.addView(panel,pp)}.onFailure{
+            Log.e("RallyLayout","panel attach failed",it)
+            menuView=null;panelParams=null;menuOpen=false;persist();buildCollapsed()
+            return
+        }
+        installInsetsTracking(panel)
         panel.scaleY=.98f;panel.pivotY=0f
-        p.width=panelWidthPx;p.x=targetX;runCatching{wm.updateViewLayout(f,p)}
-        val oldH=p.height.coerceAtLeast(dp(84));val oldY=p.y
-        panelAnimator?.cancel()
-        panelAnimator=ValueAnimator.ofFloat(0f,1f).apply{duration=250;addUpdateListener{a->val q=a.animatedValue as Float;p.height=(oldH+(targetH-oldH)*q).roundToInt();p.y=(oldY+(targetY-oldY)*q).roundToInt();runCatching{wm.updateViewLayout(f,p)}};start()}
-        panel.animate().scaleY(1f).setDuration(250).start();updateClock()
+        panel.animate().scaleY(1f).setDuration(180).start()
+        updateClock()
     }
     private fun renderMenu(){showMenu()}
     private fun label(parent:LinearLayout,s:String){parent.addView(text(s,10f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(21)))}
@@ -886,15 +882,17 @@ class RallyOverlayService : Service() {
     private fun format(n:Int):String = RallyTime.format(n)
     private fun copy(s:String){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Rally",s));Toast.makeText(uiContext,t("تم النسخ","Copied"),Toast.LENGTH_SHORT).show()}
     private fun setFocus(on:Boolean) {
-        val r=root?:return;val p=params?:return
+        val panel=menuView
+        val p=panelParams
+        if(panel==null||p==null)return
         if(focusable==on)return
         focusable=on
         p.flags=if(on)p.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv() else p.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
         p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
-        runCatching { wm.updateViewLayout(r,p) }
+        runCatching { wm.updateViewLayout(panel,p) }
         if(on)focusedField?.let { field -> field.post { if(field.hasFocus())imm.showSoftInput(field,InputMethodManager.SHOW_IMPLICIT) } }
     }
-    override fun onDestroy(){running=false;sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName));Choreographer.getInstance().removeFrameCallback(dragFrameCallback);UtcClockTicker.removeListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};touchRegionListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnComputeInternalInsetsListener(l)}};touchRegionListener=null;root?.let{runCatching{wm.removeView(it)}};root=null
+    override fun onDestroy(){running=false;sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName));Choreographer.getInstance().removeFrameCallback(dragFrameCallback);UtcClockTicker.removeListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);removePanelWindow();root?.let{runCatching{wm.removeView(it)}};root=null
         if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
     companion object { @Volatile var running:Boolean=false; private set; const val ACTION_STATE_CHANGED="com.mythic.rally.STATE_CHANGED"; const val ACTION_STOP="com.mythic.rally.STOP"; const val ACTION_LANGUAGE_CHANGED="com.mythic.rally.LANGUAGE_CHANGED"; private const val TAG="RallyOverlay" }
     private class SimpleWatcher(val changed:(String)->Unit):android.text.TextWatcher{
