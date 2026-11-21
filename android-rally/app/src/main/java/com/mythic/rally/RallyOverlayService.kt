@@ -717,7 +717,7 @@ class RallyOverlayService : Service() {
             valid.add(RallyInput(p.id,p.name.trim(),march,if(p.kind=="rally")p.rallyMinutes*60 else 0))
         }
         if(valid.isEmpty()){resultsMode=false;renderMenu();return}
-        val now=System.currentTimeMillis()
+        val now=RallyTime.nowMillis()
         val rows:List<RallyPlanRow>
         val arrival:Long
         if(calculationMode=="now") {
