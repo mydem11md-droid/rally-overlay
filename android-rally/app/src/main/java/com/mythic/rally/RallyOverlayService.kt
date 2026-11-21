@@ -13,7 +13,6 @@ import android.view.inputmethod.*
 import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.*
 
@@ -314,7 +313,7 @@ class RallyOverlayService : Service() {
     }.apply { contentDescription=t("الوقت","Clock") }
     private fun addPinnedControls(f: FrameLayout) {
         val capsule=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),10f);setPadding(dp(12),dp(5),dp(12),dp(5));minimumWidth=dp(104);direction(this) }
-        val clock=TextView(uiContext).apply { tag="utc_time";text=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(RallyTime.nowMillis()));textSize=15f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
+        val clock=TextView(uiContext).apply { tag="utc_time";text=RallyTime.utcClock(RallyTime.nowMillis());textSize=15f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
         val utc=TextView(uiContext).apply { text="UTC";textSize=11f;setTextColor(0xFFA5C4AA.toInt());includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR }
         capsule.addView(clock);capsule.addView(utc,LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(4)})
         f.addView(capsule,FrameLayout.LayoutParams(-2,-2,Gravity.TOP or Gravity.CENTER_HORIZONTAL))
@@ -348,7 +347,7 @@ class RallyOverlayService : Service() {
         addPinnedControls(f);updateClock();applyLayout()
     }
     private var downX=0f;private var downY=0f;private var startX=0;private var startY=0;private var dragged=false
-    private fun updateClock(epochMillis: Long = RallyTime.nowMillis()) {
+    private fun updateClock(epochMillis: Long = UtcClockTicker.currentTimeMillis()) {
         val c=root?.findViewWithTag<TextView>("utc_time")?:return
         c.text=RallyTime.utcClock(epochMillis)
     }
@@ -631,7 +630,7 @@ class RallyOverlayService : Service() {
         c.addView(button(t("+ إضافة مشارك","+ Add participant"),0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){people.add(Person(nextId++,"",""));persist();renderMenu();scroll?.post{scroll?.fullScroll(View.FOCUS_DOWN)}})
         errors.forEach{c.addView(text(it,11f,0xFFE57373.toInt()))}
     }
-    private fun utcTime(epoch:Long):String = SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(epoch))
+    private fun utcTime(epoch:Long):String = RallyTime.utcClock(epoch)
     private fun countdown(ms:Long):String {
         val sec=((ms+999L)/1000L).coerceAtLeast(0L)
         return String.format(Locale.US,"%02d:%02d",sec/60,sec%60)
@@ -642,7 +641,7 @@ class RallyOverlayService : Service() {
         return "${r.name} — ${verb} ${utcTime(r.actionAt)} UTC${extra}"
     }
     private fun copyRow(r:ResultRow) = copy(copyRowText(r))
-    private fun updateResultCountdowns(now: Long = RallyTime.nowMillis()) {
+    private fun updateResultCountdowns(now: Long = UtcClockTicker.currentTimeMillis()) {
         if(!resultsMode||resultCountdowns.isEmpty())return
         results.forEach { r ->
             val label=resultCountdowns[r.id]?:return@forEach
@@ -702,7 +701,7 @@ class RallyOverlayService : Service() {
         c.addView(button(uiContext.getString(R.string.recalculate_now),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()})
         c.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()})
         updateResultCountdowns()
-        val now=System.currentTimeMillis()
+        val now=RallyTime.nowMillis()
         results.forEach { r ->
             val wait=(r.actionAt-now).coerceAtLeast(0L)
             handler.postDelayed({updateResultCountdowns()},wait)
