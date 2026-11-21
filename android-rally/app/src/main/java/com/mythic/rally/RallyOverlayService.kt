@@ -588,6 +588,7 @@ class RallyOverlayService : Service() {
             val left=desiredStart.coerceIn(0,(available-menuWidth).coerceAtLeast(0))
             val insertion=(host.indexOfChild(anchor.parent as? View ?: return@setOnClickListener)+1).coerceIn(0,host.childCount)
             host.addView(scroller,insertion,LinearLayout.LayoutParams(menuWidth,desiredHeight).apply{
+                gravity=Gravity.LEFT
                 leftMargin=left
                 topMargin=dp(6)
             })
