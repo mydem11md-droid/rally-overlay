@@ -431,7 +431,7 @@ class RallyOverlayService : Service() {
     private fun applyLayout(){
         val r=root?:return;val p=params?:return
         val screen=resources.displayMetrics
-        val width=dp(84);val height=dp(76)
+        val width=dp(76);val height=dp(76)
         val x=dp(bubbleX).coerceIn(0,(screen.widthPixels-width).coerceAtLeast(0))
         val maxY=(screen.heightPixels-(if(menuOpen)dp(84)+panelHeightPx else height)-navInsetPx).coerceAtLeast(statusInsetPx+dp(8))
         val y=dp(bubbleY).coerceIn(statusInsetPx+dp(8),maxY)
@@ -496,7 +496,7 @@ class RallyOverlayService : Service() {
         panelContentHeightPx=panel.measuredHeight.coerceAtMost(panelCap).coerceAtLeast(min(dp(100),panelCap));panelHeightPx=panelContentHeightPx
         bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((screen.heightPixels-panelHeightPx-dp(84)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
         applyLayout()
-        val panelX=(dp(bubbleX+42)-panelWidthPx/2).coerceIn(0,(screen.widthPixels-panelWidthPx).coerceAtLeast(0))
+        val panelX=(dp(bubbleX+38)-panelWidthPx/2).coerceIn(0,(screen.widthPixels-panelWidthPx).coerceAtLeast(0))
         val panelY=dp(bubbleY)+dp(84)
         val pp=WindowManager.LayoutParams(panelWidthPx,panelHeightPx,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
