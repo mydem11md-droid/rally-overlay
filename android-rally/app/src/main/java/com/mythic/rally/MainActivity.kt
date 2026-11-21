@@ -107,7 +107,7 @@ class MainActivity : Activity() {
             if(!Settings.canDrawOverlays(this)) startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:$packageName")))
             else { val i=Intent(this,RallyOverlayService::class.java);if(Build.VERSION.SDK_INT>=26)startForegroundService(i)else startService(i);Toast.makeText(this,R.string.started,Toast.LENGTH_SHORT).show() }
         },LinearLayout.LayoutParams(-1,dp(46)))
-        reinforcementButton = actionButton("أداة التعزيزات",0xFF245C9A.toInt(),-1) {
+        reinforcementButton = actionButton(if (language == "en") "Reinforcements" else "أداة التعزيزات",0xFF245C9A.toInt(),-1) {
             if (!Settings.canDrawOverlays(this)) {
                 prefs.edit().putBoolean("reinforcement_pending_start", true).apply()
                 startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
@@ -152,7 +152,7 @@ class MainActivity : Activity() {
             stopService(Intent(this,ReinforcementOverlayService::class.java))
             stopService(Intent(this,ClockOverlayService::class.java))
             reinforcementButton?.let {
-                it.text = "أداة التعزيزات"
+                it.text = if (language == "en") "Reinforcements" else "أداة التعزيزات"
                 it.setTextColor(-1)
                 it.background = android.graphics.drawable.GradientDrawable().apply { setColor(0xFF245C9A.toInt()); cornerRadius=dp(9).toFloat() }
             }
@@ -198,7 +198,11 @@ class MainActivity : Activity() {
         getSharedPreferences("reinforcement_overlay", MODE_PRIVATE).edit()
             .putBoolean("window_attached", active).apply()
         reinforcementButton?.apply {
-            text = if (active) "✓ أداة التعزيزات: تعمل" else "أداة التعزيزات"
+            text = if (language == "en") {
+                if (active) "✓ Reinforcements: Running" else "Reinforcements"
+            } else {
+                if (active) "✓ أداة التعزيزات: تعمل" else "أداة التعزيزات"
+            }
             setTextColor(if (active) 0xFF102014.toInt() else -1)
             background = android.graphics.drawable.GradientDrawable().apply {
                 setColor(if (active) 0xFF4CAF50.toInt() else 0xFF245C9A.toInt())
@@ -211,9 +215,17 @@ class MainActivity : Activity() {
     }
     private fun checkForUpdates(force: Boolean) {
         updater.check(force, { update ->
-            if (update != null) showUpdateCard(update)
-            else if (force) Toast.makeText(this,R.string.update_no_update,Toast.LENGTH_SHORT).show()
-        }, { message -> if (force) Toast.makeText(this,message,Toast.LENGTH_LONG).show() })
+            if (update != null) showUpdateCard(update) else clearUpdateCard()
+        }, { message ->
+            clearUpdateCard()
+            if (force) Toast.makeText(this,message,Toast.LENGTH_LONG).show()
+        })
+    }
+
+    private fun clearUpdateCard() {
+        currentUpdate = null
+        updateCard?.let { page?.removeView(it) }
+        updateCard = null
     }
     private fun showUpdateCard(update: AvailableUpdate) {
         currentUpdate = update
