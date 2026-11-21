@@ -131,6 +131,10 @@ try{var sv=JSON.parse(localStorage.getItem("rp4")||"null");
   if(sv&&Array.isArray(sv.pages)&&sv.pages.length){pages=sv.pages.map(function(x){x.ref=null;return x});cur=Math.min(sv.cur||0,pages.length-1)}}catch(e){}
 function pg(){return pages[cur]}
 function $(i){return document.getElementById(i)}
+function nowMs(){
+  try{if(window.RallyBridge&&typeof window.RallyBridge.nowMillis==="function")return Number(window.RallyBridge.nowMillis())}catch(e){}
+  return Date.now()
+}
 function pad(x){return String(x).padStart(2,"0")}
 function parseT(s){var d=String(s).replace(/\D/g,"");if(!d)return null;
   return d.length>2?parseInt(d.slice(0,-2),10)*60+parseInt(d.slice(-2),10):parseInt(d,10)}
@@ -166,9 +170,9 @@ function draw(){
     box.appendChild(d)})}
 function atOf(g,p){var m=parseT(p.m);return m===null||!g.ref?null:g.ref-m*1000}
 function tick(){
-  $("clk").textContent=utc(Date.now());
+  $("clk").textContent=utc(nowMs());
   var g=pg();if(!g.ref||$("p").hidden)return;
-  var now=Date.now(),rows=$("pls").children;
+  var now=nowMs(),rows=$("pls").children;
   g.pl.forEach(function(p,i){
     var at=atOf(g,p),r=rows[i];if(!r)return;
     var a=r.querySelector(".at"),c=r.querySelector(".cd");
@@ -189,7 +193,7 @@ function markChips(){var t=parseT($("eta").value);[].forEach.call($("chips").chi
 $("go").onclick=function(){
   var e=parseT($("eta").value),em=parseT($("em").value);
   if(e===null||!em){$("cps").textContent="القيم غير صحيحة";return}
-  pg().ref=Date.now()+(e+em)*1000;
+  pg().ref=nowMs()+(e+em)*1000;
   $("ban").hidden=false;$("arr").textContent=utc(pg().ref);$("cps").textContent="";tick()};
 $("add").onclick=function(){var l=pg().pl;l.push({n:"لاعب "+(l.length+1),m:"1:00"});save();draw();tick()};
 $("del").onclick=function(){pages.splice(cur,1);cur=Math.min(cur,pages.length-1);save();render()};
@@ -204,9 +208,9 @@ function copy(t){
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(ok,fb)}else fb()}
 $("cpb").onclick=function(){
   if(!pg().ref){$("cps").textContent="اضغط ابدأ أولاً";return}
-  copy(textFor(pg(),Date.now()))};
+  copy(textFor(pg(),nowMs()))};
 $("cpa").onclick=function(){
-  var now=Date.now(),L=pages.filter(function(g){return g.ref}).map(function(g){return textFor(g,now)});
+  var now=nowMs(),L=pages.filter(function(g){return g.ref}).map(function(g){return textFor(g,now)});
   if(!L.length){$("cps").textContent="اضغط ابدأ أولاً";return}
   copy(L.join("\n\n"))};
 
@@ -273,7 +277,13 @@ if(!OV){
   c.addEventListener("pointerup",function(){if(drag&&!drag.moved)toggle();drag=null});
   c.addEventListener("pointercancel",function(){drag=null})}
 c.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle()}});
-render();setInterval(tick,250);
+render();
+function scheduleClockTick(){
+  tick();
+  var now=nowMs();
+  setTimeout(scheduleClockTick,Math.max(1,1000-(now%1000)));
+}
+scheduleClockTick();
 if(OV)report();
 </script>
 </body>

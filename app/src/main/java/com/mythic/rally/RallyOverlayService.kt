@@ -1,0 +1,811 @@
+package com.mythic.rally
+
+import android.app.*
+import android.content.*
+import android.content.res.Configuration
+import android.graphics.*
+import android.graphics.drawable.GradientDrawable
+import android.os.*
+import android.util.Log
+import android.provider.Settings
+import android.view.*
+import android.view.inputmethod.*
+import android.widget.*
+import org.json.JSONArray
+import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.*
+import kotlin.math.*
+
+private class EdgeResizeLayout(context: Context) : FrameLayout(context) {
+    companion object { const val L=1; const val T=2; const val R=4; const val B=8 }
+    var resizeEnabled=false
+    var onResize: ((dx:Int,dy:Int,edges:Int)->Unit)?=null
+    var onResizeEnd: (() -> Unit)?=null
+    private val edge=(20*resources.displayMetrics.density).roundToInt()
+    private val handlePaint=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0x666B95FF; strokeWidth=(2*resources.displayMetrics.density).coerceAtLeast(1f) }
+    private var edges=0
+    private var lastX=0f
+    private var lastY=0f
+    init { setWillNotDraw(false) }
+    override fun onDraw(canvas:Canvas) {
+        super.onDraw(canvas)
+        if(!resizeEnabled)return
+        val d=resources.displayMetrics.density
+        val cx=width/2f;val cy=height/2f
+        canvas.drawLine(cx-12*d,2*d,cx+12*d,2*d,handlePaint)
+        canvas.drawLine(cx-12*d,height-2*d,cx+12*d,height-2*d,handlePaint)
+        canvas.drawLine(2*d,cy-12*d,2*d,cy+12*d,handlePaint)
+        canvas.drawLine(width-2*d,cy-12*d,width-2*d,cy+12*d,handlePaint)
+    }
+    override fun onInterceptTouchEvent(event:MotionEvent):Boolean {
+        if(!resizeEnabled)return false
+        if(event.actionMasked==MotionEvent.ACTION_DOWN) {
+            edges=0
+            if(event.x<edge)edges=edges or L
+            if(event.x>width-edge)edges=edges or R
+            if(event.y<edge)edges=edges or T
+            if(event.y>height-edge)edges=edges or B
+            lastX=event.rawX;lastY=event.rawY
+            return edges!=0
+        }
+        return edges!=0
+    }
+    override fun onTouchEvent(event:MotionEvent):Boolean {
+        if(!resizeEnabled||edges==0)return false
+        when(event.actionMasked) {
+            MotionEvent.ACTION_MOVE -> {
+                val dx=(event.rawX-lastX).roundToInt();val dy=(event.rawY-lastY).roundToInt()
+                lastX=event.rawX;lastY=event.rawY
+                if(dx!=0||dy!=0)onResize?.invoke(dx,dy,edges)
+            }
+            MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL -> { edges=0;onResizeEnd?.invoke() }
+        }
+        return true
+    }
+}
+
+class RallyOverlayService : Service() {
+    private val prefs by lazy { getSharedPreferences("rally_native", MODE_PRIVATE) }
+    private lateinit var uiContext: Context
+    private var language = "en"
+    private val handler = Handler(Looper.getMainLooper())
+    private lateinit var wm: WindowManager
+    private var root: EdgeResizeLayout? = null
+    private var panelWidthPx = 0
+    private var panelHeightPx = 0
+    private var panelXdp = -1
+    private var panelYdp = 180
+    private var params: WindowManager.LayoutParams? = null
+    private var menuOpen = false
+    private var resultsMode = false
+    private var settingsMode = false
+    private var confirming = false
+    private var focusable = false
+    private val imm by lazy { getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager }
+    private var target = ""
+    private var targetHour = ""
+    private var calculationMode = "now"
+    private var prepSeconds = 10
+    private var vibrationEnabled = true
+    private var targetHourInput: EditText? = null
+    private var resultCountdowns = mutableMapOf<Int,TextView>()
+    private var resultRowsViews = mutableMapOf<Int,View>()
+    private var resultZeroAt = mutableMapOf<Int,Long>()
+    private var vibratedIds = mutableSetOf<Int>()
+    private var people = mutableListOf<Person>()
+    private var results = mutableListOf<ResultRow>()
+    private var errors = mutableListOf<String>()
+    private var nextId = 1
+    private var bubbleX = 24
+    private var bubbleY = 180
+    private var menuView: LinearLayout? = null
+    private var scroll: ScrollView? = null
+    private var targetInput: EditText? = null
+    private var imeHeightPx = 0
+    private var imeWasVisible = false
+    private var statusInsetPx = 0
+    private var navInsetPx = 0
+    private var focusedField: EditText? = null
+    private var miniEditor: LinearLayout? = null
+    private var miniEditorTitle: TextView? = null
+    private var lastScrollMode = "idle"
+    private var miniEditorValue: TextView? = null
+    private var globalLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
+    private class CappedScrollView(context: Context) : ScrollView(context) {
+        var maxHeightPx = Int.MAX_VALUE
+        override fun onMeasure(widthMeasureSpec:Int,heightMeasureSpec:Int) {
+            val parentHeight=MeasureSpec.getSize(heightMeasureSpec)
+            val targetHeight=min(parentHeight,maxHeightPx.coerceAtLeast(0))
+            val mode=if(MeasureSpec.getMode(heightMeasureSpec)==MeasureSpec.EXACTLY)MeasureSpec.EXACTLY else MeasureSpec.AT_MOST
+            super.onMeasure(widthMeasureSpec,MeasureSpec.makeMeasureSpec(targetHeight,mode))
+        }
+    }
+    private val density get() = resources.displayMetrics.density
+    private fun dp(v: Int) = (v * density).roundToInt()
+    private fun dp(v: Float) = (v * density).roundToInt()
+    private fun ar() = language == "ar"
+    private val C_PANEL = Color.rgb(23, 30, 39)
+    private val C_FIELD = Color.rgb(14, 19, 25)
+    private val C_TEXT = Color.rgb(232, 237, 243)
+    private val C_MUTED = Color.rgb(134, 150, 168)
+    private val C_BORDER = Color.rgb(42, 52, 65)
+    private val C_ACCENT = Color.rgb(107, 149, 255)
+    private val C_ACCENT_TEXT = Color.rgb(11, 18, 32)
+    private val C_DANGER = Color.rgb(255, 140, 128)
+    private val C_WARNING = Color.rgb(240, 193, 90)
+    private fun t(a: String, e: String) = if (ar()) a else e
+    private fun localizedContext(): Context {
+        language = prefs.getString("language", null) ?: if (Locale.getDefault().language.equals("ar", true)) "ar" else "en"
+        val locale = Locale.forLanguageTag(language)
+        val config = Configuration(resources.configuration)
+        config.setLocale(locale)
+        config.setLayoutDirection(locale)
+        return createConfigurationContext(config)
+    }
+    private fun changeLanguage() {
+        language = if (language == "ar") "en" else "ar"
+        prefs.edit().putString("language", language).apply()
+        syncLauncherAlias()
+        uiContext = localizedContext()
+        persist()
+        if (root != null) { if (menuOpen) showMenu() else buildCollapsed(); startForeground(27, notification()) }
+    }
+    private fun syncLauncherAlias() {
+        val selected=if(language=="ar")ComponentName(this,packageName+".LauncherArabic")else ComponentName(this,packageName+".LauncherEnglish")
+        val other=if(language=="ar")ComponentName(this,packageName+".LauncherEnglish")else ComponentName(this,packageName+".LauncherArabic")
+        packageManager.setComponentEnabledSetting(selected,android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,android.content.pm.PackageManager.DONT_KILL_APP)
+        packageManager.setComponentEnabledSetting(other,android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,android.content.pm.PackageManager.DONT_KILL_APP)
+    }
+    private fun direction(view: View) {
+        view.layoutDirection = if (ar()) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
+    }
+    private fun bg(color: Int, radius: Float): GradientDrawable =
+        GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = dp(radius).toFloat()
+            setStroke(dp(1), C_BORDER)
+        }
+    private fun orbBackground() = GradientDrawable(
+        GradientDrawable.Orientation.TL_BR,
+        intArrayOf(Color.rgb(47, 123, 255), Color.rgb(10, 63, 209))
+    ).apply { shape = GradientDrawable.OVAL; setStroke(dp(2), C_TEXT) }
+    private fun text(value: String, size: Float, color: Int, bold: Boolean = false) =
+        TextView(uiContext).apply { text=value; textSize=size; setTextColor(color); gravity=Gravity.CENTER_VERTICAL; direction(this)
+            if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD) }
+    private fun button(value: String, color: Int, fg: Int, action: () -> Unit) =
+        TextView(uiContext).apply { text=value; textSize=13f; gravity=Gravity.CENTER; setTextColor(fg); direction(this)
+            background=android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x226B95FF), bg(color,9f), null
+            ); setPadding(dp(10),dp(7),dp(10),dp(7)); minHeight=dp(36); setOnClickListener { action() } }
+    private fun fitControl(v: TextView) = v.apply { includeFontPadding=false; isSingleLine=true; gravity=Gravity.CENTER; minHeight=dp(40); setPadding(paddingLeft,dp(5),paddingRight,dp(5)) }
+    private data class Person(val id:Int,var name:String,var duration:String,var kind:String="solo",var rallyMinutes:Int=5)
+    private data class ResultRow(val id:Int,val name:String,val isRally:Boolean,val rallySeconds:Int,val marchSeconds:Int,val actionAt:Long,val departAt:Long,val arrivalAt:Long)
+    private val localeReceiver = object: BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            uiContext=localizedContext()
+            if(root!=null){if(menuOpen)showMenu()else buildCollapsed();startForeground(27,notification())}
+        }
+    }
+    private val clockTick = object: Runnable { override fun run() { updateClock(); updateResultCountdowns(); handler.postDelayed(this,1000) } }
+
+    override fun onCreate() {
+        super.onCreate()
+        uiContext=localizedContext()
+        wm=getSystemService(WINDOW_SERVICE) as WindowManager
+        val filter=IntentFilter(ACTION_LANGUAGE_CHANGED)
+        if(Build.VERSION.SDK_INT>=33) registerReceiver(localeReceiver,filter,Context.RECEIVER_NOT_EXPORTED) else registerReceiver(localeReceiver,filter)
+        restore()
+    }
+    override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
+        if(intent?.action==ACTION_STOP){stopSelf();return START_NOT_STICKY}
+        if(!Settings.canDrawOverlays(this)){stopSelf();return START_NOT_STICKY}
+        startForeground(27,notification())
+        if(root==null) createOverlay()
+        return START_STICKY
+    }
+    override fun onBind(intent:Intent?):IBinder?=null
+
+    private fun restore() {
+        target=prefs.getString("target","") ?: ""
+        targetHour=prefs.getString("target_hour","") ?: ""
+        calculationMode=prefs.getString("calculation_mode","now") ?: "now"
+        prepSeconds=prefs.getInt("prep_seconds",10)
+        vibrationEnabled=prefs.getBoolean("vibration_enabled",true)
+        bubbleX=prefs.getInt("x",24); bubbleY=prefs.getInt("y",180)
+        panelWidthPx=dp(prefs.getInt("panel_w",320)).coerceAtLeast(dp(240))
+        panelHeightPx=dp(prefs.getInt("panel_h",520)).coerceAtLeast(dp(280))
+        panelXdp=prefs.getInt("panel_x",-1); panelYdp=prefs.getInt("panel_y",bubbleY)
+        menuOpen=prefs.getBoolean("open",false); resultsMode=prefs.getBoolean("results",false); settingsMode=prefs.getBoolean("settings",false)
+        nextId=prefs.getInt("next",1)
+        runCatching {
+            val a=JSONArray(prefs.getString("people","[]"))
+            for(i in 0 until a.length()){val o=a.getJSONObject(i);people.add(Person(o.getInt("id"),o.optString("name"),o.optString("duration"),o.optString("kind","solo"),o.optInt("rally_minutes",5)))}
+        }
+        if(people.isEmpty()) people.add(Person(nextId++,"",""))
+        runCatching {
+            val a=JSONArray(prefs.getString("result_rows","[]"))
+            for(i in 0 until a.length()){val o=a.getJSONObject(i);results.add(ResultRow(o.getInt("id"),o.optString("name"),o.optBoolean("is_rally"),o.optInt("rally_seconds"),o.optInt("march_seconds"),o.optLong("action_at"),o.optLong("depart_at"),o.optLong("arrival_at")))}
+        }
+    }
+    private fun persist() {
+        val a=JSONArray(); people.forEach { a.put(JSONObject().put("id",it.id).put("name",it.name).put("duration",it.duration).put("kind",it.kind).put("rally_minutes",it.rallyMinutes)) }
+        val r=JSONArray(); results.forEach { r.put(JSONObject().put("id",it.id).put("name",it.name).put("is_rally",it.isRally).put("rally_seconds",it.rallySeconds).put("march_seconds",it.marchSeconds).put("action_at",it.actionAt).put("depart_at",it.departAt).put("arrival_at",it.arrivalAt)) }
+        prefs.edit().putString("target",target).putString("target_hour",targetHour).putString("calculation_mode",calculationMode).putInt("prep_seconds",prepSeconds).putBoolean("vibration_enabled",vibrationEnabled).putString("people",a.toString()).putString("result_rows",r.toString())
+            .putInt("next",nextId).putInt("x",bubbleX).putInt("y",bubbleY)
+            .putBoolean("open",menuOpen).putBoolean("results",resultsMode).putBoolean("settings",settingsMode).apply()
+    }
+    private fun notification():Notification {
+        val channel="rally_native"
+        if(Build.VERSION.SDK_INT>=26)getSystemService(NotificationManager::class.java).createNotificationChannel(
+            NotificationChannel(channel,t("أداة تنسيق الحشود","Rally Coordinator"),NotificationManager.IMPORTANCE_LOW))
+        val stop=PendingIntent.getService(this,8,Intent(this,RallyOverlayService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val b=if(Build.VERSION.SDK_INT>=26)Notification.Builder(this,channel) else Notification.Builder(this)
+        return b.setSmallIcon(R.drawable.ic_stat_rally).setContentTitle(t("أداة تنسيق الحشود","Rally Coordinator"))
+            .setContentText(t("الأداة العائمة تعمل","Floating tool is active")).setOngoing(true)
+            .addAction(Notification.Action.Builder(null,t("إيقاف","Stop"),stop).build()).build()
+    }
+    private fun createOverlay() {
+        statusInsetPx=dp(24);navInsetPx=dp(24)
+        val screenW=resources.displayMetrics.widthPixels
+        val screenH=resources.displayMetrics.heightPixels
+        panelWidthPx=panelWidthPx.takeIf{it>0} ?: dp(320)
+        panelHeightPx=panelHeightPx.takeIf{it>0} ?: dp(520)
+        panelWidthPx=panelWidthPx.coerceIn(dp(240),screenW.coerceAtLeast(dp(240)))
+        panelHeightPx=panelHeightPx.coerceIn(dp(280),screenH.coerceAtLeast(dp(280)))
+        bubbleX=bubbleX.coerceIn(0,((screenW-dp(104))/density).roundToInt().coerceAtLeast(0))
+        bubbleY=bubbleY.coerceAtLeast(((statusInsetPx+dp(8))/density).roundToInt())
+        if(panelXdp<0)panelXdp=((dp(bubbleX+52)-panelWidthPx/2)/density).roundToInt()
+        panelXdp=panelXdp.coerceIn(0,((screenW-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
+        panelYdp=panelYdp.coerceIn(0,((screenH-panelHeightPx).coerceAtLeast(0)/density).roundToInt())
+        val frame=EdgeResizeLayout(uiContext).apply { clipChildren=true;clipToPadding=true;direction(this);isFocusableInTouchMode=true }
+        root=frame
+        val p=WindowManager.LayoutParams(
+            if(menuOpen)panelWidthPx else dp(104),
+            if(menuOpen)panelHeightPx else dp(80),
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity=Gravity.TOP or Gravity.START
+            x=if(menuOpen)dp(panelXdp) else dp(bubbleX)
+            y=if(menuOpen)dp(panelYdp) else dp(bubbleY)
+            softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
+        }
+        params=p
+        frame.resizeEnabled=menuOpen
+        frame.onResize={dx,dy,edges -> resizePanelBy(dx,dy,edges)}
+        frame.onResizeEnd={
+            prefs.edit()
+                .putInt("panel_w",(panelWidthPx/density).roundToInt())
+                .putInt("panel_h",(panelHeightPx/density).roundToInt())
+                .putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()
+        }
+        frame.setOnKeyListener { _,code,event ->
+            if(code==KeyEvent.KEYCODE_BACK && event.action==KeyEvent.ACTION_UP && focusable) {
+                focusedField?.let { dismissIme(it) } ?: dismissIme(null)
+                true
+            } else false
+        }
+        wm.addView(frame,p)
+        buildCollapsed()
+        installInsetsTracking(frame)
+        if(menuOpen)showMenu()
+        handler.post(clockTick)
+    }
+    private fun resizePanelBy(dx:Int,dy:Int,edges:Int) {
+        val r=root?:return
+        val p=params?:return
+        val sw=resources.displayMetrics.widthPixels
+        val sh=resources.displayMetrics.heightPixels
+        val minW=dp(240);val minH=dp(280)
+        var x=p.x;var y=p.y;var w=p.width;var h=p.height
+        if(edges and EdgeResizeLayout.R!=0)w=(w+dx).coerceIn(minW,(sw-x).coerceAtLeast(minW))
+        if(edges and EdgeResizeLayout.L!=0) {
+            val right=x+w
+            w=(w-dx).coerceIn(minW,sw.coerceAtLeast(minW))
+            x=right-w
+        }
+        if(edges and EdgeResizeLayout.B!=0)h=(h+dy).coerceIn(minH,(sh-y).coerceAtLeast(minH))
+        if(edges and EdgeResizeLayout.T!=0) {
+            val bottom=y+h
+            h=(h-dy).coerceIn(minH,sh.coerceAtLeast(minH))
+            y=bottom-h
+        }
+        if(x<0){w=(x+w).coerceIn(minW,sw.coerceAtLeast(minW));x=0}
+        if(y<0){h=(y+h).coerceIn(minH,sh.coerceAtLeast(minH));y=0}
+        if(x+w>sw)w=(sw-x).coerceAtLeast(minW)
+        if(y+h>sh)h=(sh-y).coerceAtLeast(minH)
+        x=x.coerceAtLeast(0);y=y.coerceAtLeast(0)
+        p.width=w;p.height=h;p.x=x;p.y=y
+        panelWidthPx=w;panelHeightPx=h
+        panelXdp=(x/density).roundToInt();panelYdp=(y/density).roundToInt()
+        runCatching { wm.updateViewLayout(r,p) }
+    }
+    private fun iconCircle():View = object:View(uiContext) {
+        private val paint=Paint(3).apply { color=C_TEXT; style=Paint.Style.STROKE; strokeWidth=dp(2).toFloat(); strokeCap=Paint.Cap.ROUND }
+        override fun onDraw(c:Canvas) { super.onDraw(c); val x=width/2f;val y=height/2f
+            c.drawCircle(x,y,dp(9).toFloat(),paint);c.drawLine(x,y,x,y-dp(5),paint);c.drawLine(x,y,x+dp(4),y+dp(3),paint) }
+    }.apply { contentDescription=t("الوقت","Clock") }
+    private fun addPinnedControls(f: FrameLayout) {
+        val capsule=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=bg(C_PANEL,10f);setPadding(dp(12),dp(6),dp(12),dp(6));minimumWidth=dp(104);direction(this) }
+        val clock=TextView(uiContext).apply { tag="utc_time";text=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(System.currentTimeMillis()));textSize=15f;setTextColor(C_TEXT);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
+        val utc=TextView(uiContext).apply { text="UTC";textSize=11f;setTextColor(C_MUTED);includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR }
+        capsule.addView(clock);capsule.addView(utc,LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(4)})
+        f.addView(capsule,FrameLayout.LayoutParams(-2,-2,Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+        val orb=FrameLayout(uiContext).apply { background=orbBackground();addView(iconCircle(),FrameLayout.LayoutParams(dp(24),dp(24),Gravity.CENTER)) }
+        f.addView(orb,FrameLayout.LayoutParams(dp(46),dp(46),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(34)})
+        val close=object:View(uiContext) {
+            private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
+            override fun onDraw(canvas:Canvas) { super.onDraw(canvas);val cx=width/2f;val cy=height/2f;paint.style=Paint.Style.FILL;paint.color=C_PANEL;canvas.drawCircle(cx,cy,dp(10).toFloat(),paint);paint.color=if(isPressed)C_DANGER else C_FIELD;canvas.drawCircle(cx,cy,dp(8).toFloat(),paint);paint.color=C_TEXT;paint.style=Paint.Style.STROKE;paint.strokeWidth=dp(1.5f).toFloat();paint.strokeCap=Paint.Cap.ROUND;val d=dp(3).toFloat();canvas.drawLine(cx-d,cy-d,cx+d,cy+d,paint);canvas.drawLine(cx+d,cy-d,cx-d,cy+d,paint) }
+            override fun onTouchEvent(event:MotionEvent):Boolean { when(event.actionMasked){MotionEvent.ACTION_DOWN->{isPressed=true;invalidate();return true};MotionEvent.ACTION_UP->{isPressed=false;invalidate();performClick();return true};MotionEvent.ACTION_CANCEL->{isPressed=false;invalidate();return true}};return true }
+            override fun performClick():Boolean { super.performClick();showConfirm();return true }
+        }
+        f.addView(close,FrameLayout.LayoutParams(dp(36),dp(36),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{leftMargin=dp(6);topMargin=dp(16)})
+        if(menuOpen) {
+            val width=dp(280); val sw=resources.displayMetrics.widthPixels
+            val desired=dp(bubbleX+52)
+            val expandedLeft=(desired-width/2).coerceIn(0,(sw-width).coerceAtLeast(0))
+            val shift=(desired-(expandedLeft+width/2)).toFloat()
+            capsule.translationX=shift; orb.translationX=shift; close.translationX=shift
+        }
+        orb.setOnClickListener { menuOpen=!menuOpen;persist();if(menuOpen)showMenu()else collapse() }
+        val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true};MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt();if(abs(dx)+abs(dy)>5)dragged=true;if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-104);bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-55);panelXdp=((dp(bubbleX+52)-panelWidthPx/2)/density).roundToInt().coerceIn(0,((resources.displayMetrics.widthPixels-panelWidthPx).coerceAtLeast(0)/density).roundToInt());panelYdp=bubbleY.coerceIn(0,((resources.displayMetrics.heightPixels-panelHeightPx).coerceAtLeast(0)/density).roundToInt());applyLayout();persist();prefs.edit().putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()};true};MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true};else->true} }
+        orb.setOnTouchListener(drag)
+        if(menuOpen)f.setOnTouchListener(null) else f.setOnTouchListener(drag)
+    }
+    private fun buildCollapsed() {
+        if(focusable){focusedField?.clearFocus();setFocus(false)}
+        val f=root?:return
+        f.resizeEnabled=false
+        f.removeAllViews();f.clipChildren=true;f.clipToPadding=true
+        menuView=null;scroll=null;miniEditor=null;miniEditorTitle=null;miniEditorValue=null
+        addPinnedControls(f);updateClock();applyLayout()
+    }
+    private var downX=0f;private var downY=0f;private var startX=0;private var startY=0;private var dragged=false
+    private fun updateClock() {
+        val c=root?.findViewWithTag<TextView>("utc_time")?:return
+        val formatter=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}
+        c.text=formatter.format(Date())
+    }
+    private fun availableOverlayHeight(): Int {
+        val full=if(Build.VERSION.SDK_INT>=30)wm.currentWindowMetrics.bounds.height() else resources.displayMetrics.heightPixels
+        val top=if(menuOpen)dp(panelYdp) else dp(bubbleY)
+        return (full-max(statusInsetPx,top)-navInsetPx-imeHeightPx-dp(16)).coerceAtLeast(dp(120))
+    }
+    private fun installInsetsTracking(view: View) {
+        statusInsetPx=dp(24); navInsetPx=dp(24)
+        view.setOnApplyWindowInsetsListener { _, insets ->
+            if (Build.VERSION.SDK_INT >= 30) {
+                val bars=insets.getInsets(WindowInsets.Type.statusBars() or WindowInsets.Type.displayCutout())
+                statusInsetPx=bars.top
+                navInsetPx=insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+                imeHeightPx=insets.getInsets(WindowInsets.Type.ime()).bottom
+            } else {
+                val cutoutTop=if(Build.VERSION.SDK_INT>=28)insets.displayCutout?.safeInsetTop ?: 0 else 0
+                statusInsetPx=max(insets.systemWindowInsetTop,cutoutTop)
+                navInsetPx=insets.systemWindowInsetBottom
+            }
+            updateImeFocusState()
+            resizeForInsets()
+            insets
+        }
+        val listener=ViewTreeObserver.OnGlobalLayoutListener {
+            val rect=Rect(); view.getWindowVisibleDisplayFrame(rect)
+            val fallback=(resources.displayMetrics.heightPixels-rect.bottom-navInsetPx).coerceAtLeast(0)
+            val next=if(fallback>dp(80))fallback else 0
+            if(next!=imeHeightPx){imeHeightPx=next;updateImeFocusState();resizeForInsets()}
+        }
+        globalLayoutListener=listener
+        view.viewTreeObserver.addOnGlobalLayoutListener(listener)
+        view.requestApplyInsets()
+    }
+    private fun updateImeFocusState() {
+        val visible = imeHeightPx > dp(80)
+        if (visible) {
+            imeWasVisible = true
+        } else if (imeWasVisible) {
+            imeWasVisible = false
+            if (focusable) {
+                focusedField?.clearFocus()
+                setFocus(false)
+            }
+        }
+    }
+    private fun resizeForInsets() {
+        if(root==null)return
+        val cap=(availableOverlayHeight()-dp(88+34+17+38+12)).coerceAtLeast(dp(72))
+        (scroll as? CappedScrollView)?.maxHeightPx=if(resultsMode)(availableOverlayHeight()-dp(88+34+17)).coerceAtLeast(dp(72)) else cap
+        scroll?.requestLayout()
+        focusedField?.let { field -> field.post { if(field.hasFocus())ensureFocusedFieldVisible(field) } }
+    }
+    private fun ensureFocusedFieldVisible(field: EditText) {
+        val sc=scroll?:return
+        val rect=Rect();field.getDrawingRect(rect);sc.offsetDescendantRectToMyCoords(field,rect)
+        val visibleBottom=sc.scrollY+sc.height-dp(12)
+        if(rect.bottom>visibleBottom)sc.smoothScrollTo(0,(rect.bottom-sc.height+dp(18)).coerceAtLeast(0))
+        val needsMini=imeHeightPx>dp(80) && (sc.height<dp(90) || rect.height()>sc.height)
+        miniEditorTitle?.text=field.contentDescription?.toString() ?: field.hint?.toString().orEmpty()
+        miniEditorValue?.text=field.text?.toString().orEmpty()
+        miniEditor?.visibility=if(needsMini)View.VISIBLE else View.GONE
+        if(needsMini)lastScrollMode="mini-editor"
+    }
+    private fun applyLayout() {
+        val r=root?:return
+        val p=params?:return
+        val expanded=menuOpen && menuView!=null
+        val width=if(expanded)panelWidthPx else dp(104)
+        val height=if(expanded)panelHeightPx else dp(80)
+        val x=if(expanded)dp(panelXdp.coerceAtLeast(0)) else dp(bubbleX)
+        val y=if(expanded)dp(panelYdp.coerceAtLeast(0)) else dp(bubbleY)
+        val changed=p.width!=width || p.height!=height || p.x!=x || p.y!=y
+        p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
+        if(changed) {
+            p.width=width;p.height=height;p.x=x;p.y=y
+            runCatching { wm.updateViewLayout(r,p) }.onFailure { Log.e("RallyLayout","update failed",it) }
+        }
+    }
+    private fun collapse(){
+        if (focusable) { dismissIme(focusedField);setFocus(false) }
+        val panel=menuView
+        if(panel!=null) {
+            panel.animate().alpha(0f).setDuration(150).withEndAction {
+                menuOpen=false;persist();menuView=null;buildCollapsed();applyLayout()
+            }.start()
+        } else { menuOpen=false;persist();buildCollapsed();applyLayout() }
+    }
+    private fun showMenu() {
+        val f=root?:return
+        f.resizeEnabled=true
+        f.removeAllViews();f.clipChildren=true;f.clipToPadding=true;addPinnedControls(f)
+        val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(C_PANEL,12f);setPadding(dp(10),dp(10),dp(10),dp(10));clipChildren=true;clipToPadding=true;direction(this)}
+        menuView=panel
+        val header=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL;orientation=LinearLayout.HORIZONTAL;direction(this)}
+        header.addView(text(if(settingsMode)t("الإعدادات","Settings")else if(resultsMode)t("نتائج التنسيق","Rally results")else t("أداة تنسيق الحشود","Rally Coordinator"),14f,C_TEXT,true),LinearLayout.LayoutParams(0,dp(34),1f))
+        header.addView(button("ع | EN",C_FIELD,C_MUTED){changeLanguage()},LinearLayout.LayoutParams(dp(58),dp(32)))
+        header.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
+        header.addView(button("⚙",C_FIELD,C_MUTED){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(dp(34),dp(32)))
+        panel.addView(header)
+        miniEditor=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;visibility=View.GONE;background=bg(C_FIELD,9f);setPadding(dp(10),dp(7),dp(10),dp(7))}
+        miniEditorTitle=text("",10f,C_MUTED,true)
+        miniEditorValue=text("",18f,C_TEXT,true)
+        miniEditor?.addView(miniEditorTitle);miniEditor?.addView(miniEditorValue)
+        panel.addView(miniEditor,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(5)})
+        val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=true;clipToPadding=true;direction(this)};scroll=sc
+        val content=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=true;clipToPadding=true;direction(this)}
+        sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,0,1f))
+        if(resultsMode)buildResults(content)else buildEditor(content)
+        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),C_ACCENT,C_ACCENT_TEXT){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(12)})
+        panel.alpha=0f
+        f.addView(panel,FrameLayout.LayoutParams(-1,-1).apply{leftMargin=dp(20);rightMargin=dp(20);topMargin=dp(88);bottomMargin=dp(12)})
+        applyLayout()
+        panel.animate().alpha(1f).setDuration(150).start()
+    }
+    private fun renderMenu(){showMenu()}
+    private fun label(parent:LinearLayout,s:String){parent.addView(text(s,11f,C_MUTED,true),LinearLayout.LayoutParams(-1,dp(23)))}
+    private inner class OverlayEditText(context:Context):EditText(context) {
+        override fun onKeyPreIme(keyCode:Int,event:KeyEvent):Boolean {
+            if(keyCode==KeyEvent.KEYCODE_BACK && this@RallyOverlayService.focusable) {
+                if(event.action==KeyEvent.ACTION_UP)dismissIme(this)
+                return true
+            }
+            return super.onKeyPreIme(keyCode,event)
+        }
+    }
+    private fun dismissIme(field:EditText?) {
+        val token=field?.windowToken ?: root?.windowToken
+        if(token!=null)imm.hideSoftInputFromWindow(token,0)
+        field?.clearFocus()
+        if(focusedField===field)focusedField=null
+    }
+    private fun handleEditorAction(field:EditText,actionId:Int):Boolean {
+        if(actionId==EditorInfo.IME_ACTION_DONE) { dismissIme(field);return true }
+        if(actionId==EditorInfo.IME_ACTION_NEXT) {
+            val next=field.focusSearch(View.FOCUS_FORWARD)
+            if(next!=null) { next.requestFocus();if(next is EditText)next.post { if(next.hasFocus())imm.showSoftInput(next,InputMethodManager.SHOW_IMPLICIT) } }
+            else dismissIme(field)
+            return true
+        }
+        return false
+    }
+    private fun input(hint:String,value:String,numeric:Boolean=false):EditText {
+        return OverlayEditText(uiContext).apply {
+            setSingleLine(true); textSize=13f; setTextColor(C_TEXT); setHintTextColor(C_MUTED); setHint(hint); setText(value); contentDescription=hint
+            background=bg(C_FIELD,9f); setPadding(dp(9),0,dp(9),0)
+            if(numeric) { inputType=android.text.InputType.TYPE_CLASS_NUMBER; keyListener=android.text.method.DigitsKeyListener.getInstance("0123456789"); imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=View.TEXT_DIRECTION_LTR; textAlignment=View.TEXT_ALIGNMENT_CENTER }
+            else { inputType=android.text.InputType.TYPE_CLASS_TEXT; imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=if(ar())View.TEXT_DIRECTION_RTL else View.TEXT_DIRECTION_LTR }
+            setOnTouchListener { v,event ->
+                if(event.actionMasked==MotionEvent.ACTION_DOWN) {
+                    if(!this@RallyOverlayService.focusable)setFocus(true)
+                    v.post { if(v.isAttachedToWindow) { v.requestFocus();imm.showSoftInput(v,InputMethodManager.SHOW_IMPLICIT) } }
+                }
+                false
+            }
+            setOnFocusChangeListener { _,has ->
+                if(has) {
+                    focusedField=this;setFocus(true)
+                    post { if(hasFocus()) { imm.showSoftInput(this,InputMethodManager.SHOW_IMPLICIT);scroll?.post { ensureFocusedFieldVisible(this) } } }
+                } else {
+                    if(focusedField===this)focusedField=null
+                    if(numeric)finalizeTimeInput(this) {}
+                }
+            }
+            setOnEditorActionListener { _,actionId,_ -> if(actionId==EditorInfo.IME_ACTION_NEXT && numeric)finalizeTimeInput(this) {};handleEditorAction(this,actionId) }
+        }
+    }
+    private fun timePreview(digits: String): String = RallyTime.preview(digits)
+    private fun bindTimeInput(field: EditText, changed: (String) -> Unit) {
+        var formatting = false
+        field.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                if (formatting) return
+                val digits = (s?.toString() ?: "").filter { it in '0'..'9' }.take(4)
+                val rebuilt = timePreview(digits)
+                if (rebuilt != s?.toString()) { formatting=true; field.setText(rebuilt); field.setSelection(rebuilt.length); formatting=false }
+                changed(rebuilt)
+                if(focusedField===field)miniEditorValue?.text=rebuilt
+            }
+        })
+        val initial=RallyTime.preview(field.text.toString())
+        if(initial!=field.text.toString()){field.setText(initial);field.setSelection(initial.length)}
+        changed(initial)
+        field.setOnFocusChangeListener { _,has ->
+            if(has) { focusedField=field;setFocus(true);scroll?.post { ensureFocusedFieldVisible(field) } }
+            else { if(focusedField===field)focusedField=null;finalizeTimeInput(field,changed) }
+        }
+        field.setOnEditorActionListener { _,actionId,_ ->
+            if(actionId==EditorInfo.IME_ACTION_NEXT)finalizeTimeInput(field,changed)
+            handleEditorAction(field,actionId)
+        }
+    }
+    private fun finalizeTimeInput(field: EditText, changed: (String) -> Unit) {
+        val raw=field.text.toString()
+        val normalized=RallyTime.normalize(raw)
+        if(normalized!=null) { if(raw!=normalized){field.setText(normalized);field.setSelection(normalized.length)};changed(normalized) }
+        else changed(RallyTime.preview(raw))
+    }
+    private fun buildEditor(c:LinearLayout) {
+        if(settingsMode) {
+            label(c,t("الإعدادات","Settings"))
+            c.addView(button(if(vibrationEnabled)uiContext.getString(R.string.vibration_on)else uiContext.getString(R.string.vibration_off),C_FIELD,C_TEXT){vibrationEnabled=!vibrationEnabled;persist();renderMenu()})
+            c.addView(button(uiContext.getString(R.string.back),C_ACCENT,C_ACCENT_TEXT){settingsMode=false;persist();renderMenu()})
+            return
+        }
+        val modes=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;direction(this)}
+        modes.addView(button(uiContext.getString(R.string.mode_now),if(calculationMode=="now")C_ACCENT else C_FIELD,if(calculationMode=="now")C_ACCENT_TEXT else C_TEXT){calculationMode="now";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
+        modes.addView(Space(uiContext),LinearLayout.LayoutParams(dp(6),1))
+        modes.addView(button(uiContext.getString(R.string.mode_target),if(calculationMode=="target")C_ACCENT else C_FIELD,if(calculationMode=="target")C_ACCENT_TEXT else C_TEXT){calculationMode="target";persist();renderMenu()},LinearLayout.LayoutParams(0,dp(32),1f))
+        c.addView(modes)
+        if(calculationMode=="now") {
+            label(c,uiContext.getString(R.string.prep_delay))
+            val delays=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
+            listOf(5,10,20,30).forEach { value ->
+                delays.addView(button(value.toString(),if(prepSeconds==value)C_ACCENT else C_FIELD,if(prepSeconds==value)C_ACCENT_TEXT else C_TEXT){prepSeconds=value;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(30),1f))
+                if(value!=30)delays.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
+            }
+            c.addView(delays)
+        } else {
+            label(c,t("الوقت المستهدف · MM:SS","Target time · MM:SS"))
+            targetInput=input("MM:SS",target,true).apply{contentDescription=t("الوقت المستهدف","Target time")}
+            c.addView(targetInput,LinearLayout.LayoutParams(-1,dp(38)))
+            targetInput?.let { bindTimeInput(it) { value -> target=value; persist() } }
+            label(c,uiContext.getString(R.string.utc_hour_optional))
+            targetHourInput=input("HH",targetHour,true)
+            c.addView(targetHourInput,LinearLayout.LayoutParams(-1,dp(34)))
+            targetHourInput?.addTextChangedListener(SimpleWatcher{targetHour=it.filter{ch->ch.isDigit()}.take(2);persist()})
+        }
+        label(c,t("المشاركون","Participants")+" · ${people.size}")
+        people.forEachIndexed{index,p->
+            val row=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(C_FIELD,9f);setPadding(dp(8),dp(8),dp(8),dp(8))}
+            row.addView(text(t("مشارك","Participant")+" ${index+1}",11f,C_MUTED,true))
+            val fields=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL}
+            val name=input(t("اسم اللاعب","Player name"),p.name)
+            val duration=input("MM:SS",p.duration,true)
+            duration.imeOptions=if(index==people.lastIndex && p.kind!="rally")EditorInfo.IME_ACTION_DONE else EditorInfo.IME_ACTION_NEXT
+            name.contentDescription=t("مشارك ${index+1} · الاسم","Participant ${index+1} · name")
+            duration.contentDescription=t("مشارك ${index+1} · المدة","Participant ${index+1} · duration")
+            name.addTextChangedListener(SimpleWatcher{p.name=it;persist();if(focusedField===name)miniEditorValue?.text=it})
+            bindTimeInput(duration) { value -> p.duration=value; persist() }
+            fields.addView(name,LinearLayout.LayoutParams(0,dp(38),1f))
+            fields.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
+            fields.addView(duration,LinearLayout.LayoutParams(dp(82),dp(38)))
+            row.addView(fields)
+            val kindRow=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
+            kindRow.addView(fitControl(button(uiContext.getString(R.string.solo),if(p.kind=="solo")C_ACCENT else C_FIELD,if(p.kind=="solo")C_ACCENT_TEXT else C_TEXT){p.kind="solo";persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(40),1f))
+            kindRow.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
+            kindRow.addView(fitControl(button(uiContext.getString(R.string.rally),if(p.kind=="rally")C_ACCENT else C_FIELD,if(p.kind=="rally")C_ACCENT_TEXT else C_TEXT){p.kind="rally";persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(40),1f))
+            row.addView(kindRow,LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(4)})
+            if(p.kind=="rally") {
+                duration.hint="MM:SS";duration.contentDescription=uiContext.getString(R.string.rally_march_arrival)
+                label(row,uiContext.getString(R.string.rally_march_arrival));label(row,uiContext.getString(R.string.rally_duration))
+                val presets=listOf(1,3,5,10,15,30,60)
+                presets.chunked(4).forEach { group ->
+                    val durations=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
+                    group.forEach { mins ->
+                        durations.addView(fitControl(button(if(ar())"${mins}د" else "${mins}m",if(p.rallyMinutes==mins)C_ACCENT else C_FIELD,if(p.rallyMinutes==mins)C_ACCENT_TEXT else C_TEXT){p.rallyMinutes=mins;persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(40),1f))
+                        if(mins!=group.last())durations.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
+                    }
+                    row.addView(durations,LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(3)})
+                }
+                val custom=input(uiContext.getString(R.string.minutes),if(p.rallyMinutes !in presets)p.rallyMinutes.toString() else "",true)
+                if(index==people.lastIndex)custom.imeOptions=EditorInfo.IME_ACTION_DONE
+                custom.visibility=View.GONE
+                val customToggle=fitControl(button(uiContext.getString(R.string.custom_minutes),if(p.rallyMinutes !in presets)C_ACCENT else C_FIELD,if(p.rallyMinutes !in presets)C_ACCENT_TEXT else C_TEXT){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE})
+                row.addView(customToggle,LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(8)})
+                custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it > 0 && it <= Int.MAX_VALUE/60}?.let{p.rallyMinutes=it;persist();customToggle.setBackground(bg(C_ACCENT,9f));customToggle.setTextColor(C_ACCENT_TEXT)}})
+                row.addView(custom,LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(4)})
+            }
+            val actions=LinearLayout(uiContext).apply{gravity=if(ar())Gravity.END else Gravity.START}
+            actions.addView(button(t("تعديل","Edit"),C_FIELD,C_TEXT){name.requestFocus();name.setSelection(name.text.length);setFocus(true)})
+            actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
+            actions.addView(button(t("حذف","Delete"),C_DANGER,C_TEXT){people.removeAll{it.id==p.id};if(people.isEmpty())people.add(Person(nextId++,"",""));persist();renderMenu()})
+            row.addView(actions,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(8)});c.addView(row)
+            if(index<people.lastIndex)c.addView(View(uiContext).apply{setBackgroundColor(C_BORDER)},LinearLayout.LayoutParams(-1,dp(1)))
+        }
+        c.addView(button(t("+ إضافة مشارك","+ Add participant"),C_FIELD,C_MUTED){people.add(Person(nextId++,"",""));persist();renderMenu();scroll?.post{scroll?.fullScroll(View.FOCUS_DOWN)}})
+        errors.forEach{c.addView(text(it,11f,C_DANGER))}
+    }
+    private fun utcTime(epoch:Long):String = SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(epoch))
+    private fun countdown(ms:Long):String {
+        val sec=((ms+999L)/1000L).coerceAtLeast(0L)
+        return String.format(Locale.US,"%02d:%02d",sec/60,sec%60)
+    }
+    private fun copyRowText(r:ResultRow):String {
+        val verb=if(r.isRally)uiContext.getString(R.string.start_rally) else uiContext.getString(R.string.send_action)
+        val extra=if(r.isRally)String.format(Locale.US,uiContext.getString(R.string.rally_copy_suffix),r.rallySeconds/60) else ""
+        return "${r.name} — ${verb} ${utcTime(r.actionAt)} UTC${extra}"
+    }
+    private fun copyRow(r:ResultRow) = copy(copyRowText(r))
+    private fun updateResultCountdowns() {
+        if(!resultsMode||resultCountdowns.isEmpty())return
+        val now=System.currentTimeMillis()
+        results.forEach { r ->
+            val label=resultCountdowns[r.id]?:return@forEach
+            val remaining=r.actionAt-now
+            if(remaining>0) {
+                label.text=String.format(Locale.US,uiContext.getString(R.string.countdown_in),countdown(remaining))
+                label.setTextColor(if(remaining<=10_000L)C_WARNING else C_MUTED)
+            } else {
+                val zeroAt=resultZeroAt.getOrPut(r.id){now}
+                label.text=uiContext.getString(R.string.now_label)
+                label.setTextColor(if(now-zeroAt<3000L)C_ACCENT else C_MUTED)
+                resultRowsViews[r.id]?.alpha=if(now-zeroAt<3000L)1f else 0.55f
+                if(vibrationEnabled&&vibratedIds.add(r.id)) {
+                    runCatching {
+                        val vibrator=if(Build.VERSION.SDK_INT>=31)getSystemService(VibratorManager::class.java).defaultVibrator else @Suppress("DEPRECATION") getSystemService(VIBRATOR_SERVICE) as Vibrator
+                        if(Build.VERSION.SDK_INT>=26)vibrator.vibrate(VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE)) else @Suppress("DEPRECATION") vibrator.vibrate(70)
+                    }
+                }
+            }
+        }
+    }
+    private fun buildResults(c:LinearLayout) {
+        resultCountdowns.clear();resultRowsViews.clear()
+        label(c,uiContext.getString(R.string.execution_schedule))
+        results.forEachIndexed { index,r ->
+            val wrap=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(C_FIELD,9f);setPadding(dp(8),dp(7),dp(8),dp(7));direction(this)}
+            resultRowsViews[r.id]=wrap
+            val top=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
+            val info=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL}
+            info.addView(text(r.name,12f,C_TEXT,true))
+            info.addView(text(if(r.isRally)String.format(Locale.US,uiContext.getString(R.string.rally_badge),r.rallySeconds/60) else uiContext.getString(R.string.solo),10f,C_MUTED))
+            top.addView(info,LinearLayout.LayoutParams(0,-2,1f))
+            top.addView(text(if(r.isRally)uiContext.getString(R.string.start_rally) else uiContext.getString(R.string.send_action),11f,C_MUTED,true))
+            val time=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;layoutDirection=View.LAYOUT_DIRECTION_LTR}
+            time.addView(text(utcTime(r.actionAt).substring(0,2),11f,C_MUTED))
+            time.addView(text(utcTime(r.actionAt).substring(2),17f,C_TEXT,true))
+            top.addView(time,LinearLayout.LayoutParams(-2,dp(34)).apply{marginStart=dp(7)})
+            top.addView(button(t("نسخ","Copy"),C_FIELD,C_TEXT){copyRow(r)})
+            wrap.addView(top)
+            val timer=text("",11f,C_MUTED,true).apply{textDirection=View.TEXT_DIRECTION_LTR}
+            resultCountdowns[r.id]=timer
+            wrap.addView(timer,LinearLayout.LayoutParams(-1,dp(22)))
+            if(r.isRally)wrap.addView(text(t("ينطلق ","Departs ")+utcTime(r.departAt),10f,C_MUTED))
+            c.addView(wrap)
+            if(index<results.lastIndex) {
+                val next=results[index+1]
+                val gap=((next.actionAt-r.actionAt)/1000L).coerceAtLeast(0L)
+                c.addView(text(String.format(Locale.US,uiContext.getString(R.string.after_player_by),r.name,countdown(gap*1000)),9f,C_MUTED))
+                c.addView(View(uiContext).apply{setBackgroundColor(C_BORDER)},LinearLayout.LayoutParams(-1,dp(1)))
+            }
+        }
+        errors.forEach{c.addView(text(it,10f,C_DANGER))}
+        results.firstOrNull()?.let { r ->
+            c.addView(text(String.format(Locale.US,uiContext.getString(R.string.everyone_arrives),utcTime(r.arrivalAt)),11f,C_ACCENT,true))
+        }
+        c.addView(button(t("نسخ الكل","Copy all"),C_FIELD,C_TEXT){copy(results.joinToString("\n"){r->copyRowText(r)})})
+        c.addView(button(uiContext.getString(R.string.recalculate_now),C_ACCENT,C_ACCENT_TEXT){calculationMode="now";resultsMode=false;calculate()})
+        c.addView(button(t("رجوع للتعديل","Back to edit"),C_FIELD,C_TEXT){resultsMode=false;persist();renderMenu()})
+        updateResultCountdowns()
+        val now=System.currentTimeMillis()
+        results.forEach { r ->
+            val wait=(r.actionAt-now).coerceAtLeast(0L)
+            handler.postDelayed({updateResultCountdowns()},wait)
+        }
+    }
+    private fun calculate() {
+        errors.clear()
+        val valid=mutableListOf<RallyInput>()
+        people.forEachIndexed{i,p->
+            if(p.name.isBlank()){errors.add(t("أدخل اسم اللاعب للمشارك ","Enter a player name for participant ")+(i+1));return@forEachIndexed}
+            val march=parse(p.duration)
+            if(march==null){errors.add(t("مدة المسيرة غير صالحة للمشارك: ","Invalid march duration for: ")+p.name);return@forEachIndexed}
+            valid.add(RallyInput(p.id,p.name.trim(),march,if(p.kind=="rally")p.rallyMinutes*60 else 0))
+        }
+        if(valid.isEmpty()){resultsMode=false;renderMenu();return}
+        val now=System.currentTimeMillis()
+        val rows:List<RallyPlanRow>
+        val arrival:Long
+        if(calculationMode=="now") {
+            val plan=RallyPlanner.planNow(now,prepSeconds,valid);rows=plan.rows;arrival=plan.arrivalAtMillis
+        } else {
+            val goal=parse(target)
+            if(goal==null){errors.add(uiContext.getString(R.string.invalid_target_mmss));resultsMode=false;renderMenu();targetInput?.requestFocus();return}
+            val targetAt=if(targetHour.isNotBlank()) {
+                val hour=targetHour.toIntOrNull()
+                if(hour==null||hour !in 0..23){errors.add(uiContext.getString(R.string.invalid_utc_hour));renderMenu();return}
+                val cal=Calendar.getInstance(TimeZone.getTimeZone("UTC"),Locale.US).apply{timeInMillis=now;set(Calendar.HOUR_OF_DAY,hour);set(Calendar.MINUTE,goal/60);set(Calendar.SECOND,goal%60);set(Calendar.MILLISECOND,0)}
+                cal.timeInMillis
+            } else now+goal*1000L
+            val late=valid.filter{targetAt-(it.totalSeconds*1000L)<now}
+            late.forEach{errors.add(String.format(Locale.US,uiContext.getString(R.string.missed_action_for),it.name))}
+            rows=valid.filterNot{it in late}.map{p->
+                RallyPlanRow(p.id,p.name,p.isRally,p.rallySeconds,p.marchSeconds,targetAt-p.totalSeconds*1000L,targetAt-p.marchSeconds*1000L,targetAt)
+            }.sortedBy{it.actionAtMillis}
+            arrival=targetAt
+            if(late.isNotEmpty()) {
+                results=rows.map{ResultRow(it.id,it.name,it.isRally,it.rallySeconds,it.marchSeconds,it.actionAtMillis,it.departAtMillis,it.arrivalAtMillis)}.toMutableList()
+                resultsMode=true;persist();renderMenu()
+                val postpone=button(uiContext.getString(R.string.postpone_target_hour),C_ACCENT,C_ACCENT_TEXT){
+                    val shifted=Calendar.getInstance(TimeZone.getTimeZone("UTC"),Locale.US).apply{timeInMillis=targetAt+3600000L}
+                    targetHour=String.format(Locale.US,"%02d",shifted.get(Calendar.HOUR_OF_DAY))
+                    target=String.format(Locale.US,"%d:%02d",shifted.get(Calendar.MINUTE),shifted.get(Calendar.SECOND))
+                    persist();calculate()
+                }
+                menuView?.addView(postpone,LinearLayout.LayoutParams(-1,dp(34)).apply{topMargin=dp(5)})
+                return
+            }
+        }
+        results=rows.map{ResultRow(it.id,it.name,it.isRally,it.rallySeconds,it.marchSeconds,it.actionAtMillis,it.departAtMillis,arrival)}.toMutableList()
+        resultsMode=true;resultZeroAt.clear();vibratedIds.clear();persist();renderMenu()
+    }
+    private fun parse(raw:String):Int? = RallyTime.seconds(raw)
+    private fun format(n:Int):String = RallyTime.format(n)
+    private fun copy(s:String){(getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Rally",s));Toast.makeText(uiContext,t("تم النسخ","Copied"),Toast.LENGTH_SHORT).show()}
+    private fun setFocus(on:Boolean) {
+        val r=root?:return;val p=params?:return
+        if(focusable==on)return
+        focusable=on
+        p.flags=if(on)p.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv() else p.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
+        runCatching { wm.updateViewLayout(r,p) }
+        if(on)focusedField?.let { field -> field.post { if(field.hasFocus())imm.showSoftInput(field,InputMethodManager.SHOW_IMPLICIT) } }
+    }
+    private fun showConfirm() {
+        if(confirming)return;confirming=true
+        if (focusable) { dismissIme(focusedField);setFocus(false) }
+        val dialog=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=bg(C_PANEL,12f);setPadding(dp(16),dp(12),dp(16),dp(12))}
+        dialog.addView(text(t("هل تريد إغلاق الأداة؟","Close the tool?"),13f,C_TEXT,true))
+        val actions=LinearLayout(uiContext).apply{gravity=Gravity.CENTER}
+        actions.addView(button(t("نعم","Yes"),C_ACCENT,C_ACCENT_TEXT){confirming=false;stopSelf()})
+        actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(8),1))
+        actions.addView(button(t("لا","No"),C_DANGER,C_TEXT){confirming=false;buildCollapsed();applyLayout()})
+        dialog.addView(actions)
+        val r=root?:return
+        r.resizeEnabled=false
+        r.removeAllViews();r.addView(dialog,FrameLayout.LayoutParams(dp(220),dp(100),Gravity.CENTER))
+        val p=params?:return;p.width=dp(240);p.height=dp(120);p.x=(resources.displayMetrics.widthPixels-p.width)/2;p.y=(resources.displayMetrics.heightPixels-p.height)/2
+        runCatching{wm.updateViewLayout(r,p)}
+    }
+    override fun onDestroy(){runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};root?.let{runCatching{wm.removeView(it)}};root=null
+        if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
+    companion object { const val ACTION_STOP="com.mythic.rally.STOP"; const val ACTION_LANGUAGE_CHANGED="com.mythic.rally.LANGUAGE_CHANGED"; private const val TAG="RallyOverlay" }
+    private class SimpleWatcher(val changed:(String)->Unit):android.text.TextWatcher{
+        override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){}
+        override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){changed(s?.toString()?: "")}
+        override fun afterTextChanged(s:android.text.Editable?){}
+    }
+}

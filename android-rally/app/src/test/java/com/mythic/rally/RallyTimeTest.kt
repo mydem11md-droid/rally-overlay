@@ -29,4 +29,12 @@ class RallyTimeTest {
         assertEquals("3:28",RallyTime.preview("03:28abc"))
         assertEquals("12:30",RallyTime.preview("123099"))
     }
+    @Test fun sharedUtcClockUsesEpochMilliseconds() {
+        assertEquals("03:04:05", RallyTime.utcClock(1704164645678L))
+        assertEquals(322L, RallyTime.millisUntilNextSecond(1704164645678L))
+        assertEquals(1000L, RallyTime.millisUntilNextSecond(1704164645000L))
+        assertEquals(3, RallyTime.utcParts(1704164645678L)[0])
+        assertEquals(4, RallyTime.utcParts(1704164645678L)[1])
+        assertEquals(5, RallyTime.utcParts(1704164645678L)[2])
+    }
 }

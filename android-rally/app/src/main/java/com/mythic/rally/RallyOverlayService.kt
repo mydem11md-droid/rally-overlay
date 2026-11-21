@@ -13,7 +13,6 @@ import android.view.inputmethod.*
 import android.widget.*
 import org.json.JSONArray
 import org.json.JSONObject
-import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.*
 
@@ -187,7 +186,13 @@ class RallyOverlayService : Service() {
             if(root!=null){if(menuOpen)showMenu()else buildCollapsed();startForeground(27,notification())}
         }
     }
-    private val clockTick = object: Runnable { override fun run() { updateClock(); updateResultCountdowns(); handler.postDelayed(this,1000) } }
+    private val clockTick = object: Runnable {
+        override fun run() {
+            updateClock()
+            updateResultCountdowns()
+            handler.postDelayed(this, RallyTime.millisUntilNextSecond())
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -330,7 +335,7 @@ class RallyOverlayService : Service() {
     }.apply { contentDescription=t("الوقت","Clock") }
     private fun addPinnedControls(f: FrameLayout) {
         val capsule=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=bg(C_PANEL,10f);setPadding(dp(12),dp(6),dp(12),dp(6));minimumWidth=dp(104);direction(this) }
-        val clock=TextView(uiContext).apply { tag="utc_time";text=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(System.currentTimeMillis()));textSize=15f;setTextColor(C_TEXT);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
+        val clock=TextView(uiContext).apply { tag="utc_time";text=RallyTime.utcClock();textSize=15f;setTextColor(C_TEXT);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
         val utc=TextView(uiContext).apply { text="UTC";textSize=11f;setTextColor(C_MUTED);includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR }
         capsule.addView(clock);capsule.addView(utc,LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(4)})
         f.addView(capsule,FrameLayout.LayoutParams(-2,-2,Gravity.TOP or Gravity.CENTER_HORIZONTAL))
@@ -366,8 +371,7 @@ class RallyOverlayService : Service() {
     private var downX=0f;private var downY=0f;private var startX=0;private var startY=0;private var dragged=false
     private fun updateClock() {
         val c=root?.findViewWithTag<TextView>("utc_time")?:return
-        val formatter=SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}
-        c.text=formatter.format(Date())
+        c.text=RallyTime.utcClock()
     }
     private fun availableOverlayHeight(): Int {
         val full=if(Build.VERSION.SDK_INT>=30)wm.currentWindowMetrics.bounds.height() else resources.displayMetrics.heightPixels
@@ -648,7 +652,7 @@ class RallyOverlayService : Service() {
         c.addView(button(t("+ إضافة مشارك","+ Add participant"),C_FIELD,C_MUTED){people.add(Person(nextId++,"",""));persist();renderMenu();scroll?.post{scroll?.fullScroll(View.FOCUS_DOWN)}})
         errors.forEach{c.addView(text(it,11f,C_DANGER))}
     }
-    private fun utcTime(epoch:Long):String = SimpleDateFormat("HH:mm:ss",Locale.US).apply{timeZone=TimeZone.getTimeZone("UTC")}.format(Date(epoch))
+    private fun utcTime(epoch:Long):String = RallyTime.utcClock(epoch)
     private fun countdown(ms:Long):String {
         val sec=((ms+999L)/1000L).coerceAtLeast(0L)
         return String.format(Locale.US,"%02d:%02d",sec/60,sec%60)
@@ -661,7 +665,7 @@ class RallyOverlayService : Service() {
     private fun copyRow(r:ResultRow) = copy(copyRowText(r))
     private fun updateResultCountdowns() {
         if(!resultsMode||resultCountdowns.isEmpty())return
-        val now=System.currentTimeMillis()
+        val now=RallyTime.nowMillis()
         results.forEach { r ->
             val label=resultCountdowns[r.id]?:return@forEach
             val remaining=r.actionAt-now
@@ -720,7 +724,7 @@ class RallyOverlayService : Service() {
         c.addView(button(uiContext.getString(R.string.recalculate_now),C_ACCENT,C_ACCENT_TEXT){calculationMode="now";resultsMode=false;calculate()})
         c.addView(button(t("رجوع للتعديل","Back to edit"),C_FIELD,C_TEXT){resultsMode=false;persist();renderMenu()})
         updateResultCountdowns()
-        val now=System.currentTimeMillis()
+        val now=RallyTime.nowMillis()
         results.forEach { r ->
             val wait=(r.actionAt-now).coerceAtLeast(0L)
             handler.postDelayed({updateResultCountdowns()},wait)
@@ -736,7 +740,7 @@ class RallyOverlayService : Service() {
             valid.add(RallyInput(p.id,p.name.trim(),march,if(p.kind=="rally")p.rallyMinutes*60 else 0))
         }
         if(valid.isEmpty()){resultsMode=false;renderMenu();return}
-        val now=System.currentTimeMillis()
+        val now=RallyTime.nowMillis()
         val rows:List<RallyPlanRow>
         val arrival:Long
         if(calculationMode=="now") {
