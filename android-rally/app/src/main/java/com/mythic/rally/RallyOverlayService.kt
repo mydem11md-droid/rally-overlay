@@ -77,6 +77,8 @@ class RallyOverlayService : Service() {
     private var panelYdp = 180
     private var params: WindowManager.LayoutParams? = null
     private var menuOpen = false
+    private var panelAbove = false
+    private var panelContentHeightPx = 0
     private var resultsMode = false
     private var settingsMode = false
     private var focusable = false
@@ -99,6 +101,7 @@ class RallyOverlayService : Service() {
     private var bubbleX = 24
     private var bubbleY = 180
     private var menuView: LinearLayout? = null
+    private var popupRef: PopupWindow? = null
     private var scroll: ScrollView? = null
     private var targetInput: EditText? = null
     private var imeHeightPx = 0
@@ -351,7 +354,7 @@ class RallyOverlayService : Service() {
             addView(clockStack,FrameLayout.LayoutParams(dp(62),dp(34),Gravity.CENTER))
             contentDescription=t("فتح أو إغلاق أداة تنسيق الحشود","Open or close Rally Coordinator")
         }
-        f.addView(orb,FrameLayout.LayoutParams(dp(76),dp(76),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(4)})
+        f.addView(orb,FrameLayout.LayoutParams(dp(76),dp(76),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=if(panelAbove)panelContentHeightPx+dp(12) else dp(4)})
         if(menuOpen) {
             val desired=dp(bubbleX+42)
             orb.translationX=(desired-(dp(panelXdp.coerceAtLeast(0))+panelWidthPx/2)).toFloat()
@@ -365,7 +368,7 @@ class RallyOverlayService : Service() {
                     bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-84)
                     bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-84)
                     panelXdp=((dp(bubbleX+42)-panelWidthPx/2)/density).roundToInt().coerceIn(0,((resources.displayMetrics.widthPixels-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
-                    panelYdp=bubbleY.coerceIn(0,((resources.displayMetrics.heightPixels-panelHeightPx).coerceAtLeast(0)/density).roundToInt())
+                    panelYdp=(if(panelAbove) bubbleY-(panelHeightPx/density).roundToInt()+88 else bubbleY).coerceIn((statusInsetPx/density).roundToInt(),((resources.displayMetrics.heightPixels-panelHeightPx).coerceAtLeast(0)/density).roundToInt())
                     if(menuOpen)view.translationX=(dp(bubbleX+42)-(dp(panelXdp)+panelWidthPx/2)).toFloat()
                     applyLayout();persist();prefs.edit().putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()
                 };true
@@ -471,15 +474,17 @@ class RallyOverlayService : Service() {
         if (focusable) { dismissIme(focusedField);setFocus(false) }
         val panel=menuView
         if(panel!=null) {
-            panel.animate().alpha(0f).setDuration(150).withEndAction {
-                menuOpen=false;persist();menuView=null;buildCollapsed();applyLayout()
+            panel.pivotY=if(panelAbove)0f else panel.height.toFloat()
+            panel.animate().scaleY(0.96f).setDuration(250).withEndAction {
+                menuOpen=false;persist();menuView=null;panelAbove=false;panelContentHeightPx=0
+                buildCollapsed();applyLayout()
             }.start()
-        } else { menuOpen=false;persist();buildCollapsed();applyLayout() }
+        } else { menuOpen=false;persist();panelAbove=false;panelContentHeightPx=0;buildCollapsed();applyLayout() }
     }
     private fun showMenu() {
         val f=root?:return
-        f.resizeEnabled=true
-        f.removeAllViews();f.clipChildren=true;f.clipToPadding=true;addPinnedControls(f)
+        f.resizeEnabled=false
+        f.removeAllViews();f.clipChildren=true;f.clipToPadding=true
         val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(12),dp(12),dp(12),dp(12));clipChildren=true;clipToPadding=true;direction(this)}
         menuView=panel
         val header=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL;orientation=LinearLayout.HORIZONTAL;direction(this)}
@@ -489,34 +494,73 @@ class RallyOverlayService : Service() {
         header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(dp(34),dp(32)))
         panel.addView(header)
         miniEditor=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;visibility=View.GONE;background=bg(0xFF2A3A2F.toInt(),9f);setPadding(dp(9),dp(5),dp(9),dp(5))}
-        miniEditorTitle=text("",10f,0xFFA5C4AA.toInt(),true)
-        miniEditorValue=text("",18f,Color.WHITE,true)
+        miniEditorTitle=text("",10f,0xFFA5C4AA.toInt(),true);miniEditorValue=text("",18f,Color.WHITE,true)
         miniEditor?.addView(miniEditorTitle);miniEditor?.addView(miniEditorValue)
         panel.addView(miniEditor,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(5)})
         val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=true;clipToPadding=true;direction(this)};scroll=sc
         val content=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=true;clipToPadding=true;direction(this)}
-        sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,0,1f))
+        sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,-2))
         if(resultsMode)buildResults(content)else buildEditor(content)
-        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(12)})
-        panel.alpha=0f
-        f.addView(panel,FrameLayout.LayoutParams(-1,-1).apply{leftMargin=dp(20);rightMargin=dp(20);topMargin=dp(88);bottomMargin=dp(12)})
+        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(6)})
+        val screenH=resources.displayMetrics.heightPixels
+        val contentWidth=(panelWidthPx-dp(64)).coerceAtLeast(dp(120))
+        content.measure(View.MeasureSpec.makeMeasureSpec(contentWidth,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED))
+        val below=(screenH-dp(bubbleY+84)-navInsetPx-dp(12)).coerceAtLeast(0)
+        val above=(dp(bubbleY)-statusInsetPx-dp(12)).coerceAtLeast(0)
+        val naturalPanel=dp(34+24+(if(resultsMode)0 else 44))+content.measuredHeight
+        panelAbove=below<naturalPanel && above>below
+        val available=(if(panelAbove)above else below).coerceAtLeast(dp(160))
+        sc.maxHeightPx=(available-dp(34+24+(if(resultsMode)0 else 44))).coerceAtLeast(dp(72))
+        val widthSpec=View.MeasureSpec.makeMeasureSpec((panelWidthPx-dp(40)).coerceAtLeast(dp(200)),View.MeasureSpec.EXACTLY)
+        panel.measure(widthSpec,View.MeasureSpec.makeMeasureSpec(available,View.MeasureSpec.AT_MOST))
+        panelContentHeightPx=panel.measuredHeight.coerceAtLeast(dp(140))
+        panelHeightPx=panelContentHeightPx+dp(100)
+        val minTop=(statusInsetPx/density).roundToInt()
+        val maxTop=((screenH-panelHeightPx).coerceAtLeast(dp(minTop)))
+        panelYdp=(if(panelAbove)bubbleY-(panelHeightPx/density).roundToInt()+88 else bubbleY)
+            .coerceIn(minTop,(maxTop/density).roundToInt())
+        panelXdp=((dp(bubbleX+42)-panelWidthPx/2)/density).roundToInt()
+            .coerceIn(0,((resources.displayMetrics.widthPixels-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
+        addPinnedControls(f)
+        val panelTop=if(panelAbove)dp(4) else dp(88)
+        val panelBottom=if(panelAbove)dp(88) else dp(12)
+        f.addView(panel,FrameLayout.LayoutParams(-1,panelContentHeightPx).apply{leftMargin=dp(20);rightMargin=dp(20);topMargin=panelTop;bottomMargin=panelBottom})
+        f.layoutParams?.let{lp->lp.width=panelWidthPx;lp.height=panelHeightPx;f.layoutParams=lp}
         applyLayout()
-        panel.animate().alpha(1f).setDuration(150).start()
+        panel.pivotY=if(panelAbove)0f else panel.height.toFloat()
+        panel.scaleY=0.96f
+        panel.animate().scaleY(1f).setDuration(250).start()
     }
     private fun renderMenu(){showMenu()}
     private fun label(parent:LinearLayout,s:String){parent.addView(text(s,10f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(21)))}
     private fun dropdown(selected:String, options:List<Pair<String,()->Unit>>):TextView {
         val anchor=button("$selected  ▾",0xFF2A3A2F.toInt(),0xFFE7F0EA.toInt()) {}
-        anchor.textSize=10f; anchor.includeFontPadding=false
-        anchor.setPadding(dp(3),dp(4),dp(3),dp(4))
+        anchor.textSize=10f;anchor.includeFontPadding=false;anchor.setPadding(dp(3),dp(4),dp(3),dp(4))
         anchor.setOnClickListener {
-            val popup=PopupMenu(uiContext,anchor)
-            options.forEach { (title,_) -> popup.menu.add(title) }
-            popup.setOnMenuItemClickListener { item ->
-                options.firstOrNull { it.first==item.title.toString() }?.second?.invoke()
-                true
+            val rows=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(5),dp(5),dp(5),dp(5))}
+            val selectedIndex=options.indexOfFirst{(title,_)->title==selected||selected.startsWith("$title ·")}
+            options.forEachIndexed{index,entry->
+                val(title,action)=entry;val chosen=index==selectedIndex
+                rows.addView(TextView(uiContext).apply{
+                    text=if(chosen)"$title   ✓" else title;textSize=12f;gravity=Gravity.CENTER_VERTICAL
+                    setTextColor(Color.WHITE);includeFontPadding=false;setPadding(dp(12),dp(5),dp(12),dp(5))
+                    background=bg(if(chosen)0xFF347B4A.toInt() else Color.TRANSPARENT,8f);minHeight=dp(42);isSingleLine=true
+                    setOnClickListener{popupRef?.dismiss();action()}
+                },LinearLayout.LayoutParams(-1,dp(42)))
+                if(index<options.lastIndex)rows.addView(View(uiContext).apply{setBackgroundColor(0xFF39483E.toInt())},LinearLayout.LayoutParams(-1,dp(1)).apply{topMargin=dp(2);bottomMargin=dp(2)})
             }
-            popup.show()
+            val scroller=ScrollView(uiContext).apply{isFillViewport=true;addView(rows)}
+            val loc=IntArray(2);anchor.getLocationOnScreen(loc);val screen=resources.displayMetrics
+            val maxHeight=(screen.heightPixels-statusInsetPx-navInsetPx-dp(16)).coerceAtLeast(dp(100))
+            val height=min(dp(options.size*46+10),min(dp(340),maxHeight))
+            val popup=PopupWindow(scroller,anchor.width.coerceAtLeast(dp(80)),height,true).apply{
+                isOutsideTouchable=true;setBackgroundDrawable(bg(0xFF1E2A22.toInt(),12f));elevation=dp(10).toFloat();isClippingEnabled=true
+            }
+            popupRef=popup
+            val belowY=loc[1]+anchor.height
+            val y=if(belowY+height<=screen.heightPixels-navInsetPx)belowY else(loc[1]-height).coerceAtLeast(statusInsetPx)
+            val x=loc[0].coerceIn(0,(screen.widthPixels-anchor.width).coerceAtLeast(0))
+            popup.showAtLocation(root,Gravity.TOP or Gravity.LEFT,x,y)
         }
         return anchor
     }
