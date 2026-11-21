@@ -455,6 +455,7 @@ class RallyOverlayService : Service() {
     }
     private var panelAnimator:ValueAnimator?=null
     private fun collapse(){
+        dismissDropdown()
         if(focusable){dismissIme(focusedField);setFocus(false)}
         val panel=menuView
         if(panel==null){menuOpen=false;persist();buildCollapsed();applyLayout();return}
