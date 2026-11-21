@@ -7,8 +7,6 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.view.View
-import java.time.LocalTime
-import java.time.ZoneOffset
 import java.util.Locale
 
 class UtcClockView(context: Context) : View(context) {
@@ -46,32 +44,23 @@ class UtcClockView(context: Context) : View(context) {
         fontFeatureSettings = "tnum"
     }
 
-    private val ticker = object : Runnable {
-        override fun run() {
-            updateTime()
-            val delay = 1000L - (System.currentTimeMillis() % 1000L)
-            postDelayed(this, delay.coerceAtLeast(1L))
-        }
-    }
+    private val clockListener: (Long) -> Unit = { epochMillis -> updateTime(epochMillis) }
 
-    private fun updateTime() {
-        val now = LocalTime.now(ZoneOffset.UTC)
-        hour = now.hour
-        minute = now.minute
-        second = now.second
+    private fun updateTime(epochMillis: Long) {
+        val now = RallyTime.utcParts(epochMillis)
+        hour = now[0]
+        minute = now[1]
+        second = now[2]
         invalidate()
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        removeCallbacks(ticker)
-        updateTime()
-        val delay = 1000L - (System.currentTimeMillis() % 1000L)
-        postDelayed(ticker, delay.coerceAtLeast(1L))
+        RallyTime.addClockListener(clockListener)
     }
 
     override fun onDetachedFromWindow() {
-        removeCallbacks(ticker)
+        RallyTime.removeClockListener(clockListener)
         super.onDetachedFromWindow()
     }
 
