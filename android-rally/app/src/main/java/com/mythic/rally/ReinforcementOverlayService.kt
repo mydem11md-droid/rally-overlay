@@ -80,6 +80,13 @@ class ReinforcementOverlayService : Service() {
         }
     }
     private val touchSlop by lazy { ViewConfiguration.get(this).scaledTouchSlop }
+    private val utcTimeListener: (Long) -> Unit = { epochMillis ->
+        if (pageLoaded && webViewCreated) {
+            runCatching {
+                webView.evaluateJavascript("window.setUtcTime && window.setUtcTime($epochMillis)", null)
+            }
+        }
+    }
     private val languageReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: Intent?) {
             val code = intent?.getStringExtra("language") ?: return
@@ -109,6 +116,7 @@ class ReinforcementOverlayService : Service() {
         val languageFilter = android.content.IntentFilter(ACTION_LANGUAGE_CHANGED)
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(languageReceiver, languageFilter, android.content.Context.RECEIVER_NOT_EXPORTED)
         else registerReceiver(languageReceiver, languageFilter)
+        RallyTime.addClockListener(utcTimeListener)
         prefs.edit().remove("language_mode").putBoolean("window_attached", false).apply()
         publishState()
     }
@@ -130,7 +138,16 @@ class ReinforcementOverlayService : Service() {
                 settings.setAlgorithmicDarkeningAllowed(false)
             }
             webChromeClient = WebChromeClient()
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    pageLoaded = true
+                    view?.evaluateJavascript(
+                        "window.setUtcTime && window.setUtcTime(${RallyTime.nowMillis()})",
+                        null
+                    )
+                }
+            }
             addJavascriptInterface(RallyBridge(), "RallyBridge")
         }
         webViewCreated = true
@@ -330,6 +347,9 @@ class ReinforcementOverlayService : Service() {
 
     private inner class RallyBridge {
         @JavascriptInterface
+        fun getUtcTimeMillis(): Long = RallyTime.nowMillis()
+
+        @JavascriptInterface
         fun getAppLanguage(): String = getSharedPreferences("rally_native", MODE_PRIVATE).getString("language", null)
             ?: if (java.util.Locale.getDefault().language.equals("ar", true)) "ar" else "en"
 
@@ -435,6 +455,7 @@ class ReinforcementOverlayService : Service() {
         Choreographer.getInstance().removeFrameCallback(overlayFrameCallback)
         overlayFramePending = false
         runCatching { unregisterReceiver(languageReceiver) }
+        RallyTime.removeClockListener(utcTimeListener)
         if (isOverlayAttached) {
             runCatching { windowManager.removeView(webView) }
         }
