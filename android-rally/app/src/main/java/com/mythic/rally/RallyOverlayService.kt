@@ -495,6 +495,7 @@ class RallyOverlayService : Service() {
         panel.measure(View.MeasureSpec.makeMeasureSpec(panelWidthPx,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(panelCap,View.MeasureSpec.AT_MOST))
         panelContentHeightPx=panel.measuredHeight.coerceAtMost(panelCap).coerceAtLeast(min(dp(100),panelCap));panelHeightPx=panelContentHeightPx
         bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((screen.heightPixels-panelHeightPx-dp(88)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
+        applyLayout()
         val panelX=(dp(bubbleX+42)-panelWidthPx/2).coerceIn(0,(screen.widthPixels-panelWidthPx).coerceAtLeast(0))
         val panelY=dp(bubbleY)+dp(88)
         val pp=WindowManager.LayoutParams(panelWidthPx,panelHeightPx,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -884,7 +885,7 @@ class RallyOverlayService : Service() {
     private fun setFocus(on:Boolean) {
         val panel=menuView
         val p=panelParams
-        if(panel==null||p==null)return
+        if(panel==null||p==null){if(!on)focusable=false;return}
         if(focusable==on)return
         focusable=on
         p.flags=if(on)p.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv() else p.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
