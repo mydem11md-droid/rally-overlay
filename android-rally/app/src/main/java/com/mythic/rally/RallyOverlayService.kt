@@ -850,7 +850,7 @@ class RallyOverlayService : Service() {
                     target=String.format(Locale.US,"%d:%02d",shifted.get(Calendar.MINUTE),shifted.get(Calendar.SECOND))
                     persist();calculate()
                 }
-                menuView?.addView(postpone,LinearLayout.LayoutParams(-1,dp(34)).apply{topMargin=dp(5)})
+                (scroll?.getChildAt(0) as? LinearLayout)?.addView(postpone,LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(5)})
                 return
             }
         }
