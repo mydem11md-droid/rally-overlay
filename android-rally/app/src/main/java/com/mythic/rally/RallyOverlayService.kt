@@ -543,7 +543,7 @@ class RallyOverlayService : Service() {
             setSingleLine(true); setText(rallyDurationMinutes.toString())
             setSelection(text.length); textDirection=View.TEXT_DIRECTION_LTR
         }
-        AlertDialog.Builder(uiContext)
+        val dialog=AlertDialog.Builder(uiContext)
             .setTitle(t("مدة حشد مخصصة بالدقائق","Custom rally duration in minutes"))
             .setView(field)
             .setNegativeButton(t("إلغاء","Cancel"),null)
@@ -551,7 +551,9 @@ class RallyOverlayService : Service() {
                 field.text.toString().toIntOrNull()?.takeIf { it>0 && it<=Int.MAX_VALUE/60 }?.let {
                     rallyDurationMinutes=it; persist(); renderMenu()
                 }
-            }.show()
+            }.create()
+        dialog.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
+        dialog.show()
     }
     private fun timelineRail(dotColor:Int=0xFF4CAF50.toInt()):View = object:View(uiContext) {
         private val line=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0xFF42634B.toInt(); strokeWidth=dp(1.5f).toFloat() }
