@@ -307,35 +307,56 @@ class RallyOverlayService : Service() {
         panelXdp=(x/density).roundToInt();panelYdp=(y/density).roundToInt()
         runCatching { wm.updateViewLayout(r,p) }
     }
-    private fun iconCircle():View = object:View(uiContext) {
-        private val paint=Paint(3).apply { color=Color.WHITE; style=Paint.Style.STROKE; strokeWidth=dp(2).toFloat(); strokeCap=Paint.Cap.ROUND }
-        override fun onDraw(c:Canvas) { super.onDraw(c); val x=width/2f;val y=height/2f
-            c.drawCircle(x,y,dp(9).toFloat(),paint);c.drawLine(x,y,x,y-dp(5),paint);c.drawLine(x,y,x+dp(4),y+dp(3),paint) }
-    }.apply { contentDescription=t("الوقت","Clock") }
+    private fun orbBackground() = GradientDrawable(
+        GradientDrawable.Orientation.TL_BR,
+        intArrayOf(Color.rgb(46, 180, 94), Color.rgb(16, 112, 57))
+    ).apply { shape=GradientDrawable.OVAL; setStroke(dp(2),Color.WHITE) }
     private fun addPinnedControls(f: FrameLayout) {
-        val capsule=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),10f);setPadding(dp(12),dp(5),dp(12),dp(5));minimumWidth=dp(104);direction(this) }
-        val clock=TextView(uiContext).apply { tag="utc_time";text=RallyTime.utcClock(RallyTime.nowMillis());textSize=15f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR;textAlignment=View.TEXT_ALIGNMENT_CENTER }
-        val utc=TextView(uiContext).apply { text="UTC";textSize=11f;setTextColor(0xFFA5C4AA.toInt());includeFontPadding=false;isSingleLine=true;ellipsize=null;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR }
-        capsule.addView(clock);capsule.addView(utc,LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(4)})
-        f.addView(capsule,FrameLayout.LayoutParams(-2,-2,Gravity.TOP or Gravity.CENTER_HORIZONTAL))
-        val orb=FrameLayout(uiContext).apply { background=bg(0xFF2E7D32.toInt(),50f);addView(iconCircle(),FrameLayout.LayoutParams(dp(24),dp(24),Gravity.CENTER)) }
-        f.addView(orb,FrameLayout.LayoutParams(dp(46),dp(46),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(34)})
-        val close=object:View(uiContext) {
-            private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
-            override fun onDraw(canvas:Canvas) { super.onDraw(canvas);val cx=width/2f;val cy=height/2f;paint.style=Paint.Style.FILL;paint.color=0xFF1E2A22.toInt();canvas.drawCircle(cx,cy,dp(10).toFloat(),paint);paint.color=if(isPressed)0xFFE57373.toInt() else 0xFF2A3A2F.toInt();canvas.drawCircle(cx,cy,dp(8).toFloat(),paint);paint.color=Color.WHITE;paint.style=Paint.Style.STROKE;paint.strokeWidth=dp(1.5f).toFloat();paint.strokeCap=Paint.Cap.ROUND;val d=dp(3).toFloat();canvas.drawLine(cx-d,cy-d,cx+d,cy+d,paint);canvas.drawLine(cx+d,cy-d,cx-d,cy+d,paint) }
-            override fun onTouchEvent(event:MotionEvent):Boolean { when(event.actionMasked){MotionEvent.ACTION_DOWN->{isPressed=true;invalidate();return true};MotionEvent.ACTION_UP->{isPressed=false;invalidate();performClick();return true};MotionEvent.ACTION_CANCEL->{isPressed=false;invalidate();return true}};return true }
-            override fun performClick():Boolean { super.performClick();showConfirm();return true }
+        val clock=TextView(uiContext).apply {
+            tag="utc_time"; text=RallyTime.utcClock(UtcClockTicker.currentTimeMillis())
+            textSize=11.5f; setTextColor(Color.WHITE)
+            setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD)
+            fontFeatureSettings="tnum"; includeFontPadding=false; isSingleLine=true
+            gravity=Gravity.CENTER; textDirection=View.TEXT_DIRECTION_LTR
         }
-        f.addView(close,FrameLayout.LayoutParams(dp(36),dp(36),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{leftMargin=dp(6);topMargin=dp(16)})
+        val utc=TextView(uiContext).apply {
+            text="UTC"; textSize=8f; setTextColor(0xFFE1F5E8.toInt())
+            includeFontPadding=false; gravity=Gravity.CENTER; textDirection=View.TEXT_DIRECTION_LTR
+        }
+        val clockStack=LinearLayout(uiContext).apply {
+            orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER
+            addView(clock,LinearLayout.LayoutParams(-1,dp(19)))
+            addView(utc,LinearLayout.LayoutParams(-1,dp(12)))
+        }
+        val orb=FrameLayout(uiContext).apply {
+            background=orbBackground()
+            addView(clockStack,FrameLayout.LayoutParams(dp(62),dp(34),Gravity.CENTER))
+            contentDescription=t("فتح أو إغلاق أداة تنسيق الحشود","Open or close Rally Coordinator")
+        }
+        f.addView(orb,FrameLayout.LayoutParams(dp(68),dp(68),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(8)})
         if(menuOpen) {
             val width=dp(280); val sw=resources.displayMetrics.widthPixels
-            val desired=dp(bubbleX+52)
+            val desired=dp(bubbleX+42)
             val expandedLeft=(desired-width/2).coerceIn(0,(sw-width).coerceAtLeast(0))
-            val shift=(desired-(expandedLeft+width/2)).toFloat()
-            capsule.translationX=shift; orb.translationX=shift; close.translationX=shift
+            orb.translationX=(desired-(expandedLeft+width/2)).toFloat()
         }
-        orb.setOnClickListener { menuOpen=!menuOpen;persist();if(menuOpen)showMenu()else collapse() }
-        val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true};MotionEvent.ACTION_MOVE->{val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt();if(abs(dx)+abs(dy)>5)dragged=true;if(dragged){bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-104);bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(50))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-55);panelXdp=((dp(bubbleX+52)-panelWidthPx/2)/density).roundToInt().coerceIn(0,((resources.displayMetrics.widthPixels-panelWidthPx).coerceAtLeast(0)/density).roundToInt());panelYdp=bubbleY.coerceIn(0,((resources.displayMetrics.heightPixels-panelHeightPx).coerceAtLeast(0)/density).roundToInt());applyLayout();persist();prefs.edit().putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()};true};MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true};else->true} }
+        val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){
+            MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true}
+            MotionEvent.ACTION_MOVE->{
+                val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt()
+                if(abs(dx)+abs(dy)>5)dragged=true
+                if(dragged){
+                    bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-84)
+                    bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-84)
+                    panelXdp=((dp(bubbleX+42)-panelWidthPx/2)/density).roundToInt().coerceIn(0,((resources.displayMetrics.widthPixels-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
+                    panelYdp=bubbleY.coerceIn(0,((resources.displayMetrics.heightPixels-panelHeightPx).coerceAtLeast(0)/density).roundToInt())
+                    applyLayout();persist();prefs.edit().putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()
+                };true
+            }
+            MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true}
+            MotionEvent.ACTION_CANCEL->true
+            else->true
+        } }
         orb.setOnTouchListener(drag)
         if(menuOpen)f.setOnTouchListener(null) else f.setOnTouchListener(drag)
     }
@@ -765,22 +786,6 @@ class RallyOverlayService : Service() {
         p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
         runCatching { wm.updateViewLayout(r,p) }
         if(on)focusedField?.let { field -> field.post { if(field.hasFocus())imm.showSoftInput(field,InputMethodManager.SHOW_IMPLICIT) } }
-    }
-    private fun showConfirm() {
-        if(confirming)return;confirming=true
-        if (focusable) { dismissIme(focusedField);setFocus(false) }
-        val dialog=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(16),dp(12),dp(16),dp(12))}
-        dialog.addView(text(t("هل تريد إغلاق الأداة؟","Close the tool?"),13f,Color.WHITE,true))
-        val actions=LinearLayout(uiContext).apply{gravity=Gravity.CENTER}
-        actions.addView(button(t("نعم","Yes"),0xFF4CAF50.toInt(),Color.WHITE){confirming=false;stopSelf()})
-        actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(8),1))
-        actions.addView(button(t("لا","No"),0xFFE57373.toInt(),Color.WHITE){confirming=false;buildCollapsed();applyLayout()})
-        dialog.addView(actions)
-        val r=root?:return
-        r.resizeEnabled=false
-        r.removeAllViews();r.addView(dialog,FrameLayout.LayoutParams(dp(220),dp(100),Gravity.CENTER))
-        val p=params?:return;p.width=dp(240);p.height=dp(120);p.x=(resources.displayMetrics.widthPixels-p.width)/2;p.y=(resources.displayMetrics.heightPixels-p.height)/2
-        runCatching{wm.updateViewLayout(r,p)}
     }
     override fun onDestroy(){UtcClockTicker.removeListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};root?.let{runCatching{wm.removeView(it)}};root=null
         if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
