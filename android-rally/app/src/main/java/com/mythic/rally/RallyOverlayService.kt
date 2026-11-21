@@ -245,11 +245,11 @@ class RallyOverlayService : Service() {
         val sh=resources.displayMetrics.heightPixels
         val maxW=(sw*0.80f).roundToInt().coerceAtLeast(dp(1))
         panelWidthPx=(panelWidthPx.takeIf{it>0} ?: min(dp(320),maxW)).coerceIn(min(dp(240),maxW),maxW)
-        bubbleX=bubbleX.coerceIn(0,((sw-dp(76))/density).roundToInt().coerceAtLeast(0))
-        bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((sh-dp(76)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
+        bubbleX=bubbleX.coerceIn(0,((sw-dp(88))/density).roundToInt().coerceAtLeast(0))
+        bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((sh-dp(88)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
         val frame=EdgeResizeLayout(uiContext).apply{clipChildren=true;clipToPadding=true;direction(this);isFocusableInTouchMode=true}
         root=frame
-        val p=WindowManager.LayoutParams(dp(76),dp(76),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+        val p=WindowManager.LayoutParams(dp(88),dp(88),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT).apply{
             gravity=Gravity.TOP or Gravity.START;x=dp(bubbleX);y=dp(bubbleY)
@@ -302,7 +302,7 @@ class RallyOverlayService : Service() {
             override fun onSizeChanged(w:Int,h:Int,oldw:Int,oldh:Int){super.onSizeChanged(w,h,oldw,oldh);fill.shader=RadialGradient(w*.32f,h*.28f,max(w,h)*.9f,intArrayOf(Color.rgb(65,174,96),Color.rgb(10,94,48)),null,Shader.TileMode.CLAMP);fill.setShadowLayer(dp(14).toFloat(),0f,dp(5).toFloat(),0x59000000)}
             override fun onDraw(canvas:Canvas){super.onDraw(canvas);val cx=width/2f;val cy=height/2f;val radius=width/2f-dp(4);canvas.drawCircle(cx,cy,radius+dp(3),glow);canvas.drawCircle(cx,cy,radius,fill);canvas.drawCircle(cx,cy,radius,border)}
         }.apply{tag="rally_orb";addView(clockStack,FrameLayout.LayoutParams(dp(62),dp(34),Gravity.CENTER));contentDescription=t("فتح أو إغلاق أداة تنسيق الحشود","Open or close Rally Coordinator")}
-        f.addView(orb,FrameLayout.LayoutParams(dp(76),dp(76),Gravity.TOP or Gravity.CENTER_HORIZONTAL))
+        f.addView(orb,FrameLayout.LayoutParams(dp(76),dp(76),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(4)})
         orb.setOnTouchListener{_,event->handleCircleTouch(event)}
     }
     private var downX=0f
@@ -323,9 +323,9 @@ class RallyOverlayService : Service() {
                 if(!draggingCircle&&(abs(dx)>touchSlop||abs(dy)>touchSlop))draggingCircle=true
                 if(draggingCircle){
                     val screen=resources.displayMetrics;val p=params?:return true
-                    val height=dp(76)
-                    val maxY=(screen.heightPixels-(if(menuOpen)dp(84)+panelHeightPx else height)-navInsetPx).coerceAtLeast(statusInsetPx+dp(8))
-                    p.x=(startWindowX+dx).coerceIn(0,(screen.widthPixels-dp(76)).coerceAtLeast(0))
+                    val height=dp(88)
+                    val maxY=(screen.heightPixels-(if(menuOpen)dp(88)+panelHeightPx else height)-navInsetPx).coerceAtLeast(statusInsetPx+dp(8))
+                    p.x=(startWindowX+dx).coerceIn(0,(screen.widthPixels-dp(88)).coerceAtLeast(0))
                     p.y=(startWindowY+dy).coerceIn(statusInsetPx+dp(8),maxY)
                     bubbleX=(p.x/density).roundToInt();bubbleY=(p.y/density).roundToInt()
                     if(!dragFramePending){dragFramePending=true;Choreographer.getInstance().postFrameCallback(dragFrameCallback)}
@@ -350,7 +350,7 @@ class RallyOverlayService : Service() {
     }
     private fun availableOverlayHeight(): Int {
         val full=if(Build.VERSION.SDK_INT>=30)wm.currentWindowMetrics.bounds.height() else resources.displayMetrics.heightPixels
-        val top=dp(bubbleY)+(if(menuOpen)dp(84) else 0)
+        val top=dp(bubbleY)+(if(menuOpen)dp(88) else 0)
         return (full-max(statusInsetPx,top)-navInsetPx-imeHeightPx-dp(16)).coerceAtLeast(dp(120))
     }
     private fun installInsetsTracking(view: View) {
@@ -431,16 +431,16 @@ class RallyOverlayService : Service() {
     private fun applyLayout(){
         val r=root?:return;val p=params?:return
         val screen=resources.displayMetrics
-        val width=dp(76);val height=dp(76)
+        val width=dp(76);val height=dp(88)
         val x=dp(bubbleX).coerceIn(0,(screen.widthPixels-width).coerceAtLeast(0))
-        val maxY=(screen.heightPixels-(if(menuOpen)dp(84)+panelHeightPx else height)-navInsetPx).coerceAtLeast(statusInsetPx+dp(8))
+        val maxY=(screen.heightPixels-(if(menuOpen)dp(88)+panelHeightPx else height)-navInsetPx).coerceAtLeast(statusInsetPx+dp(8))
         val y=dp(bubbleY).coerceIn(statusInsetPx+dp(8),maxY)
         if(p.width!=width||p.height!=height||p.x!=x||p.y!=y){p.width=width;p.height=height;p.x=x;p.y=y;runCatching{wm.updateViewLayout(r,p)}}
         if(menuOpen){
             val panel=menuView;val pp=panelParams
             if(panel!=null&&pp!=null){
-                val panelX=(x+dp(38)-panelWidthPx/2).coerceIn(0,(screen.widthPixels-panelWidthPx).coerceAtLeast(0))
-                val panelY=y+dp(84)
+                val panelX=(x+dp(42)-panelWidthPx/2).coerceIn(0,(screen.widthPixels-panelWidthPx).coerceAtLeast(0))
+                val panelY=y+dp(88)
                 if(pp.x!=panelX||pp.y!=panelY){pp.x=panelX;pp.y=panelY;runCatching{wm.updateViewLayout(panel,pp)}}
             }
         }
@@ -472,7 +472,7 @@ class RallyOverlayService : Service() {
         addPinnedControls(f)
         val screen=resources.displayMetrics
         val maxPanel=(screen.heightPixels*.65f).roundToInt().coerceAtLeast(dp(180))
-        val below=(screen.heightPixels-dp(bubbleY)-dp(84)-navInsetPx-dp(8)).coerceAtLeast(dp(160))
+        val below=(screen.heightPixels-dp(bubbleY)-dp(88)-navInsetPx-dp(8)).coerceAtLeast(dp(160))
         val panelCap=min(maxPanel,below)
         val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(10),dp(9),dp(10),dp(9));clipChildren=true;clipToPadding=true;direction(this);isFocusable=true;isFocusableInTouchMode=true}
         menuView=panel
@@ -491,13 +491,13 @@ class RallyOverlayService : Service() {
         val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=true;clipToPadding=true;direction(this);maxHeightPx=(panelCap-dp(32+18+42)).coerceAtLeast(dp(64))}
         scroll=sc;participantRowsScroll=null;sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,-2))
         if(resultsMode)buildResults(content)else buildEditor(content)
-        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()}.apply{textSize=12f},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(5)})
+        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()}.apply{textSize=12f},LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(5)})
         panel.measure(View.MeasureSpec.makeMeasureSpec(panelWidthPx,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(panelCap,View.MeasureSpec.AT_MOST))
         panelContentHeightPx=panel.measuredHeight.coerceAtMost(panelCap).coerceAtLeast(min(dp(100),panelCap));panelHeightPx=panelContentHeightPx
-        bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((screen.heightPixels-panelHeightPx-dp(84)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
+        bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((screen.heightPixels-panelHeightPx-dp(88)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
         applyLayout()
         val panelX=(dp(bubbleX+38)-panelWidthPx/2).coerceIn(0,(screen.widthPixels-panelWidthPx).coerceAtLeast(0))
-        val panelY=dp(bubbleY)+dp(84)
+        val panelY=dp(bubbleY)+dp(88)
         val pp=WindowManager.LayoutParams(panelWidthPx,panelHeightPx,WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT).apply{
@@ -528,9 +528,9 @@ class RallyOverlayService : Service() {
                 rows.addView(TextView(uiContext).apply{
                     text=if(chosen)"$title   ✓" else title;textSize=12f;gravity=Gravity.CENTER_VERTICAL
                     setTextColor(Color.WHITE);includeFontPadding=false;setPadding(dp(12),dp(5),dp(12),dp(5))
-                    background=bg(if(chosen)0xFF347B4A.toInt() else Color.TRANSPARENT,8f);minHeight=dp(38);isSingleLine=true
+                    background=bg(if(chosen)0xFF347B4A.toInt() else Color.TRANSPARENT,8f);minHeight=dp(42);isSingleLine=true
                     setOnClickListener{popupRef?.dismiss();action()}
-                },LinearLayout.LayoutParams(-1,dp(38)))
+                },LinearLayout.LayoutParams(-1,dp(42)))
                 if(index<options.lastIndex)rows.addView(View(uiContext).apply{setBackgroundColor(0xFF39483E.toInt())},LinearLayout.LayoutParams(-1,dp(1)).apply{topMargin=dp(2);bottomMargin=dp(2)})
             }
             val scroller=ScrollView(uiContext).apply{isFillViewport=true;addView(rows)}
@@ -694,18 +694,18 @@ class RallyOverlayService : Service() {
         selectors.addView(dropdown(if(calculationMode=="now")modeNow else modeTarget,listOf(
             modeNow to { calculationMode="now"; persist(); renderMenu() },
             modeTarget to { calculationMode="target"; persist(); renderMenu() }
-        )),LinearLayout.LayoutParams(0,dp(38),1f))
+        )),LinearLayout.LayoutParams(0,dp(42),1f))
         selectors.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
         selectors.addView(dropdown(prepLabels[prepSeconds] ?: (if(ar())"تجهيز ${prepSeconds}ث" else "Prep ${prepSeconds}s"),prepOptions.map { value ->
             prepLabels.getValue(value) to { prepSeconds=value; persist(); renderMenu() }
-        }),LinearLayout.LayoutParams(0,dp(38),1f))
+        }),LinearLayout.LayoutParams(0,dp(42),1f))
         selectors.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
         val customLabel=if(ar())"مخصص" else "Custom"
         val selectedRally=rallyLabels[rallyDurationMinutes] ?: (if(ar())"مخصص · ${rallyDurationMinutes}د" else "Custom · ${rallyDurationMinutes}m")
         val rallyOptions=rallyPresets.map { value ->
             rallyLabels.getValue(value) to { rallyDurationMinutes=value; persist(); renderMenu() }
         } + (customLabel to { editRallyDuration() })
-        selectors.addView(dropdown(selectedRally,rallyOptions),LinearLayout.LayoutParams(0,dp(38),1f))
+        selectors.addView(dropdown(selectedRally,rallyOptions),LinearLayout.LayoutParams(0,dp(42),1f))
         c.addView(selectors)
         if(calculationMode=="target") {
             val targetRow=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
@@ -713,11 +713,11 @@ class RallyOverlayService : Service() {
             val hourCol=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;layoutParams=LinearLayout.LayoutParams(0,-2,.75f)}
             timeCol.addView(text(t("الوقت المستهدف · MM:SS","Target time · MM:SS"),9f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(19)))
             targetInput=input("MM:SS",target,true).apply{contentDescription=t("الوقت المستهدف","Target time");textSize=12f}
-            timeCol.addView(targetInput,LinearLayout.LayoutParams(-1,dp(38)))
+            timeCol.addView(targetInput,LinearLayout.LayoutParams(-1,dp(42)))
             targetInput?.let{bindTimeInput(it){value->target=value;persist()}}
             hourCol.addView(text(uiContext.getString(R.string.utc_hour_optional)+" · HH",9f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(19)))
             targetHourInput=input("HH",targetHour,true).apply{textSize=12f}
-            hourCol.addView(targetHourInput,LinearLayout.LayoutParams(-1,dp(38)))
+            hourCol.addView(targetHourInput,LinearLayout.LayoutParams(-1,dp(42)))
             targetHourInput?.addTextChangedListener(SimpleWatcher{targetHour=it.filter{ch->ch.isDigit()}.take(2);persist()})
             targetRow.addView(timeCol);targetRow.addView(Space(uiContext),LinearLayout.LayoutParams(dp(7),1));targetRow.addView(hourCol)
             c.addView(targetRow,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(7)})
@@ -748,7 +748,7 @@ class RallyOverlayService : Service() {
             participantRows.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(5)})
         }
         c.addView(participantRows,LinearLayout.LayoutParams(-1,-2))
-        c.addView(dottedButton(t("+ إضافة مشارك","+ Add participant")){people.add(Person(nextId++,"",""));persist();renderMenu()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(3)})
+        c.addView(dottedButton(t("+ إضافة مشارك","+ Add participant")){people.add(Person(nextId++,"",""));persist();renderMenu()},LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(3)})
         errors.forEach{c.addView(text(it,10f,0xFFE57373.toInt()))}
     }
     private fun utcTime(epoch:Long):String = RallyTime.utcClock(epoch)
@@ -821,7 +821,7 @@ class RallyOverlayService : Service() {
             finalRow.addView(finalInfo,LinearLayout.LayoutParams(0,dp(52),1f))
             c.addView(finalRow,LinearLayout.LayoutParams(-1,dp(52)))
         }
-        c.addView(button(t("نسخ الكل","Copy all"),0xFF4CAF50.toInt(),0xFF102014.toInt()){copy(results.joinToString("\n"){r->copyRowText(r)})},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(8)})
+        c.addView(button(t("نسخ الكل","Copy all"),0xFF4CAF50.toInt(),0xFF102014.toInt()){copy(results.joinToString("\n"){r->copyRowText(r)})},LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(8)})
         val actions=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER; direction(this) }
         actions.addView(button(t("حساب من جديد","Calculate again"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()},LinearLayout.LayoutParams(0,dp(36),1f))
         actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(6),1))
@@ -872,7 +872,7 @@ class RallyOverlayService : Service() {
                     target=String.format(Locale.US,"%d:%02d",shifted.get(Calendar.MINUTE),shifted.get(Calendar.SECOND))
                     persist();calculate()
                 }
-                (scroll?.getChildAt(0) as? LinearLayout)?.addView(postpone,LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(5)})
+                (scroll?.getChildAt(0) as? LinearLayout)?.addView(postpone,LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(5)})
                 return
             }
         }
