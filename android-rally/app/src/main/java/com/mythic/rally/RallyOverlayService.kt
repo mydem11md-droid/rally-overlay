@@ -575,7 +575,7 @@ class RallyOverlayService : Service() {
             }
             start()
         }
-        panel.pivotY=if(panelAbove)0f else panel.height.toFloat()
+        panel.pivotY=if(panelAbove)0f else panelContentHeightPx.toFloat()
         panel.scaleY=0.98f
         panel.animate().scaleY(1f).setDuration(250).start()
     }
