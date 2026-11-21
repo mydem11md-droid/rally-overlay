@@ -376,7 +376,7 @@ class RallyOverlayService : Service() {
                     if(!dragFramePending){dragFramePending=true;Choreographer.getInstance().postFrameCallback(dragFrameCallback)}
                 };true
             }
-            MotionEvent.ACTION_UP->{Choreographer.getInstance().removeFrameCallback(dragFrameCallback);dragFramePending=false;if(dragged){persist();prefs.edit().putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()}else{if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true}
+            MotionEvent.ACTION_UP->{Choreographer.getInstance().removeFrameCallback(dragFrameCallback);dragFramePending=false;if(dragged){applyLayout();persist();prefs.edit().putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()}else{if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true}
             MotionEvent.ACTION_CANCEL->{Choreographer.getInstance().removeFrameCallback(dragFrameCallback);dragFramePending=false;true}
             else->true
         } }
@@ -570,11 +570,11 @@ class RallyOverlayService : Service() {
         }
         return anchor
     }
-    private fun miniIconButton(symbol:String, action:()->Unit):TextView =
+    private fun miniIconButton(symbol:String, action:()->Unit, tint:Int=0xFFE7F0EA.toInt()):TextView =
         TextView(uiContext).apply {
-            text=symbol; textSize=16f; gravity=Gravity.CENTER; setTextColor(0xFFE7F0EA.toInt())
-            background=bg(0xFF2A3A2F.toInt(),7f); includeFontPadding=false
-            setPadding(0,0,0,0); minWidth=dp(24); minHeight=dp(32)
+            text=symbol; textSize=16f; gravity=Gravity.CENTER; setTextColor(tint)
+            background=bg(0xFF2A3A2F.toInt(),8f); includeFontPadding=false
+            setPadding(0,0,0,0); minWidth=dp(44); minHeight=dp(44)
             setOnClickListener { action() }
         }
     private fun dottedButton(value:String, action:()->Unit):TextView =
