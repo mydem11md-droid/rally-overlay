@@ -373,7 +373,22 @@ class RallyOverlayService : Service() {
                     panelXdp=((dp(bubbleX+42)-panelWidthPx/2)/density).roundToInt().coerceIn(0,((resources.displayMetrics.widthPixels-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
                     val below=(resources.displayMetrics.heightPixels-dp(bubbleY)-navInsetPx-dp(112)).coerceAtLeast(0)
                     val above=(dp(bubbleY)-statusInsetPx-dp(12)).coerceAtLeast(0)
+                    val wasAbove=panelAbove
                     panelAbove=menuOpen && below<panelContentHeightPx && above>below
+                    if(menuOpen && wasAbove!=panelAbove) {
+                        val frame=root
+                        (frame?.getChildAt(0)?.layoutParams as? FrameLayout.LayoutParams)?.let { lp ->
+                            lp.topMargin=if(panelAbove)panelContentHeightPx+dp(12) else dp(4)
+                            frame.getChildAt(0).layoutParams=lp
+                        }
+                        menuView?.let { panel ->
+                            (panel.layoutParams as? FrameLayout.LayoutParams)?.let { lp ->
+                                lp.topMargin=if(panelAbove)dp(4) else dp(88)
+                                lp.bottomMargin=if(panelAbove)dp(88) else dp(12)
+                                panel.layoutParams=lp
+                            }
+                        }
+                    }
                     panelYdp=(if(panelAbove) bubbleY-(panelHeightPx/density).roundToInt()+88 else bubbleY).coerceIn((statusInsetPx/density).roundToInt(),((resources.displayMetrics.heightPixels-panelHeightPx).coerceAtLeast(0)/density).roundToInt())
                     if(menuOpen)view.translationX=(dp(bubbleX+42)-(dp(panelXdp)+panelWidthPx/2)).toFloat()
                     if(!dragFramePending){dragFramePending=true;Choreographer.getInstance().postFrameCallback(dragFrameCallback)}
@@ -447,8 +462,9 @@ class RallyOverlayService : Service() {
     }
     private fun resizeForInsets() {
         if(root==null)return
-        val cap=(availableOverlayHeight()-dp(88+34+17+38+12)).coerceAtLeast(dp(72))
-        (scroll as? CappedScrollView)?.maxHeightPx=if(resultsMode)(availableOverlayHeight()-dp(88+34+17)).coerceAtLeast(dp(72)) else cap
+        val available=availableOverlayHeight()
+        val cap=(available-dp(88+34+24+44+38+21+41+12+(if(calculationMode=="target")110 else 0))).coerceAtLeast(dp(72))
+        (scroll as? CappedScrollView)?.maxHeightPx=if(resultsMode)(available-dp(88+34+24+12)).coerceAtLeast(dp(72)) else cap
         scroll?.requestLayout()
         focusedField?.let { field -> field.post { if(field.hasFocus())ensureFocusedFieldVisible(field) } }
     }
@@ -482,7 +498,7 @@ class RallyOverlayService : Service() {
         if (focusable) { dismissIme(focusedField);setFocus(false) }
         val panel=menuView
         if(panel!=null) {
-            panel.pivotY=if(panelAbove)0f else panel.height.toFloat()
+            panel.pivotY=if(panelAbove)0f else panelContentHeightPx.toFloat()
             panel.animate().scaleY(0.96f).setDuration(250).withEndAction {
                 menuOpen=false;persist();menuView=null;panelAbove=false;panelContentHeightPx=0
                 buildCollapsed();applyLayout()
