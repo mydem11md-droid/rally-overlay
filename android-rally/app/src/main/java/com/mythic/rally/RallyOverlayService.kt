@@ -276,7 +276,7 @@ class RallyOverlayService : Service() {
         buildCollapsed()
         installInsetsTracking(frame)
         if(menuOpen)showMenu()
-        RallyTime.addClockListener(clockListener)
+        UtcClockTicker.addListener(clockListener)
     }
     private fun resizePanelBy(dx:Int,dy:Int,edges:Int) {
         val r=root?:return
@@ -644,7 +644,6 @@ class RallyOverlayService : Service() {
     private fun copyRow(r:ResultRow) = copy(copyRowText(r))
     private fun updateResultCountdowns(now: Long = RallyTime.nowMillis()) {
         if(!resultsMode||resultCountdowns.isEmpty())return
-        val now=System.currentTimeMillis()
         results.forEach { r ->
             val label=resultCountdowns[r.id]?:return@forEach
             val remaining=r.actionAt-now
@@ -783,7 +782,7 @@ class RallyOverlayService : Service() {
         val p=params?:return;p.width=dp(240);p.height=dp(120);p.x=(resources.displayMetrics.widthPixels-p.width)/2;p.y=(resources.displayMetrics.heightPixels-p.height)/2
         runCatching{wm.updateViewLayout(r,p)}
     }
-    override fun onDestroy(){RallyTime.removeClockListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};root?.let{runCatching{wm.removeView(it)}};root=null
+    override fun onDestroy(){UtcClockTicker.removeListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};root?.let{runCatching{wm.removeView(it)}};root=null
         if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
     companion object { const val ACTION_STOP="com.mythic.rally.STOP"; const val ACTION_LANGUAGE_CHANGED="com.mythic.rally.LANGUAGE_CHANGED"; private const val TAG="RallyOverlay" }
     private class SimpleWatcher(val changed:(String)->Unit):android.text.TextWatcher{
