@@ -27,11 +27,30 @@ class AppUpdater(private val activity: MainActivity) {
     private var onProgress: ((Int) -> Unit)? = null
     private var onError: ((String) -> Unit)? = null
     private var onInstalledFile: (() -> Unit)? = null
+    private var lastResult: AvailableUpdate? = null
+    private var hasResult = false
+
+    init {
+        if (prefs.getInt("update_notice_cleanup_version", 0) < 1) {
+            prefs.edit()
+                .remove("last_check")
+                .remove("cached_update")
+                .remove("available_update")
+                .remove("available_version")
+                .remove("update_available")
+                .remove("last_update")
+                .putInt("update_notice_cleanup_version", 1)
+                .apply()
+        }
+    }
 
     fun check(force: Boolean, callback: (AvailableUpdate?) -> Unit, error: (String) -> Unit) {
         val now = System.currentTimeMillis()
+        if (!force && hasResult) {
+            callback(lastResult)
+            return
+        }
         if (!force && now - prefs.getLong("last_check", 0L) < 6 * 60 * 60 * 1000L) {
-            callback(null)
             return
         }
         prefs.edit().putLong("last_check", now).apply()
@@ -49,6 +68,12 @@ class AppUpdater(private val activity: MainActivity) {
                 if (code == 403 || code == 429) throw IllegalStateException(activity.getString(R.string.update_rate_limited))
                 if (code !in 200..299) throw IllegalStateException(activity.getString(R.string.update_check_failed))
                 val release = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                if (release.optBoolean("draft", false) ||
+                    release.optBoolean("prerelease", false) ||
+                    release.optString("published_at").isBlank()) {
+                    main.post { lastResult = null; hasResult = true; callback(null) }
+                    return@execute
+                }
                 val assets = release.getJSONArray("assets")
                 var versionAsset: String? = null
                 var apkAsset: String? = null
@@ -68,11 +93,18 @@ class AppUpdater(private val activity: MainActivity) {
                 if (metaConnection.responseCode !in 200..299) throw IllegalStateException(activity.getString(R.string.update_metadata_missing))
                 val meta = JSONObject(metaConnection.inputStream.bufferedReader().use { it.readText() })
                 val remoteCode = meta.getInt("versionCode")
-                val installedVersionCode = activity.packageManager.getPackageInfo(activity.packageName, 0).let { if (Build.VERSION.SDK_INT >= 28) it.longVersionCode.toInt() else @Suppress("DEPRECATION") it.versionCode }
-                val update = if (remoteCode > installedVersionCode) AvailableUpdate(
-                    remoteCode, meta.getString("versionName"), meta.optString("notes", release.optString("body")), apkUrl
+                val remoteName = meta.getString("versionName")
+                val installedInfo = activity.packageManager.getPackageInfo(activity.packageName, 0)
+                val installedVersionCode = if (Build.VERSION.SDK_INT >= 28) installedInfo.longVersionCode.toInt() else @Suppress("DEPRECATION") installedInfo.versionCode
+                val installedVersionName = installedInfo.versionName ?: "0.0.0"
+                val update = if (remoteCode > installedVersionCode && isNewerVersion(remoteName, installedVersionName)) AvailableUpdate(
+                    remoteCode, remoteName, meta.optString("notes", release.optString("body")), apkUrl
                 ) else null
-                main.post { callback(update) }
+                main.post {
+                    lastResult = update
+                    hasResult = true
+                    callback(update)
+                }
             } catch (e: Exception) {
                 val message = if (e is UnknownHostException || e is SocketTimeoutException || e is ConnectException)
                     activity.getString(R.string.update_no_internet)
@@ -80,6 +112,22 @@ class AppUpdater(private val activity: MainActivity) {
                 main.post { error(message) }
             }
         }
+    }
+
+    private fun isNewerVersion(remote: String, installed: String): Boolean {
+        fun parts(value: String): List<Int>? {
+            val normalized = value.trim().removePrefix("v")
+            if (normalized.isEmpty()) return null
+            val values = normalized.split(".").map { it.toIntOrNull() ?: return null }
+            return values
+        }
+        val remoteParts = parts(remote) ?: return false
+        val installedParts = parts(installed) ?: return false
+        for (index in 0 until maxOf(remoteParts.size, installedParts.size)) {
+            val comparison = (remoteParts.getOrElse(index) { 0 }).compareTo(installedParts.getOrElse(index) { 0 })
+            if (comparison != 0) return comparison > 0
+        }
+        return false
     }
 
     fun download(update: AvailableUpdate, progress: (Int) -> Unit, error: (String) -> Unit, ready: () -> Unit) {

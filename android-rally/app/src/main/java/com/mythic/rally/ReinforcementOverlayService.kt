@@ -80,11 +80,22 @@ class ReinforcementOverlayService : Service() {
         }
     }
     private val touchSlop by lazy { ViewConfiguration.get(this).scaledTouchSlop }
+    private val utcTimeListener: (Long) -> Unit = { epochMillis ->
+        if (pageLoaded && webViewCreated) {
+            runCatching {
+                webView.evaluateJavascript("window.setUtcTime && window.setUtcTime($epochMillis)", null)
+            }
+        }
+    }
     private val languageReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: Intent?) {
             val code = intent?.getStringExtra("language") ?: return
-            if (prefs.getString("language_mode", "app") == "app" && pageLoaded) {
+            if (pageLoaded) {
                 webView.evaluateJavascript("window.setAppLanguage && window.setAppLanguage(${org.json.JSONObject.quote(code)})", null)
+            }
+            createNotificationChannel()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification())
             }
         }
     }
@@ -105,7 +116,8 @@ class ReinforcementOverlayService : Service() {
         val languageFilter = android.content.IntentFilter(ACTION_LANGUAGE_CHANGED)
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(languageReceiver, languageFilter, android.content.Context.RECEIVER_NOT_EXPORTED)
         else registerReceiver(languageReceiver, languageFilter)
-        prefs.edit().putBoolean("window_attached", false).apply()
+        UtcClockTicker.addListener(utcTimeListener)
+        prefs.edit().remove("language_mode").putBoolean("window_attached", false).apply()
         publishState()
     }
 
@@ -126,7 +138,16 @@ class ReinforcementOverlayService : Service() {
                 settings.setAlgorithmicDarkeningAllowed(false)
             }
             webChromeClient = WebChromeClient()
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    pageLoaded = true
+                    view?.evaluateJavascript(
+                        "window.setUtcTime && window.setUtcTime(${UtcClockTicker.currentTimeMillis()})",
+                        null
+                    )
+                }
+            }
             addJavascriptInterface(RallyBridge(), "RallyBridge")
         }
         webViewCreated = true
@@ -326,15 +347,21 @@ class ReinforcementOverlayService : Service() {
 
     private inner class RallyBridge {
         @JavascriptInterface
+        fun getUtcTimeMillis(): Long = RallyTime.nowMillis()
+
+        @JavascriptInterface
+        fun getUtcDisplayTimeMillis(): Long = UtcClockTicker.currentTimeMillis()
+
+        @JavascriptInterface
         fun getAppLanguage(): String = getSharedPreferences("rally_native", MODE_PRIVATE).getString("language", null)
             ?: if (java.util.Locale.getDefault().language.equals("ar", true)) "ar" else "en"
 
         @JavascriptInterface
-        fun getToolLanguage(): String = prefs.getString("language_mode", "app") ?: "app"
+        fun getToolLanguage(): String = "app"
 
         @JavascriptInterface
         fun setToolLanguage(value: String) {
-            if (value == "app" || value == "ar" || value == "en") prefs.edit().putString("language_mode", value).apply()
+            prefs.edit().remove("language_mode").apply()
         }
 
         @JavascriptInterface
@@ -378,11 +405,15 @@ class ReinforcementOverlayService : Service() {
         }
     }
 
+    private fun appLanguage(): String =
+        getSharedPreferences("rally_native", MODE_PRIVATE).getString("language", null)
+            ?: if (java.util.Locale.getDefault().language.equals("ar", true)) "ar" else "en"
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "أداة التعزيزات",
+                if (appLanguage() == "en") "Reinforcements" else "أداة التعزيزات",
                 NotificationManager.IMPORTANCE_LOW
             )
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
@@ -396,12 +427,13 @@ class ReinforcementOverlayService : Service() {
             Intent(this, ReinforcementOverlayService::class.java).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val english = appLanguage() == "en"
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_rally)
-            .setContentTitle("أداة التعزيزات")
-            .setContentText("خدمة الأداة جاهزة")
+            .setContentTitle(if (english) "Reinforcements" else "أداة التعزيزات")
+            .setContentText(if (english) "The tool is ready" else "خدمة الأداة جاهزة")
             .setOngoing(true)
-            .addAction(0, "إيقاف", stopIntent)
+            .addAction(0, if (english) "Stop" else "إيقاف", stopIntent)
             .build()
     }
 
@@ -426,6 +458,7 @@ class ReinforcementOverlayService : Service() {
         Choreographer.getInstance().removeFrameCallback(overlayFrameCallback)
         overlayFramePending = false
         runCatching { unregisterReceiver(languageReceiver) }
+        UtcClockTicker.removeListener(utcTimeListener)
         if (isOverlayAttached) {
             runCatching { windowManager.removeView(webView) }
         }

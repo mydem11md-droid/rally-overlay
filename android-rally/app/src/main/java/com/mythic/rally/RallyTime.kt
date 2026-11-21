@@ -1,8 +1,38 @@
 package com.mythic.rally
 
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 object RallyTime {
+    /** The single wall-clock epoch source used by every UTC display and calculation. */
+    fun nowMillis(): Long = System.currentTimeMillis()
+
+    /** Milliseconds until the next exact epoch-second boundary. */
+    fun millisUntilNextSecond(epochMillis: Long = nowMillis()): Long =
+        1000L - Math.floorMod(epochMillis, 1000L)
+
+    private val utcTimeZone: TimeZone
+        get() = TimeZone.getTimeZone("UTC")
+
+    fun utcParts(epochMillis: Long = nowMillis()): IntArray {
+        val calendar = Calendar.getInstance(utcTimeZone, Locale.US).apply {
+            timeInMillis = epochMillis
+        }
+        return intArrayOf(
+            calendar.get(Calendar.HOUR_OF_DAY),
+            calendar.get(Calendar.MINUTE),
+            calendar.get(Calendar.SECOND)
+        )
+    }
+
+    fun utcClock(epochMillis: Long = nowMillis()): String =
+        SimpleDateFormat("HH:mm:ss", Locale.US).apply {
+            timeZone = utcTimeZone
+        }.format(Date(epochMillis))
+
     fun digits(raw: String): String = raw.filter { it in '0'..'9' }.take(4)
     fun preview(raw: String): String {
         val d=digits(raw)
