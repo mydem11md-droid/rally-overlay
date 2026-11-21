@@ -188,9 +188,10 @@ class RallyOverlayService : Service() {
     }
     private val clockTick = object: Runnable {
         override fun run() {
-            updateClock()
-            updateResultCountdowns()
-            handler.postDelayed(this, RallyTime.millisUntilNextSecond())
+            val now = RallyTime.nowMillis()
+            updateClock(now)
+            updateResultCountdowns(now)
+            handler.postDelayed(this, RallyTime.millisUntilNextSecond(now))
         }
     }
 
@@ -369,9 +370,9 @@ class RallyOverlayService : Service() {
         addPinnedControls(f);updateClock();applyLayout()
     }
     private var downX=0f;private var downY=0f;private var startX=0;private var startY=0;private var dragged=false
-    private fun updateClock() {
+    private fun updateClock(epochMillis: Long = RallyTime.nowMillis()) {
         val c=root?.findViewWithTag<TextView>("utc_time")?:return
-        c.text=RallyTime.utcClock()
+        c.text=RallyTime.utcClock(epochMillis)
     }
     private fun availableOverlayHeight(): Int {
         val full=if(Build.VERSION.SDK_INT>=30)wm.currentWindowMetrics.bounds.height() else resources.displayMetrics.heightPixels
@@ -663,9 +664,8 @@ class RallyOverlayService : Service() {
         return "${r.name} — ${verb} ${utcTime(r.actionAt)} UTC${extra}"
     }
     private fun copyRow(r:ResultRow) = copy(copyRowText(r))
-    private fun updateResultCountdowns() {
+    private fun updateResultCountdowns(now: Long = RallyTime.nowMillis()) {
         if(!resultsMode||resultCountdowns.isEmpty())return
-        val now=RallyTime.nowMillis()
         results.forEach { r ->
             val label=resultCountdowns[r.id]?:return@forEach
             val remaining=r.actionAt-now
