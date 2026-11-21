@@ -31,11 +31,13 @@ class MainActivity : Activity() {
     private var updateCard: LinearLayout? = null
     private var currentUpdate: AvailableUpdate? = null
     private var utcClockButton: TextView? = null
+    private var rallyButton: TextView? = null
     private var reinforcementButton: TextView? = null
     private var reinforcementReceiverRegistered = false
     private val reinforcementStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             refreshReinforcementButton()
+            refreshRallyButton()
         }
     }
 
@@ -65,8 +67,9 @@ class MainActivity : Activity() {
         refreshPermissionStatus()
         refreshUtcButton()
         refreshReinforcementButton()
+        refreshRallyButton()
         if (!reinforcementReceiverRegistered) {
-            val filter = IntentFilter(ReinforcementOverlayService.ACTION_STATE_CHANGED)
+            val filter = IntentFilter(ReinforcementOverlayService.ACTION_STATE_CHANGED).apply { addAction(RallyOverlayService.ACTION_STATE_CHANGED) }
             if (Build.VERSION.SDK_INT >= 33) registerReceiver(reinforcementStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
             else registerReceiver(reinforcementStateReceiver, filter)
             reinforcementReceiverRegistered = true
@@ -103,12 +106,25 @@ class MainActivity : Activity() {
         },LinearLayout.LayoutParams(dp(76),dp(34)).apply { bottomMargin=dp(18) })
         val status = TextView(this).apply { tag="permission_status";textSize=12f;setTextColor(0xFFA5C4AA.toInt());gravity=Gravity.CENTER;setPadding(0,0,0,dp(14)) }
         root.addView(status,LinearLayout.LayoutParams(-1,-2))
-        root.addView(actionButton(getString(R.string.start),0xFF4CAF50.toInt(),0xFF102014.toInt()) {
-            if(!Settings.canDrawOverlays(this)) startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:$packageName")))
-            else { val i=Intent(this,RallyOverlayService::class.java);if(Build.VERSION.SDK_INT>=26)startForegroundService(i)else startService(i);Toast.makeText(this,R.string.started,Toast.LENGTH_SHORT).show() }
-        },LinearLayout.LayoutParams(-1,dp(46)))
+        rallyButton=actionButton(getString(R.string.start),0xFF2A3A2F.toInt(),-1) {
+            if(RallyOverlayService.running) {
+                stopService(Intent(this,RallyOverlayService::class.java))
+                refreshRallyButton()
+            } else if(!Settings.canDrawOverlays(this)) {
+                startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,Uri.parse("package:$packageName")))
+            } else {
+                val i=Intent(this,RallyOverlayService::class.java)
+                if(Build.VERSION.SDK_INT>=26)startForegroundService(i)else startService(i)
+                refreshRallyButton()
+                Toast.makeText(this,R.string.started,Toast.LENGTH_SHORT).show()
+            }
+        }
+        root.addView(rallyButton,LinearLayout.LayoutParams(-1,dp(46)))
         reinforcementButton = actionButton(if (language == "en") "Reinforcements" else "أداة التعزيزات",0xFF245C9A.toInt(),-1) {
-            if (!Settings.canDrawOverlays(this)) {
+            if(ReinforcementOverlayService.isServiceAlive) {
+                stopService(Intent(this,ReinforcementOverlayService::class.java))
+                refreshReinforcementButton()
+            } else if (!Settings.canDrawOverlays(this)) {
                 prefs.edit().putBoolean("reinforcement_pending_start", true).apply()
                 startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             } else {
@@ -157,6 +173,7 @@ class MainActivity : Activity() {
                 it.background = android.graphics.drawable.GradientDrawable().apply { setColor(0xFF245C9A.toInt()); cornerRadius=dp(9).toFloat() }
             }
             utcClockButton?.setText(R.string.utc_enable)
+            refreshRallyButton()
             Toast.makeText(this,R.string.stopped,Toast.LENGTH_SHORT).show()
         },LinearLayout.LayoutParams(-1,dp(46)).apply { topMargin=dp(10) })
         root.addView(actionButton(getString(R.string.check_update),0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()) { checkForUpdates(true) },LinearLayout.LayoutParams(-1,dp(42)).apply { topMargin=dp(10) })
@@ -192,8 +209,16 @@ class MainActivity : Activity() {
         val service = Intent(this, ReinforcementOverlayService::class.java).setAction(ReinforcementOverlayService.ACTION_TOGGLE)
         if (Build.VERSION.SDK_INT >= 26) startForegroundService(service) else startService(service)
     }
+    private fun refreshRallyButton() {
+        val active=RallyOverlayService.running
+        rallyButton?.apply {
+            text=if(language=="en"){if(active)"✓ Rally Coordinator: Running" else "Rally Coordinator"}else{if(active)"✓ أداة تنسيق الحشود: تعمل" else getString(R.string.start)}
+            setTextColor(if(active)0xFF102014.toInt() else -1)
+            background=android.graphics.drawable.GradientDrawable().apply{setColor(if(active)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt());cornerRadius=dp(9).toFloat()}
+        }
+    }
     private fun refreshReinforcementButton() {
-        val active = ReinforcementOverlayService.isOverlayAttached
+        val active = ReinforcementOverlayService.isServiceAlive
         prefs.edit().putBoolean("reinforcement_overlay_active", active).apply()
         getSharedPreferences("reinforcement_overlay", MODE_PRIVATE).edit()
             .putBoolean("window_attached", active).apply()
