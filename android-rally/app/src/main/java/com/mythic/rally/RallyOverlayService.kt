@@ -341,8 +341,8 @@ class RallyOverlayService : Service() {
             }
             override fun onDraw(canvas:Canvas) {
                 super.onDraw(canvas)
-                val cx=width/2f; val cy=height/2f; val radius=width/2f-dp(1.5f)
-                canvas.drawCircle(cx,cy,radius,glow)
+                val cx=width/2f; val cy=height/2f; val radius=width/2f-dp(4)
+                canvas.drawCircle(cx,cy,radius+dp(3),glow)
                 canvas.drawCircle(cx,cy,radius,fill)
                 canvas.drawCircle(cx,cy,radius,border)
             }
@@ -350,7 +350,7 @@ class RallyOverlayService : Service() {
             addView(clockStack,FrameLayout.LayoutParams(dp(62),dp(34),Gravity.CENTER))
             contentDescription=t("فتح أو إغلاق أداة تنسيق الحشود","Open or close Rally Coordinator")
         }
-        f.addView(orb,FrameLayout.LayoutParams(dp(68),dp(68),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(8)})
+        f.addView(orb,FrameLayout.LayoutParams(dp(76),dp(76),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(4)})
         if(menuOpen) {
             val width=dp(280); val sw=resources.displayMetrics.widthPixels
             val desired=dp(bubbleX+42)
@@ -358,7 +358,7 @@ class RallyOverlayService : Service() {
             orb.translationX=(desired-(expandedLeft+width/2)).toFloat()
         }
         val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){
-            MotionEvent.ACTION_DOWN->{downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true}
+            MotionEvent.ACTION_DOWN->{if(ev.x<dp(4)||ev.x>dp(72)||ev.y<dp(4)||ev.y>dp(72))false else {downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true}}
             MotionEvent.ACTION_MOVE->{
                 val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt()
                 if(abs(dx)+abs(dy)>5)dragged=true
