@@ -5,6 +5,16 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class RallyTimeTest {
+    @Test fun allClockFormatsUseTheSameUtcEpoch() {
+        assertEquals("00:00:00", RallyTime.utcClock(0L))
+        assertEquals("00:00:00", RallyTime.utcClock(1704067200000L))
+        assertEquals(listOf(0, 0, 0), RallyTime.utcParts(1704067200000L).toList())
+    }
+    @Test fun nextSecondDelayIsAlignedToEpochBoundary() {
+        assertEquals(766L, RallyTime.millisUntilNextSecond(1234L))
+        assertEquals(1L, RallyTime.millisUntilNextSecond(1999L))
+        assertEquals(1000L, RallyTime.millisUntilNextSecond(2000L))
+    }
     @Test fun insertsColonDuringTyping() {
         assertEquals("1:01",RallyTime.preview("101"))
         assertEquals("1:02",RallyTime.preview("102"))
