@@ -370,7 +370,7 @@ class RallyOverlayService : Service() {
                     bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-84)
                     bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-84)
                     panelXdp=((dp(bubbleX+42)-panelWidthPx/2)/density).roundToInt().coerceIn(0,((resources.displayMetrics.widthPixels-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
-                    val below=(resources.displayMetrics.heightPixels-dp(bubbleY+84)-navInsetPx-dp(12)).coerceAtLeast(0)
+                    val below=(resources.displayMetrics.heightPixels-dp(bubbleY)-navInsetPx-dp(112)).coerceAtLeast(0)
                     val above=(dp(bubbleY)-statusInsetPx-dp(12)).coerceAtLeast(0)
                     panelAbove=menuOpen && below<panelContentHeightPx && above>below
                     panelYdp=(if(panelAbove) bubbleY-(panelHeightPx/density).roundToInt()+88 else bubbleY).coerceIn((statusInsetPx/density).roundToInt(),((resources.displayMetrics.heightPixels-panelHeightPx).coerceAtLeast(0)/density).roundToInt())
@@ -516,7 +516,7 @@ class RallyOverlayService : Service() {
         }
         if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(6)})
         val screenH=resources.displayMetrics.heightPixels
-        val below=(screenH-dp(bubbleY+84)-navInsetPx-dp(12)).coerceAtLeast(0)
+        val below=(screenH-dp(bubbleY)-navInsetPx-dp(112)).coerceAtLeast(0)
         val above=(dp(bubbleY)-statusInsetPx-dp(12)).coerceAtLeast(0)
         val estimatedRows=if(resultsMode)results.size*dp(78)+dp(52+90) else people.size*dp(49)+dp(120)+(if(calculationMode=="target")dp(110) else 0)
         val naturalPanel=dp(34+24+44)+estimatedRows
