@@ -368,13 +368,16 @@ class RallyOverlayService : Service() {
                     bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-84)
                     bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-84)
                     panelXdp=((dp(bubbleX+42)-panelWidthPx/2)/density).roundToInt().coerceIn(0,((resources.displayMetrics.widthPixels-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
+                    val below=(resources.displayMetrics.heightPixels-dp(bubbleY+84)-navInsetPx-dp(12)).coerceAtLeast(0)
+                    val above=(dp(bubbleY)-statusInsetPx-dp(12)).coerceAtLeast(0)
+                    panelAbove=menuOpen && below<panelContentHeightPx && above>below
                     panelYdp=(if(panelAbove) bubbleY-(panelHeightPx/density).roundToInt()+88 else bubbleY).coerceIn((statusInsetPx/density).roundToInt(),((resources.displayMetrics.heightPixels-panelHeightPx).coerceAtLeast(0)/density).roundToInt())
                     if(menuOpen)view.translationX=(dp(bubbleX+42)-(dp(panelXdp)+panelWidthPx/2)).toFloat()
-                    applyLayout();persist();prefs.edit().putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()
+                    if(!dragFramePending){dragFramePending=true;Choreographer.getInstance().postFrameCallback(dragFrameCallback)}
                 };true
             }
-            MotionEvent.ACTION_UP->{if(!dragged){if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true}
-            MotionEvent.ACTION_CANCEL->true
+            MotionEvent.ACTION_UP->{Choreographer.getInstance().removeFrameCallback(dragFrameCallback);dragFramePending=false;if(dragged){persist();prefs.edit().putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()}else{if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true}
+            MotionEvent.ACTION_CANCEL->{Choreographer.getInstance().removeFrameCallback(dragFrameCallback);dragFramePending=false;true}
             else->true
         } }
         orb.setOnTouchListener(drag)
@@ -389,6 +392,8 @@ class RallyOverlayService : Service() {
         addPinnedControls(f);updateClock();applyLayout()
     }
     private var downX=0f;private var downY=0f;private var startX=0;private var startY=0;private var dragged=false
+    private var dragFramePending=false
+    private val dragFrameCallback=Choreographer.FrameCallback { dragFramePending=false;applyLayout() }
     private fun updateClock(epochMillis: Long = UtcClockTicker.currentTimeMillis()) {
         val c=root?.findViewWithTag<TextView>("utc_time")?:return
         c.text=RallyTime.utcClock(epochMillis)
@@ -560,7 +565,8 @@ class RallyOverlayService : Service() {
             val belowY=loc[1]+anchor.height
             val y=if(belowY+height<=screen.heightPixels-navInsetPx)belowY else(loc[1]-height).coerceAtLeast(statusInsetPx)
             val x=loc[0].coerceIn(0,(screen.widthPixels-anchor.width).coerceAtLeast(0))
-            popup.showAtLocation(root,Gravity.TOP or Gravity.LEFT,x,y)
+            val parent=root ?: return@setOnClickListener
+            popup.showAtLocation(parent,Gravity.TOP or Gravity.LEFT,x,y)
         }
         return anchor
     }
@@ -749,13 +755,14 @@ class RallyOverlayService : Service() {
             val kind=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER; direction(this) }
             kind.addView(button(uiContext.getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()}.apply{textSize=10f;setPadding(0,dp(4),0,dp(4));minHeight=dp(30)},LinearLayout.LayoutParams(0,dp(34),1f))
             kind.addView(button(uiContext.getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()}.apply{textSize=10f;setPadding(0,dp(4),0,dp(4));minHeight=dp(30)},LinearLayout.LayoutParams(0,dp(34),1f))
-            row.addView(kind,LinearLayout.LayoutParams(dp(86),dp(36)))
+            row.addView(kind,LinearLayout.LayoutParams(dp(76),dp(36)))
             row.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
             val actions=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER }
-            actions.addView(miniIconButton("✎") { name.requestFocus(); name.setSelection(name.text.length); setFocus(true) },LinearLayout.LayoutParams(dp(22),dp(34)))
-            actions.addView(miniIconButton("×") { people.removeAll{it.id==p.id}; if(people.isEmpty())people.add(Person(nextId++,"","")); persist(); renderMenu() },LinearLayout.LayoutParams(dp(22),dp(34)))
-            row.addView(actions,LinearLayout.LayoutParams(dp(44),dp(36)))
-            c.addView(row,LinearLayout.LayoutParams(-1,dp(40)))
+            actions.addView(miniIconButton("✎", { name.requestFocus(); name.setSelection(name.text.length); setFocus(true) }),LinearLayout.LayoutParams(dp(44),dp(44)))
+            actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(10),1))
+            actions.addView(miniIconButton("×", { people.removeAll{it.id==p.id}; if(people.isEmpty())people.add(Person(nextId++,"","")); persist(); renderMenu() },0xFFFF7777.toInt()),LinearLayout.LayoutParams(dp(44),dp(44)))
+            row.addView(actions,LinearLayout.LayoutParams(dp(98),dp(44)))
+            c.addView(row,LinearLayout.LayoutParams(-1,dp(48)))
             if(index<people.lastIndex)c.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
         }
         c.addView(dottedButton(t("+ إضافة مشارك","+ Add participant")) {
@@ -903,7 +910,7 @@ class RallyOverlayService : Service() {
         runCatching { wm.updateViewLayout(r,p) }
         if(on)focusedField?.let { field -> field.post { if(field.hasFocus())imm.showSoftInput(field,InputMethodManager.SHOW_IMPLICIT) } }
     }
-    override fun onDestroy(){UtcClockTicker.removeListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};root?.let{runCatching{wm.removeView(it)}};root=null
+    override fun onDestroy(){Choreographer.getInstance().removeFrameCallback(dragFrameCallback);UtcClockTicker.removeListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};root?.let{runCatching{wm.removeView(it)}};root=null
         if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
     companion object { const val ACTION_STOP="com.mythic.rally.STOP"; const val ACTION_LANGUAGE_CHANGED="com.mythic.rally.LANGUAGE_CHANGED"; private const val TAG="RallyOverlay" }
     private class SimpleWatcher(val changed:(String)->Unit):android.text.TextWatcher{
