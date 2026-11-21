@@ -116,6 +116,7 @@ class RallyOverlayService : Service() {
     private var lastScrollMode = "idle"
     private var miniEditorValue: TextView? = null
     private var globalLayoutListener: ViewTreeObserver.OnGlobalLayoutListener? = null
+    private var touchRegionListener: ViewTreeObserver.OnComputeInternalInsetsListener? = null
     private class CappedScrollView(context: Context) : ScrollView(context) {
         var maxHeightPx = Int.MAX_VALUE
         override fun onMeasure(widthMeasureSpec:Int,heightMeasureSpec:Int) {
@@ -206,7 +207,8 @@ class RallyOverlayService : Service() {
         panelWidthPx=dp(prefs.getInt("panel_w",320)).coerceAtLeast(dp(240))
         panelHeightPx=dp(prefs.getInt("panel_h",520)).coerceAtLeast(dp(280))
         panelXdp=prefs.getInt("panel_x",-1); panelYdp=prefs.getInt("panel_y",bubbleY)
-        menuOpen=prefs.getBoolean("open",false); resultsMode=prefs.getBoolean("results",false); settingsMode=prefs.getBoolean("settings",false)
+        menuOpen=false; resultsMode=prefs.getBoolean("results",false); settingsMode=prefs.getBoolean("settings",false)
+        prefs.edit().putBoolean("open",false).apply()
         nextId=prefs.getInt("next",1)
         runCatching {
             val a=JSONArray(prefs.getString("people","[]"))
@@ -255,7 +257,7 @@ class RallyOverlayService : Service() {
         }
         params=p;frame.resizeEnabled=false
         frame.setOnKeyListener{_,code,event->if(code==KeyEvent.KEYCODE_BACK&&event.action==KeyEvent.ACTION_UP&&focusable){focusedField?.let{dismissIme(it)}?:dismissIme(null);true}else false}
-        wm.addView(frame,p);buildCollapsed();installInsetsTracking(frame)
+        wm.addView(frame,p);buildCollapsed();installInsetsTracking(frame);installTouchableRegion(frame)
         if(menuOpen)showMenu()
         UtcClockTicker.addListener(clockListener)
     }
@@ -299,7 +301,7 @@ class RallyOverlayService : Service() {
             init{setWillNotDraw(false);setLayerType(View.LAYER_TYPE_SOFTWARE,null)}
             override fun onSizeChanged(w:Int,h:Int,oldw:Int,oldh:Int){super.onSizeChanged(w,h,oldw,oldh);fill.shader=RadialGradient(w*.32f,h*.28f,max(w,h)*.9f,intArrayOf(Color.rgb(65,174,96),Color.rgb(10,94,48)),null,Shader.TileMode.CLAMP);fill.setShadowLayer(dp(14).toFloat(),0f,dp(5).toFloat(),0x59000000)}
             override fun onDraw(canvas:Canvas){super.onDraw(canvas);val cx=width/2f;val cy=height/2f;val radius=width/2f-dp(4);canvas.drawCircle(cx,cy,radius+dp(3),glow);canvas.drawCircle(cx,cy,radius,fill);canvas.drawCircle(cx,cy,radius,border)}
-        }.apply{addView(clockStack,FrameLayout.LayoutParams(dp(62),dp(34),Gravity.CENTER));contentDescription=t("فتح أو إغلاق أداة تنسيق الحشود","Open or close Rally Coordinator")}
+        }.apply{tag="rally_orb";addView(clockStack,FrameLayout.LayoutParams(dp(62),dp(34),Gravity.CENTER));contentDescription=t("فتح أو إغلاق أداة تنسيق الحشود","Open or close Rally Coordinator")}
         f.addView(orb,FrameLayout.LayoutParams(dp(76),dp(76),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(4)})
         orb.setOnTouchListener{_,event->handleCircleTouch(event)}
     }
@@ -341,6 +343,27 @@ class RallyOverlayService : Service() {
         f.removeAllViews();f.clipChildren=true;f.clipToPadding=true
         menuView=null;scroll=null;miniEditor=null;miniEditorTitle=null;miniEditorValue=null
         addPinnedControls(f);updateClock();applyLayout()
+    }
+    private fun installTouchableRegion(frame: EdgeResizeLayout) {
+        val listener = ViewTreeObserver.OnComputeInternalInsetsListener { info ->
+            info.setTouchableInsets(ViewTreeObserver.InternalInsetsInfo.TOUCHABLE_INSETS_REGION)
+            info.touchableRegion.setEmpty()
+            frame.findViewWithTag<View>("rally_orb")?.takeIf { it.visibility == View.VISIBLE && it.width > 0 && it.height > 0 }?.let { orb ->
+                val circle = Path().apply {
+                    addCircle(orb.left + orb.width / 2f, orb.top + orb.height / 2f,
+                        min(orb.width, orb.height) / 2f, Path.Direction.CW)
+                }
+                val clip = Region(orb.left, orb.top, orb.right, orb.bottom)
+                info.touchableRegion.union(Region().apply { setPath(circle, clip) })
+            }
+            menuView?.takeIf { it.visibility == View.VISIBLE && it.width > 0 && it.height > 0 }?.let { panel ->
+                val rect = Rect()
+                panel.getHitRect(rect)
+                info.touchableRegion.union(rect)
+            }
+        }
+        touchRegionListener = listener
+        frame.viewTreeObserver.addOnComputeInternalInsetsListener(listener)
     }
     private fun updateClock(epochMillis: Long = UtcClockTicker.currentTimeMillis()) {
         val c=root?.findViewWithTag<TextView>("utc_time")?:return
@@ -461,6 +484,7 @@ class RallyOverlayService : Service() {
     private fun showMenu(){
         val f=root?:return
         f.resizeEnabled=false;f.removeAllViews();f.clipChildren=true;f.clipToPadding=true
+        addPinnedControls(f)
         val screen=resources.displayMetrics
         val maxPanel=(screen.heightPixels*.65f).roundToInt().coerceAtLeast(dp(180))
         val below=(screen.heightPixels-dp(bubbleY)-dp(88)-navInsetPx-dp(8)).coerceAtLeast(dp(160))
@@ -870,7 +894,7 @@ class RallyOverlayService : Service() {
         runCatching { wm.updateViewLayout(r,p) }
         if(on)focusedField?.let { field -> field.post { if(field.hasFocus())imm.showSoftInput(field,InputMethodManager.SHOW_IMPLICIT) } }
     }
-    override fun onDestroy(){running=false;sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName));Choreographer.getInstance().removeFrameCallback(dragFrameCallback);UtcClockTicker.removeListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};root?.let{runCatching{wm.removeView(it)}};root=null
+    override fun onDestroy(){running=false;sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName));Choreographer.getInstance().removeFrameCallback(dragFrameCallback);UtcClockTicker.removeListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};touchRegionListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnComputeInternalInsetsListener(l)}};touchRegionListener=null;root?.let{runCatching{wm.removeView(it)}};root=null
         if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
     companion object { @Volatile var running:Boolean=false; private set; const val ACTION_STATE_CHANGED="com.mythic.rally.STATE_CHANGED"; const val ACTION_STOP="com.mythic.rally.STOP"; const val ACTION_LANGUAGE_CHANGED="com.mythic.rally.LANGUAGE_CHANGED"; private const val TAG="RallyOverlay" }
     private class SimpleWatcher(val changed:(String)->Unit):android.text.TextWatcher{
