@@ -314,6 +314,9 @@ class ReinforcementOverlayService : Service() {
 
     private inner class RallyBridge {
         @JavascriptInterface
+        fun nowMillis(): Long = RallyTime.nowMillis()
+
+        @JavascriptInterface
         fun setLayout(open: Boolean, w: Int, h: Int, circleX: Int) {
             mainHandler.post {
                 if (!webViewCreated || !isOverlayAttached) return@post
