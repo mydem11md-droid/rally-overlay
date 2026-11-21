@@ -239,49 +239,23 @@ class RallyOverlayService : Service() {
     }
     private fun createOverlay() {
         statusInsetPx=dp(24);navInsetPx=dp(24)
-        val screenW=resources.displayMetrics.widthPixels
-        val screenH=resources.displayMetrics.heightPixels
-        panelWidthPx=panelWidthPx.takeIf{it>0} ?: dp(320)
-        panelHeightPx=panelHeightPx.takeIf{it>0} ?: dp(520)
-        panelWidthPx=panelWidthPx.coerceAtLeast(dp(360)).coerceAtMost(screenW.coerceAtLeast(dp(240)))
-        panelHeightPx=panelHeightPx.coerceIn(dp(280),screenH.coerceAtLeast(dp(280)))
-        bubbleX=bubbleX.coerceIn(0,((screenW-dp(84))/density).roundToInt().coerceAtLeast(0))
-        bubbleY=bubbleY.coerceAtLeast(((statusInsetPx+dp(8))/density).roundToInt())
-        if(panelXdp<0)panelXdp=((dp(bubbleX+42)-panelWidthPx/2)/density).roundToInt()
-        panelXdp=panelXdp.coerceIn(0,((screenW-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
-        panelYdp=panelYdp.coerceIn(0,((screenH-panelHeightPx).coerceAtLeast(0)/density).roundToInt())
-        val frame=EdgeResizeLayout(uiContext).apply { clipChildren=true;clipToPadding=true;direction(this);isFocusableInTouchMode=true }
+        val sw=resources.displayMetrics.widthPixels
+        val sh=resources.displayMetrics.heightPixels
+        val maxW=(sw*0.80f).roundToInt().coerceAtLeast(dp(1))
+        panelWidthPx=(panelWidthPx.takeIf{it>0} ?: min(dp(320),maxW)).coerceIn(min(dp(240),maxW),maxW)
+        bubbleX=bubbleX.coerceIn(0,((sw-dp(84))/density).roundToInt().coerceAtLeast(0))
+        bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((sh-dp(84)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
+        val frame=EdgeResizeLayout(uiContext).apply{clipChildren=true;clipToPadding=true;direction(this);isFocusableInTouchMode=true}
         root=frame
-        val p=WindowManager.LayoutParams(
-            if(menuOpen)panelWidthPx else dp(84),
-            if(menuOpen)panelHeightPx else dp(84),
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+        val p=WindowManager.LayoutParams(dp(84),dp(84),WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity=Gravity.TOP or Gravity.START
-            x=if(menuOpen)dp(panelXdp) else dp(bubbleX)
-            y=if(menuOpen)dp(panelYdp) else dp(bubbleY)
+            PixelFormat.TRANSLUCENT).apply{
+            gravity=Gravity.TOP or Gravity.START;x=dp(bubbleX);y=dp(bubbleY)
             softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
         }
-        params=p
-        frame.resizeEnabled=menuOpen
-        frame.onResize={dx,dy,edges -> resizePanelBy(dx,dy,edges)}
-        frame.onResizeEnd={
-            prefs.edit()
-                .putInt("panel_w",(panelWidthPx/density).roundToInt())
-                .putInt("panel_h",(panelHeightPx/density).roundToInt())
-                .putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()
-        }
-        frame.setOnKeyListener { _,code,event ->
-            if(code==KeyEvent.KEYCODE_BACK && event.action==KeyEvent.ACTION_UP && focusable) {
-                focusedField?.let { dismissIme(it) } ?: dismissIme(null)
-                true
-            } else false
-        }
-        wm.addView(frame,p)
-        buildCollapsed()
-        installInsetsTracking(frame)
+        params=p;frame.resizeEnabled=false
+        frame.setOnKeyListener{_,code,event->if(code==KeyEvent.KEYCODE_BACK&&event.action==KeyEvent.ACTION_UP&&focusable){focusedField?.let{dismissIme(it)}?:dismissIme(null);true}else false}
+        wm.addView(frame,p);buildCollapsed();installInsetsTracking(frame)
         if(menuOpen)showMenu()
         UtcClockTicker.addListener(clockListener)
     }
@@ -315,97 +289,51 @@ class RallyOverlayService : Service() {
         runCatching { wm.updateViewLayout(r,p) }
     }
     private fun addPinnedControls(f: FrameLayout) {
-        val clock=TextView(uiContext).apply {
-            tag="utc_time"; text=RallyTime.utcClock(UtcClockTicker.currentTimeMillis())
-            textSize=12f; setTextColor(Color.WHITE)
-            setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD)
-            fontFeatureSettings="tnum"; includeFontPadding=false; isSingleLine=true
-            gravity=Gravity.CENTER; textDirection=View.TEXT_DIRECTION_LTR
-        }
-        val utc=TextView(uiContext).apply {
-            text="UTC"; textSize=8f; setTextColor(0xFFE1F5E8.toInt())
-            includeFontPadding=false; gravity=Gravity.CENTER; textDirection=View.TEXT_DIRECTION_LTR
-        }
-        val clockStack=LinearLayout(uiContext).apply {
-            orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER
-            addView(clock,LinearLayout.LayoutParams(-1,dp(19)))
-            addView(utc,LinearLayout.LayoutParams(-1,dp(12)))
-        }
-        val orb=object:FrameLayout(uiContext) {
+        val clock=TextView(uiContext).apply{tag="utc_time";text=RallyTime.utcClock(UtcClockTicker.currentTimeMillis());textSize=12f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR}
+        val utc=TextView(uiContext).apply{text="UTC";textSize=8f;setTextColor(0xFFE1F5E8.toInt());includeFontPadding=false;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR}
+        val clockStack=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;addView(clock,LinearLayout.LayoutParams(-1,dp(19)));addView(utc,LinearLayout.LayoutParams(-1,dp(12)))}
+        val orb=object:FrameLayout(uiContext){
             private val fill=Paint(Paint.ANTI_ALIAS_FLAG)
-            private val border=Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color=Color.WHITE; style=Paint.Style.STROKE; strokeWidth=dp(3).toFloat()
-            }
-            private val glow=Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color=0x5541B86C; style=Paint.Style.STROKE; strokeWidth=dp(3).toFloat()
-            }
-            init { setWillNotDraw(false); setLayerType(View.LAYER_TYPE_SOFTWARE,null) }
-            override fun onSizeChanged(w:Int,h:Int,oldw:Int,oldh:Int) {
-                super.onSizeChanged(w,h,oldw,oldh)
-                fill.shader=RadialGradient(w*.32f,h*.28f,max(w,h)*.9f,
-                    intArrayOf(Color.rgb(65,174,96),Color.rgb(10,94,48)),null,Shader.TileMode.CLAMP)
-                fill.setShadowLayer(dp(14).toFloat(),0f,dp(5).toFloat(),0x59000000)
-            }
-            override fun onDraw(canvas:Canvas) {
-                super.onDraw(canvas)
-                val cx=width/2f; val cy=height/2f; val radius=width/2f-dp(4)
-                canvas.drawCircle(cx,cy,radius+dp(3),glow)
-                canvas.drawCircle(cx,cy,radius,fill)
-                canvas.drawCircle(cx,cy,radius,border)
-            }
-        }.apply {
-            addView(clockStack,FrameLayout.LayoutParams(dp(62),dp(34),Gravity.CENTER))
-            contentDescription=t("فتح أو إغلاق أداة تنسيق الحشود","Open or close Rally Coordinator")
-        }
-        f.addView(orb,FrameLayout.LayoutParams(dp(76),dp(76),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=if(panelAbove)panelContentHeightPx+dp(12) else dp(4)})
-        if(menuOpen) {
-            val desired=dp(bubbleX+42)
-            orb.translationX=(desired-(dp(panelXdp.coerceAtLeast(0))+panelWidthPx/2)).toFloat()
-        }
-        val drag=View.OnTouchListener { view,ev -> when(ev.actionMasked){
-            MotionEvent.ACTION_DOWN->{if(ev.x<dp(4)||ev.x>dp(72)||ev.y<dp(4)||ev.y>dp(72))false else {downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true}}
-            MotionEvent.ACTION_MOVE->{
-                val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt()
-                if(abs(dx)+abs(dy)>5)dragged=true
-                if(dragged){
-                    bubbleX=(startX+dx).coerceIn(0,(resources.displayMetrics.widthPixels/density).roundToInt()-84)
-                    bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-84)
-                    panelXdp=((dp(bubbleX+42)-panelWidthPx/2)/density).roundToInt().coerceIn(0,((resources.displayMetrics.widthPixels-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
-                    val below=(resources.displayMetrics.heightPixels-dp(bubbleY)-navInsetPx-dp(112)).coerceAtLeast(0)
-                    val above=(dp(bubbleY)-statusInsetPx-dp(12)).coerceAtLeast(0)
-                    val wasAbove=panelAbove
-                    panelAbove=menuOpen && below<panelContentHeightPx && above>below
-                    if(menuOpen) {
-                        val safeMin=((statusInsetPx+dp(12)+panelContentHeightPx)/density).roundToInt()
-                        val safeMax=((resources.displayMetrics.heightPixels-navInsetPx-dp(112)-panelContentHeightPx)/density).roundToInt()
-                        if(safeMin<=safeMax)bubbleY=if(panelAbove)bubbleY.coerceAtLeast(safeMin) else bubbleY.coerceAtMost(safeMax)
-                    }
-                    if(menuOpen && wasAbove!=panelAbove) {
-                        val frame=root
-                        (frame?.getChildAt(0)?.layoutParams as? FrameLayout.LayoutParams)?.let { lp ->
-                            lp.topMargin=if(panelAbove)panelContentHeightPx+dp(12) else dp(4)
-                            frame.getChildAt(0).layoutParams=lp
-                        }
-                        menuView?.let { panel ->
-                            (panel.layoutParams as? FrameLayout.LayoutParams)?.let { lp ->
-                                lp.topMargin=if(panelAbove)dp(4) else dp(88)
-                                lp.bottomMargin=if(panelAbove)dp(88) else dp(12)
-                                panel.layoutParams=lp
-                            }
-                        }
-                    }
-                    panelYdp=(if(panelAbove) bubbleY-(panelHeightPx/density).roundToInt()+88 else bubbleY).coerceIn((statusInsetPx/density).roundToInt(),((resources.displayMetrics.heightPixels-panelHeightPx).coerceAtLeast(0)/density).roundToInt())
-                    if(menuOpen)view.translationX=(dp(bubbleX+42)-(dp(panelXdp)+panelWidthPx/2)).toFloat()
-                    if(!dragFramePending){dragFramePending=true;Choreographer.getInstance().postFrameCallback(dragFrameCallback)}
-                };true
-            }
-            MotionEvent.ACTION_UP->{Choreographer.getInstance().removeFrameCallback(dragFrameCallback);dragFramePending=false;if(dragged){applyLayout();persist();prefs.edit().putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()}else{if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};true}
-            MotionEvent.ACTION_CANCEL->{Choreographer.getInstance().removeFrameCallback(dragFrameCallback);dragFramePending=false;true}
-            else->true
-        } }
-        orb.setOnTouchListener(drag)
-        f.setOnTouchListener(null)
+            private val border=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=Color.WHITE;style=Paint.Style.STROKE;strokeWidth=dp(3).toFloat()}
+            private val glow=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=0x5541B86C;style=Paint.Style.STROKE;strokeWidth=dp(3).toFloat()}
+            init{setWillNotDraw(false);setLayerType(View.LAYER_TYPE_SOFTWARE,null)}
+            override fun onSizeChanged(w:Int,h:Int,oldw:Int,oldh:Int){super.onSizeChanged(w,h,oldw,oldh);fill.shader=RadialGradient(w*.32f,h*.28f,max(w,h)*.9f,intArrayOf(Color.rgb(65,174,96),Color.rgb(10,94,48)),null,Shader.TileMode.CLAMP);fill.setShadowLayer(dp(14).toFloat(),0f,dp(5).toFloat(),0x59000000)}
+            override fun onDraw(canvas:Canvas){super.onDraw(canvas);val cx=width/2f;val cy=height/2f;val radius=width/2f-dp(4);canvas.drawCircle(cx,cy,radius+dp(3),glow);canvas.drawCircle(cx,cy,radius,fill);canvas.drawCircle(cx,cy,radius,border)}
+        }.apply{addView(clockStack,FrameLayout.LayoutParams(dp(62),dp(34),Gravity.CENTER));contentDescription=t("فتح أو إغلاق أداة تنسيق الحشود","Open or close Rally Coordinator")}
+        f.addView(orb,FrameLayout.LayoutParams(dp(76),dp(76),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(4)})
+        orb.setOnTouchListener{_,event->handleCircleTouch(event)}
     }
+    private var downX=0f
+    private var downY=0f
+    private var startWindowX=0
+    private var startWindowY=0
+    private var trackingCircle=false
+    private var draggingCircle=false
+    private var dragFramePending=false
+    private val touchSlop by lazy{ViewConfiguration.get(this).scaledTouchSlop}
+    private val dragFrameCallback=Choreographer.FrameCallback{dragFramePending=false;applyLayout()}
+    private fun handleCircleTouch(event:MotionEvent):Boolean{
+        when(event.actionMasked){
+            MotionEvent.ACTION_DOWN->{trackingCircle=true;draggingCircle=false;downX=event.rawX;downY=event.rawY;val p=params?:return false;startWindowX=p.x;startWindowY=p.y;return true}
+            MotionEvent.ACTION_MOVE->{
+                if(!trackingCircle)return false
+                val dx=(event.rawX-downX).roundToInt();val dy=(event.rawY-downY).roundToInt()
+                if(!draggingCircle&&(abs(dx)>touchSlop||abs(dy)>touchSlop))draggingCircle=true
+                if(draggingCircle){
+                    val screen=resources.displayMetrics;val p=params?:return true
+                    val width=if(menuOpen)panelWidthPx else dp(84);val height=if(menuOpen)dp(88)+panelHeightPx else dp(84)
+                    val center=startWindowX+(if(menuOpen)panelWidthPx else dp(84))/2+dx
+                    p.x=(center-width/2).coerceIn(0,(screen.widthPixels-width).coerceAtLeast(0))
+                    p.y=(startWindowY+dy).coerceIn(statusInsetPx+dp(8),(screen.heightPixels-height-navInsetPx).coerceAtLeast(statusInsetPx+dp(8)))
+                    bubbleX=((p.x+(if(menuOpen)panelWidthPx else dp(84))/2-dp(42))/density).roundToInt();bubbleY=(p.y/density).roundToInt()
+                    if(!dragFramePending){dragFramePending=true;Choreographer.getInstance().postFrameCallback(dragFrameCallback)}
+                };return true
+            }
+            MotionEvent.ACTION_UP->{if(!trackingCircle)return false;val moved=draggingCircle;trackingCircle=false;draggingCircle=false;if(moved){flushDragLayout();persist()}else{if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};return true}
+            MotionEvent.ACTION_CANCEL->{val was=trackingCircle;if(draggingCircle)flushDragLayout();trackingCircle=false;draggingCircle=false;return was}
+        };return trackingCircle
+    }
+    private fun flushDragLayout(){if(dragFramePending){Choreographer.getInstance().removeFrameCallback(dragFrameCallback);dragFramePending=false};applyLayout()}
     private fun buildCollapsed() {
         if(focusable){focusedField?.clearFocus();setFocus(false)}
         val f=root?:return
@@ -467,9 +395,9 @@ class RallyOverlayService : Service() {
     }
     private fun resizeForInsets() {
         if(root==null)return
-        val available=availableOverlayHeight()
-        val cap=(available-dp(88+34+24+44+38+21+41+12+(if(calculationMode=="target")110 else 0))).coerceAtLeast(dp(72))
-        (scroll as? CappedScrollView)?.maxHeightPx=if(resultsMode)(available-dp(88+34+24+12)).coerceAtLeast(dp(72)) else cap
+        val screenCap=(resources.displayMetrics.heightPixels*.65f).roundToInt()
+        val cap=(min(screenCap,availableOverlayHeight())-dp(32+18+42)).coerceAtLeast(dp(64))
+        (scroll as? CappedScrollView)?.maxHeightPx=cap
         scroll?.requestLayout()
         focusedField?.let { field -> field.post { if(field.hasFocus())ensureFocusedFieldVisible(field) } }
     }
@@ -501,100 +429,60 @@ class RallyOverlayService : Service() {
         miniEditor?.visibility=if(needsMini)View.VISIBLE else View.GONE
         if(needsMini)lastScrollMode="mini-editor"
     }
-    private fun applyLayout() {
-        val r=root?:return
-        val p=params?:return
-        val expanded=menuOpen && menuView!=null
-        val width=if(expanded)panelWidthPx else dp(84)
-        val height=if(expanded)panelHeightPx else dp(84)
-        val x=if(expanded)dp(panelXdp.coerceAtLeast(0)) else dp(bubbleX)
-        val y=if(expanded)dp(panelYdp.coerceAtLeast(0)) else dp(bubbleY)
-        val changed=p.width!=width || p.height!=height || p.x!=x || p.y!=y
-        p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
-        if(changed) {
-            p.width=width;p.height=height;p.x=x;p.y=y
-            runCatching { wm.updateViewLayout(r,p) }.onFailure { Log.e("RallyLayout","update failed",it) }
-        }
+    private fun applyLayout(){
+        val r=root?:return;val p=params?:return
+        val expanded=menuOpen&&menuView!=null
+        val width=if(expanded)panelWidthPx else dp(84);val height=if(expanded)dp(88)+panelHeightPx else dp(84)
+        val x=if(expanded)(dp(bubbleX+42)-width/2).coerceIn(0,(resources.displayMetrics.widthPixels-width).coerceAtLeast(0)) else dp(bubbleX)
+        val y=dp(bubbleY).coerceIn(statusInsetPx+dp(8),(resources.displayMetrics.heightPixels-height-navInsetPx).coerceAtLeast(statusInsetPx+dp(8)))
+        if(p.width!=width||p.height!=height||p.x!=x||p.y!=y){p.width=width;p.height=height;p.x=x;p.y=y;p.softInputMode=WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED;runCatching{wm.updateViewLayout(r,p)}.onFailure{Log.e("RallyLayout","update failed",it)}}
     }
     private fun collapse(){
-        if (focusable) { dismissIme(focusedField);setFocus(false) }
+        if(focusable){dismissIme(focusedField);setFocus(false)}
         val panel=menuView
-        if(panel!=null) {
-            panel.pivotY=if(panelAbove)0f else panelContentHeightPx.toFloat()
-            panel.animate().scaleY(0.96f).setDuration(250).withEndAction {
-                menuOpen=false;persist();menuView=null;panelAbove=false;panelContentHeightPx=0
-                buildCollapsed();applyLayout()
-            }.start()
-        } else { menuOpen=false;persist();panelAbove=false;panelContentHeightPx=0;buildCollapsed();applyLayout() }
+        if(panel==null){menuOpen=false;persist();buildCollapsed();applyLayout();return}
+        panel.animate().scaleY(.98f).setDuration(250).withEndAction{
+            menuOpen=false;persist();menuView=null;panelHeightPx=0;panelContentHeightPx=0;buildCollapsed()
+            val p=params?:return@withEndAction;val r=root?:return@withEndAction
+            val sx=p.x;val sy=p.y;val sh=p.height;val tx=dp(bubbleX);val ty=dp(bubbleY)
+            ValueAnimator.ofFloat(0f,1f).apply{duration=250;addUpdateListener{a->val q=a.animatedValue as Float;p.width=dp(84);p.height=(sh+(dp(84)-sh)*q).roundToInt();p.x=(sx+(tx-sx)*q).roundToInt();p.y=(sy+(ty-sy)*q).roundToInt();runCatching{wm.updateViewLayout(r,p)}};start()}
+        }.start()
     }
-    private fun showMenu() {
+    private fun showMenu(){
         val f=root?:return
-        f.resizeEnabled=false
-        f.removeAllViews();f.clipChildren=true;f.clipToPadding=true
-        val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(12),dp(12),dp(12),dp(12));clipChildren=true;clipToPadding=true;direction(this)}
+        f.resizeEnabled=false;f.removeAllViews();f.clipChildren=true;f.clipToPadding=true
+        val screen=resources.displayMetrics
+        val maxPanel=(screen.heightPixels*.65f).roundToInt().coerceAtLeast(dp(180))
+        val below=(screen.heightPixels-dp(bubbleY)-dp(88)-navInsetPx-dp(8)).coerceAtLeast(dp(120))
+        val panelCap=min(maxPanel,below)
+        val panel=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(10),dp(9),dp(10),dp(9));clipChildren=true;clipToPadding=true;direction(this)}
         menuView=panel
         val header=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL;orientation=LinearLayout.HORIZONTAL;direction(this)}
-        header.addView(text(if(settingsMode)t("الإعدادات","Settings")else if(resultsMode)t("نتائج التنسيق","Rally results")else t("أداة تنسيق الحشود","Rally Coordinator"),14f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(34),1f))
-        header.addView(button("EN | ع",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){changeLanguage()}.apply{textDirection=View.TEXT_DIRECTION_LTR},LinearLayout.LayoutParams(dp(58),dp(32)))
-        header.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
-        header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(dp(34),dp(32)))
+        header.addView(text(if(settingsMode)t("الإعدادات","Settings")else if(resultsMode)t("نتائج التنسيق","Rally results")else t("أداة تنسيق الحشود","Rally Coordinator"),13f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(32),1f))
+        header.addView(button("EN | ع",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){changeLanguage()}.apply{textDirection=View.TEXT_DIRECTION_LTR;textSize=10f},LinearLayout.LayoutParams(dp(54),dp(30)))
+        header.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
+        header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()}.apply{textSize=12f},LinearLayout.LayoutParams(dp(32),dp(30)))
         panel.addView(header)
-        miniEditor=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;visibility=View.GONE;background=bg(0xFF2A3A2F.toInt(),9f);setPadding(dp(9),dp(5),dp(9),dp(5))}
-        miniEditorTitle=text("",10f,0xFFA5C4AA.toInt(),true);miniEditorValue=text("",18f,Color.WHITE,true)
+        miniEditor=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;visibility=View.GONE;background=bg(0xFF2A3A2F.toInt(),9f);setPadding(dp(8),dp(4),dp(8),dp(4))}
+        miniEditorTitle=text("",9f,0xFFA5C4AA.toInt(),true);miniEditorValue=text("",16f,Color.WHITE,true)
         miniEditor?.addView(miniEditorTitle);miniEditor?.addView(miniEditorValue)
-        panel.addView(miniEditor,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(5)})
+        panel.addView(miniEditor,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(4)})
         val content=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=true;clipToPadding=true;direction(this)}
-        if(resultsMode) {
-            val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=true;clipToPadding=true;direction(this)}
-            scroll=sc;participantRowsScroll=null;sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,-2))
-            buildResults(content)
-        } else {
-            scroll=null
-            panel.addView(content,LinearLayout.LayoutParams(-1,-2))
-            buildEditor(content)
-        }
-        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(6)})
-        val screenH=resources.displayMetrics.heightPixels
-        val below=(screenH-dp(bubbleY)-navInsetPx-dp(112)).coerceAtLeast(0)
-        val above=(dp(bubbleY)-statusInsetPx-dp(12)).coerceAtLeast(0)
-        val estimatedRows=if(resultsMode)results.size*dp(78)+dp(52+90) else people.size*dp(49)+dp(120)+(if(calculationMode=="target")dp(110) else 0)
-        val naturalPanel=dp(34+24+44)+estimatedRows
-        panelAbove=below<naturalPanel && above>below
-        val available=(if(panelAbove)above else below).coerceAtLeast(dp(160))
-        if(resultsMode) scroll?.let { (it as? CappedScrollView)?.maxHeightPx=(available-dp(58)).coerceAtLeast(dp(72)) }
-        else participantRowsScroll?.maxHeightPx=(available-dp(34+24+44+38+21+41+(if(calculationMode=="target")110 else 0))).coerceAtLeast(dp(72))
-        val widthSpec=View.MeasureSpec.makeMeasureSpec((panelWidthPx-dp(40)).coerceAtLeast(dp(200)),View.MeasureSpec.EXACTLY)
-        panel.measure(widthSpec,View.MeasureSpec.makeMeasureSpec(available,View.MeasureSpec.AT_MOST))
-        panelContentHeightPx=panel.measuredHeight.coerceAtLeast(dp(140))
-        panelHeightPx=panelContentHeightPx+dp(100)
-        val minTop=(statusInsetPx/density).roundToInt()
-        val maxTop=((screenH-panelHeightPx).coerceAtLeast(dp(minTop)))
-        panelYdp=(if(panelAbove)bubbleY-(panelHeightPx/density).roundToInt()+88 else bubbleY)
-            .coerceIn(minTop,(maxTop/density).roundToInt())
-        panelXdp=((dp(bubbleX+42)-panelWidthPx/2)/density).roundToInt()
-            .coerceIn(0,((resources.displayMetrics.widthPixels-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
-        addPinnedControls(f)
-        val panelTop=if(panelAbove)dp(4) else dp(88)
-        val panelBottom=if(panelAbove)dp(88) else dp(12)
-        f.addView(panel,FrameLayout.LayoutParams(-1,panelContentHeightPx).apply{leftMargin=dp(20);rightMargin=dp(20);topMargin=panelTop;bottomMargin=panelBottom})
-        val layout=params?:return
-        val oldHeight=layout.height.coerceAtLeast(dp(84));val oldY=layout.y
-        val targetY=dp(panelYdp);val targetHeight=panelHeightPx;val targetX=dp(panelXdp)
-        layout.width=panelWidthPx;layout.height=oldHeight;layout.x=targetX;layout.y=oldY
-        runCatching{wm.updateViewLayout(f,layout)}
-        ValueAnimator.ofFloat(0f,1f).apply {
-            duration=250
-            addUpdateListener { animator ->
-                val fraction=animator.animatedValue as Float
-                layout.height=(oldHeight+(targetHeight-oldHeight)*fraction).roundToInt()
-                layout.y=(oldY+(targetY-oldY)*fraction).roundToInt()
-                runCatching{wm.updateViewLayout(f,layout)}
-            }
-            start()
-        }
-        panel.pivotY=if(panelAbove)0f else panelContentHeightPx.toFloat()
-        panel.scaleY=0.98f
-        panel.animate().scaleY(1f).setDuration(250).start()
+        val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=true;clipToPadding=true;direction(this);maxHeightPx=(panelCap-dp(32+18+42)).coerceAtLeast(dp(64))}
+        scroll=sc;participantRowsScroll=null;sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,-2))
+        if(resultsMode)buildResults(content)else buildEditor(content)
+        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()}.apply{textSize=12f},LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(5)})
+        panel.measure(View.MeasureSpec.makeMeasureSpec(panelWidthPx,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(panelCap,View.MeasureSpec.AT_MOST))
+        panelContentHeightPx=panel.measuredHeight.coerceIn(dp(130),panelCap);panelHeightPx=panelContentHeightPx
+        bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((screen.heightPixels-panelHeightPx-dp(88)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
+        f.addView(panel,FrameLayout.LayoutParams(-1,panelContentHeightPx,Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(88)})
+        val p=params?:return;val targetH=dp(88)+panelHeightPx;val targetX=(dp(bubbleX+42)-panelWidthPx/2).coerceIn(0,(screen.widthPixels-panelWidthPx).coerceAtLeast(0));val targetY=dp(bubbleY)
+        panel.scaleY=.98f;panel.pivotY=0f
+        p.width=panelWidthPx;p.x=targetX;runCatching{wm.updateViewLayout(f,p)}
+        val oldH=p.height.coerceAtLeast(dp(84));val oldY=p.y
+        panelAnimator?.cancel()
+        panelAnimator=ValueAnimator.ofFloat(0f,1f).apply{duration=250;addUpdateListener{a->val q=a.animatedValue as Float;p.height=(oldH+(targetH-oldH)*q).roundToInt();p.y=(oldY+(targetY-oldY)*q).roundToInt();runCatching{wm.updateViewLayout(f,p)}};start()}
+        panel.animate().scaleY(1f).setDuration(250).start();updateClock()
     }
     private fun renderMenu(){showMenu()}
     private fun label(parent:LinearLayout,s:String){parent.addView(text(s,10f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(21)))}
@@ -789,49 +677,47 @@ class RallyOverlayService : Service() {
         selectors.addView(dropdown(selectedRally,rallyOptions),LinearLayout.LayoutParams(0,dp(38),1f))
         c.addView(selectors)
         if(calculationMode=="target") {
-            label(c,t("الوقت المستهدف · MM:SS","Target time · MM:SS"))
-            targetInput=input("MM:SS",target,true).apply{contentDescription=t("الوقت المستهدف","Target time")}
-            c.addView(targetInput,LinearLayout.LayoutParams(-1,dp(36)))
-            targetInput?.let { bindTimeInput(it) { value -> target=value; persist() } }
-            label(c,uiContext.getString(R.string.utc_hour_optional))
-            targetHourInput=input("HH",targetHour,true)
-            c.addView(targetHourInput,LinearLayout.LayoutParams(-1,dp(32)))
+            val targetRow=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
+            val timeCol=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;layoutParams=LinearLayout.LayoutParams(0,-2,1.35f)}
+            val hourCol=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;layoutParams=LinearLayout.LayoutParams(0,-2,.75f)}
+            timeCol.addView(text(t("الوقت المستهدف · MM:SS","Target time · MM:SS"),9f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(19)))
+            targetInput=input("MM:SS",target,true).apply{contentDescription=t("الوقت المستهدف","Target time");textSize=12f}
+            timeCol.addView(targetInput,LinearLayout.LayoutParams(-1,dp(38)))
+            targetInput?.let{bindTimeInput(it){value->target=value;persist()}}
+            hourCol.addView(text(uiContext.getString(R.string.utc_hour_optional)+" · HH",9f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(19)))
+            targetHourInput=input("HH",targetHour,true).apply{textSize=12f}
+            hourCol.addView(targetHourInput,LinearLayout.LayoutParams(-1,dp(38)))
             targetHourInput?.addTextChangedListener(SimpleWatcher{targetHour=it.filter{ch->ch.isDigit()}.take(2);persist()})
+            targetRow.addView(timeCol);targetRow.addView(Space(uiContext),LinearLayout.LayoutParams(dp(7),1));targetRow.addView(hourCol)
+            c.addView(targetRow,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(7)})
         }
-        label(c,t("المشاركون · الاسم · وقت المسير · النوع","Participants · Name · March time · Type"))
+        label(c,t("المشاركون · الاسم ووقت المسير · النوع","Participants · Name and march time · Type"))
         val participantRows=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=true;clipToPadding=true;direction(this)}
-        val participantScroll=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=true;clipToPadding=true;direction(this)}
-        participantScroll.addView(participantRows);participantRowsScroll=participantScroll;scroll=participantScroll
-        c.addView(participantScroll,LinearLayout.LayoutParams(-1,-2))
+        participantRowsScroll=null
         people.forEachIndexed { index,p ->
-            val row=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
-            val name=input(t("الاسم","Name"),p.name).apply { textSize=11f; contentDescription=t("مشارك ${index+1} · الاسم","Participant ${index+1} · name") }
-            val duration=input("MM:SS",p.duration,true).apply {
-                textSize=11f; contentDescription=t("مشارك ${index+1} · وقت المسير","Participant ${index+1} · march time")
-                imeOptions=if(index==people.lastIndex)EditorInfo.IME_ACTION_DONE else EditorInfo.IME_ACTION_NEXT
-            }
+            val card=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;direction(this);setPadding(dp(6),dp(5),dp(6),dp(5));background=bg(0xFF26382C.toInt(),9f)}
+            val first=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
+            val name=input(t("الاسم","Name"),p.name).apply{textSize=12f;contentDescription=t("مشارك ${index+1} · الاسم","Participant ${index+1} · name")}
+            val duration=input("MM:SS",p.duration,true).apply{textSize=12f;contentDescription=t("مشارك ${index+1} · وقت المسير","Participant ${index+1} · march time");imeOptions=if(index==people.lastIndex)EditorInfo.IME_ACTION_DONE else EditorInfo.IME_ACTION_NEXT}
             name.addTextChangedListener(SimpleWatcher{p.name=it;persist();if(focusedField===name)miniEditorValue?.text=it})
-            bindTimeInput(duration) { value -> p.duration=value; persist() }
-            row.addView(name,LinearLayout.LayoutParams(0,dp(36),1f))
-            row.addView(Space(uiContext),LinearLayout.LayoutParams(dp(3),1))
-            row.addView(duration,LinearLayout.LayoutParams(dp(60),dp(36)))
-            row.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
-            val kind=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER; direction(this) }
-            kind.addView(button(uiContext.getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()}.apply{textSize=10f;setPadding(0,dp(4),0,dp(4));minHeight=dp(30)},LinearLayout.LayoutParams(0,dp(34),1f))
-            kind.addView(button(uiContext.getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()}.apply{textSize=10f;setPadding(0,dp(4),0,dp(4));minHeight=dp(30)},LinearLayout.LayoutParams(0,dp(34),1f))
-            row.addView(kind,LinearLayout.LayoutParams(dp(68),dp(36)))
-            row.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
-            val actions=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER }
-            actions.addView(miniIconButton("✎", { name.requestFocus(); name.setSelection(name.text.length); setFocus(true) }),LinearLayout.LayoutParams(dp(44),dp(44)))
-            actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(10),1))
-            actions.addView(miniIconButton("×", { people.removeAll{it.id==p.id}; if(people.isEmpty())people.add(Person(nextId++,"","")); persist(); renderMenu() },0xFFFF7777.toInt()),LinearLayout.LayoutParams(dp(44),dp(44)))
-            row.addView(actions,LinearLayout.LayoutParams(dp(98),dp(44)))
-            participantRows.addView(row,LinearLayout.LayoutParams(-1,dp(48)))
-            if(index<people.lastIndex)participantRows.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
+            bindTimeInput(duration){value->p.duration=value;persist()}
+            first.addView(name,LinearLayout.LayoutParams(0,dp(40),1f));first.addView(Space(uiContext),LinearLayout.LayoutParams(dp(6),1));first.addView(duration,LinearLayout.LayoutParams(dp(76),dp(40)))
+            card.addView(first)
+            val second=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
+            val kind=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;direction(this)}
+            kind.addView(button(uiContext.getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()}.apply{textSize=10f;setPadding(dp(3),0,dp(3),0);minHeight=dp(44)},LinearLayout.LayoutParams(0,dp(44),1f))
+            kind.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
+            kind.addView(button(uiContext.getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()}.apply{textSize=10f;setPadding(dp(3),0,dp(3),0);minHeight=dp(44)},LinearLayout.LayoutParams(0,dp(44),1f))
+            second.addView(kind,LinearLayout.LayoutParams(0,dp(44),1f));second.addView(Space(uiContext),LinearLayout.LayoutParams(dp(8),1))
+            val actions=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
+            actions.addView(miniIconButton("✎",{name.requestFocus();name.setSelection(name.text.length);setFocus(true)}),LinearLayout.LayoutParams(dp(44),dp(44)))
+            actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(8),1))
+            actions.addView(miniIconButton("×",{people.removeAll{it.id==p.id};if(people.isEmpty())people.add(Person(nextId++,"",""));persist();renderMenu()},0xFFFF7777.toInt()),LinearLayout.LayoutParams(dp(44),dp(44)))
+            second.addView(actions,LinearLayout.LayoutParams(dp(96),dp(44)));card.addView(second,LinearLayout.LayoutParams(-1,dp(44)).apply{topMargin=dp(4)})
+            participantRows.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(5)})
         }
-        c.addView(dottedButton(t("+ إضافة مشارك","+ Add participant")) {
-            people.add(Person(nextId++,"","")); persist(); renderMenu()
-        },LinearLayout.LayoutParams(-1,dp(36)).apply{topMargin=dp(5)})
+        c.addView(participantRows,LinearLayout.LayoutParams(-1,-2))
+        c.addView(dottedButton(t("+ إضافة مشارك","+ Add participant")){people.add(Person(nextId++,"",""));persist();renderMenu()},LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(3)})
         errors.forEach{c.addView(text(it,10f,0xFFE57373.toInt()))}
     }
     private fun utcTime(epoch:Long):String = RallyTime.utcClock(epoch)
