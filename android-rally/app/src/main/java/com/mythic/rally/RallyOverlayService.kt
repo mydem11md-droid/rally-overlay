@@ -65,6 +65,7 @@ private class EdgeResizeLayout(context: Context) : FrameLayout(context) {
 }
 
 class RallyOverlayService : Service() {
+    companion object { @Volatile var running:Boolean=false; private set; const val ACTION_STATE_CHANGED="com.mythic.rally.STATE_CHANGED" }
     private val prefs by lazy { getSharedPreferences("rally_native", MODE_PRIVATE) }
     private lateinit var uiContext: Context
     private var language = "en"
@@ -188,6 +189,7 @@ class RallyOverlayService : Service() {
         if(!Settings.canDrawOverlays(this)){stopSelf();return START_NOT_STICKY}
         startForeground(27,notification())
         if(root==null) createOverlay()
+        running=true;sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName))
         return START_STICKY
     }
     override fun onBind(intent:Intent?):IBinder?=null
@@ -910,7 +912,7 @@ class RallyOverlayService : Service() {
         runCatching { wm.updateViewLayout(r,p) }
         if(on)focusedField?.let { field -> field.post { if(field.hasFocus())imm.showSoftInput(field,InputMethodManager.SHOW_IMPLICIT) } }
     }
-    override fun onDestroy(){Choreographer.getInstance().removeFrameCallback(dragFrameCallback);UtcClockTicker.removeListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};root?.let{runCatching{wm.removeView(it)}};root=null
+    override fun onDestroy(){running=false;sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName));Choreographer.getInstance().removeFrameCallback(dragFrameCallback);UtcClockTicker.removeListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);globalLayoutListener?.let{l->root?.viewTreeObserver?.let{if(it.isAlive)it.removeOnGlobalLayoutListener(l)}};root?.let{runCatching{wm.removeView(it)}};root=null
         if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
     companion object { const val ACTION_STOP="com.mythic.rally.STOP"; const val ACTION_LANGUAGE_CHANGED="com.mythic.rally.LANGUAGE_CHANGED"; private const val TAG="RallyOverlay" }
     private class SimpleWatcher(val changed:(String)->Unit):android.text.TextWatcher{
