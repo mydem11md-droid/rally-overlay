@@ -79,13 +79,13 @@ class RallyOverlayService : Service() {
     private var menuOpen = false
     private var resultsMode = false
     private var settingsMode = false
-    private var confirming = false
     private var focusable = false
     private val imm by lazy { getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager }
     private var target = ""
     private var targetHour = ""
     private var calculationMode = "now"
     private var prepSeconds = 10
+    private var rallyDurationMinutes = 5
     private var vibrationEnabled = true
     private var targetHourInput: EditText? = null
     private var resultCountdowns = mutableMapOf<Int,TextView>()
@@ -194,6 +194,7 @@ class RallyOverlayService : Service() {
         targetHour=prefs.getString("target_hour","") ?: ""
         calculationMode=prefs.getString("calculation_mode","now") ?: "now"
         prepSeconds=prefs.getInt("prep_seconds",10)
+        rallyDurationMinutes=prefs.getInt("rally_duration_minutes",5).coerceAtLeast(1)
         vibrationEnabled=prefs.getBoolean("vibration_enabled",true)
         bubbleX=prefs.getInt("x",24); bubbleY=prefs.getInt("y",180)
         panelWidthPx=dp(prefs.getInt("panel_w",320)).coerceAtLeast(dp(240))
@@ -214,7 +215,7 @@ class RallyOverlayService : Service() {
     private fun persist() {
         val a=JSONArray(); people.forEach { a.put(JSONObject().put("id",it.id).put("name",it.name).put("duration",it.duration).put("kind",it.kind).put("rally_minutes",it.rallyMinutes)) }
         val r=JSONArray(); results.forEach { r.put(JSONObject().put("id",it.id).put("name",it.name).put("is_rally",it.isRally).put("rally_seconds",it.rallySeconds).put("march_seconds",it.marchSeconds).put("action_at",it.actionAt).put("depart_at",it.departAt).put("arrival_at",it.arrivalAt)) }
-        prefs.edit().putString("target",target).putString("target_hour",targetHour).putString("calculation_mode",calculationMode).putInt("prep_seconds",prepSeconds).putBoolean("vibration_enabled",vibrationEnabled).putString("people",a.toString()).putString("result_rows",r.toString())
+        prefs.edit().putString("target",target).putString("target_hour",targetHour).putString("calculation_mode",calculationMode).putInt("prep_seconds",prepSeconds).putInt("rally_duration_minutes",rallyDurationMinutes).putBoolean("vibration_enabled",vibrationEnabled).putString("people",a.toString()).putString("result_rows",r.toString())
             .putInt("next",nextId).putInt("x",bubbleX).putInt("y",bubbleY)
             .putBoolean("open",menuOpen).putBoolean("results",resultsMode).putBoolean("settings",settingsMode).apply()
     }
@@ -237,16 +238,16 @@ class RallyOverlayService : Service() {
         panelHeightPx=panelHeightPx.takeIf{it>0} ?: dp(520)
         panelWidthPx=panelWidthPx.coerceIn(dp(240),screenW.coerceAtLeast(dp(240)))
         panelHeightPx=panelHeightPx.coerceIn(dp(280),screenH.coerceAtLeast(dp(280)))
-        bubbleX=bubbleX.coerceIn(0,((screenW-dp(104))/density).roundToInt().coerceAtLeast(0))
+        bubbleX=bubbleX.coerceIn(0,((screenW-dp(84))/density).roundToInt().coerceAtLeast(0))
         bubbleY=bubbleY.coerceAtLeast(((statusInsetPx+dp(8))/density).roundToInt())
-        if(panelXdp<0)panelXdp=((dp(bubbleX+52)-panelWidthPx/2)/density).roundToInt()
+        if(panelXdp<0)panelXdp=((dp(bubbleX+42)-panelWidthPx/2)/density).roundToInt()
         panelXdp=panelXdp.coerceIn(0,((screenW-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
         panelYdp=panelYdp.coerceIn(0,((screenH-panelHeightPx).coerceAtLeast(0)/density).roundToInt())
         val frame=EdgeResizeLayout(uiContext).apply { clipChildren=true;clipToPadding=true;direction(this);isFocusableInTouchMode=true }
         root=frame
         val p=WindowManager.LayoutParams(
-            if(menuOpen)panelWidthPx else dp(104),
-            if(menuOpen)panelHeightPx else dp(80),
+            if(menuOpen)panelWidthPx else dp(84),
+            if(menuOpen)panelHeightPx else dp(84),
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
@@ -417,8 +418,8 @@ class RallyOverlayService : Service() {
         val r=root?:return
         val p=params?:return
         val expanded=menuOpen && menuView!=null
-        val width=if(expanded)panelWidthPx else dp(104)
-        val height=if(expanded)panelHeightPx else dp(80)
+        val width=if(expanded)panelWidthPx else dp(84)
+        val height=if(expanded)panelHeightPx else dp(84)
         val x=if(expanded)dp(panelXdp.coerceAtLeast(0)) else dp(bubbleX)
         val y=if(expanded)dp(panelYdp.coerceAtLeast(0)) else dp(bubbleY)
         val changed=p.width!=width || p.height!=height || p.x!=x || p.y!=y
