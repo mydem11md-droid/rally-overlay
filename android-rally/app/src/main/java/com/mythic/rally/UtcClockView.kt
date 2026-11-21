@@ -7,7 +7,56 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.view.View
+import android.os.Handler
+import android.os.Looper
 import java.util.Locale
+
+/**
+ * One main-thread UTC ticker shared by the native clocks and the reinforcement WebView.
+ * Every listener receives the exact same epoch-millisecond sample for each second.
+ */
+object UtcClockTicker {
+    private val handler = Handler(Looper.getMainLooper())
+    private val listeners = LinkedHashSet<(Long) -> Unit>()
+    private var scheduled = false
+
+    private val tick = object : Runnable {
+        override fun run() {
+            scheduled = false
+            val now = RallyTime.nowMillis()
+            listeners.toList().forEach { listener -> runCatching { listener(now) } }
+            schedule(now)
+        }
+    }
+
+    fun addListener(listener: (Long) -> Unit) {
+        onMain {
+            listeners.add(listener)
+            listener(RallyTime.nowMillis())
+            schedule(RallyTime.nowMillis())
+        }
+    }
+
+    fun removeListener(listener: (Long) -> Unit) {
+        onMain {
+            listeners.remove(listener)
+            if (listeners.isEmpty()) {
+                handler.removeCallbacks(tick)
+                scheduled = false
+            }
+        }
+    }
+
+    private fun schedule(now: Long) {
+        if (listeners.isEmpty() || scheduled) return
+        scheduled = true
+        handler.postDelayed(tick, RallyTime.millisUntilNextSecond(now).coerceAtLeast(1L))
+    }
+
+    private fun onMain(action: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) action() else handler.post { action() }
+    }
+}
 
 class UtcClockView(context: Context) : View(context) {
     companion object {
@@ -56,11 +105,11 @@ class UtcClockView(context: Context) : View(context) {
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        RallyTime.addClockListener(clockListener)
+        UtcClockTicker.addListener(clockListener)
     }
 
     override fun onDetachedFromWindow() {
-        RallyTime.removeClockListener(clockListener)
+        UtcClockTicker.removeListener(clockListener)
         super.onDetachedFromWindow()
     }
 
