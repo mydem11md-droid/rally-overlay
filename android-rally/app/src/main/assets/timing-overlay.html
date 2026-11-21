@@ -169,10 +169,11 @@ function draw(){
     d.querySelector("button").onclick=function(){pg().pl.splice(i,1);save();draw();tick()};
     box.appendChild(d)})}
 function atOf(g,p){var m=parseT(p.m);return m===null||!g.ref?null:g.ref-m*1000}
-function tick(){
-  $("clk").textContent=utc(nowMs());
+function tick(now){
+  if(typeof now!=="number")now=nowMs();
+  $("clk").textContent=utc(now);
   var g=pg();if(!g.ref||$("p").hidden)return;
-  var now=nowMs(),rows=$("pls").children;
+  var rows=$("pls").children;
   g.pl.forEach(function(p,i){
     var at=atOf(g,p),r=rows[i];if(!r)return;
     var a=r.querySelector(".at"),c=r.querySelector(".cd");
@@ -279,8 +280,8 @@ if(!OV){
 c.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle()}});
 render();
 function scheduleClockTick(){
-  tick();
   var now=nowMs();
+  tick(now);
   setTimeout(scheduleClockTick,Math.max(1,1000-(now%1000)));
 }
 scheduleClockTick();
