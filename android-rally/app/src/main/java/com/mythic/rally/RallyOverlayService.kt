@@ -431,7 +431,7 @@ class RallyOverlayService : Service() {
     private fun applyLayout(){
         val r=root?:return;val p=params?:return
         val screen=resources.displayMetrics
-        val width=dp(76);val height=dp(84)
+        val width=dp(84);val height=dp(84)
         val x=dp(bubbleX).coerceIn(0,(screen.widthPixels-width).coerceAtLeast(0))
         val maxY=(screen.heightPixels-(if(menuOpen)dp(88)+panelHeightPx else height)-navInsetPx).coerceAtLeast(statusInsetPx+dp(8))
         val y=dp(bubbleY).coerceIn(statusInsetPx+dp(8),maxY)
