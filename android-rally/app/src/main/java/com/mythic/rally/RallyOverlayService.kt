@@ -705,75 +705,80 @@ class RallyOverlayService : Service() {
         val sec=((ms+999L)/1000L).coerceAtLeast(0L)
         return String.format(Locale.US,"%02d:%02d",sec/60,sec%60)
     }
-    private fun copyRowText(r:ResultRow):String {
-        val verb=if(r.isRally)uiContext.getString(R.string.start_rally) else uiContext.getString(R.string.send_action)
-        val extra=if(r.isRally)String.format(Locale.US,uiContext.getString(R.string.rally_copy_suffix),r.rallySeconds/60) else ""
-        return "${r.name} — ${verb} ${utcTime(r.actionAt)} UTC${extra}"
-    }
+    private fun copyRowText(r:ResultRow):String =
+        "${r.name} — ${uiContext.getString(R.string.start_rally)} ${utcTime(r.actionAt)} UTC"
     private fun copyRow(r:ResultRow) = copy(copyRowText(r))
     private fun updateResultCountdowns(now: Long = UtcClockTicker.currentTimeMillis()) {
         if(!resultsMode||resultCountdowns.isEmpty())return
         results.forEach { r ->
             val label=resultCountdowns[r.id]?:return@forEach
             val remaining=r.actionAt-now
-            if(remaining>0) {
-                label.text=String.format(Locale.US,uiContext.getString(R.string.countdown_in),countdown(remaining))
+            val status=if(remaining>0) {
                 label.setTextColor(if(remaining<=10_000L)0xFFFF9100.toInt() else 0xFFA5C4AA.toInt())
+                if(ar())"بعد ${countdown(remaining)}" else "In ${countdown(remaining)}"
             } else {
                 val zeroAt=resultZeroAt.getOrPut(r.id){now}
-                label.text=uiContext.getString(R.string.now_label)
                 label.setTextColor(if(now-zeroAt<3000L)0xFF4CAF50.toInt() else 0xFF78907D.toInt())
-                resultRowsViews[r.id]?.alpha=if(now-zeroAt<3000L)1f else 0.55f
-                if(vibrationEnabled&&vibratedIds.add(r.id)) {
-                    runCatching {
-                        val vibrator=if(Build.VERSION.SDK_INT>=31)getSystemService(VibratorManager::class.java).defaultVibrator else @Suppress("DEPRECATION") getSystemService(VIBRATOR_SERVICE) as Vibrator
-                        if(Build.VERSION.SDK_INT>=26)vibrator.vibrate(VibrationEffect.createOneShot(70, VibrationEffect.DEFAULT_AMPLITUDE)) else @Suppress("DEPRECATION") vibrator.vibrate(70)
-                    }
+                uiContext.getString(R.string.now_label)
+            }
+            label.text="${r.name} · ${uiContext.getString(R.string.start_rally)} · $status"
+            resultRowsViews[r.id]?.alpha=if(remaining>0 || now-resultZeroAt.getOrDefault(r.id,now)<3000L)1f else 0.65f
+            if(remaining<=0 && vibrationEnabled&&vibratedIds.add(r.id)) {
+                runCatching {
+                    val vibrator=if(Build.VERSION.SDK_INT>=31)getSystemService(VibratorManager::class.java).defaultVibrator else @Suppress("DEPRECATION") getSystemService(VIBRATOR_SERVICE) as Vibrator
+                    if(Build.VERSION.SDK_INT>=26)vibrator.vibrate(VibrationEffect.createOneShot(70,VibrationEffect.DEFAULT_AMPLITUDE)) else @Suppress("DEPRECATION") vibrator.vibrate(70)
                 }
             }
         }
     }
     private fun buildResults(c:LinearLayout) {
         resultCountdowns.clear();resultRowsViews.clear()
-        label(c,uiContext.getString(R.string.execution_schedule))
         results.forEachIndexed { index,r ->
-            val wrap=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;setPadding(0,dp(5),0,dp(5));direction(this)}
-            resultRowsViews[r.id]=wrap
-            val top=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
-            val info=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL}
-            info.addView(text(r.name,12f,Color.WHITE,true))
-            info.addView(text(if(r.isRally)String.format(Locale.US,uiContext.getString(R.string.rally_badge),r.rallySeconds/60) else uiContext.getString(R.string.solo),10f,0xFFA5C4AA.toInt()))
-            top.addView(info,LinearLayout.LayoutParams(0,-2,1f))
-            top.addView(text(if(r.isRally)uiContext.getString(R.string.start_rally) else uiContext.getString(R.string.send_action),11f,0xFFA5C4AA.toInt(),true))
-            val time=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;layoutDirection=View.LAYOUT_DIRECTION_LTR}
-            time.addView(text(utcTime(r.actionAt).substring(0,2),11f,0xFFA5C4AA.toInt()))
-            time.addView(text(utcTime(r.actionAt).substring(2),17f,Color.WHITE,true))
-            top.addView(time,LinearLayout.LayoutParams(-2,dp(34)).apply{marginStart=dp(7)})
-            top.addView(button(t("نسخ","Copy"),0xFF2A3A2F.toInt(),Color.WHITE){copyRow(r)})
-            wrap.addView(top)
-            val timer=text("",11f,0xFFA5C4AA.toInt(),true).apply{textDirection=View.TEXT_DIRECTION_LTR}
-            resultCountdowns[r.id]=timer
-            wrap.addView(timer,LinearLayout.LayoutParams(-1,dp(22)))
-            if(r.isRally)wrap.addView(text(t("ينطلق ","Departs ")+utcTime(r.departAt),10f,0xFFA5C4AA.toInt()))
-            c.addView(wrap)
+            val item=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
+            item.addView(timelineRail(),LinearLayout.LayoutParams(dp(18),dp(78)))
+            val details=LinearLayout(uiContext).apply { orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
+            val timeLine=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; layoutDirection=View.LAYOUT_DIRECTION_LTR }
+            timeLine.addView(text(utcTime(r.actionAt),19f,Color.WHITE,true).apply { textDirection=View.TEXT_DIRECTION_LTR })
+            timeLine.addView(text("UTC",9f,0xFFA5C4AA.toInt(),true).apply { textDirection=View.TEXT_DIRECTION_LTR },LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(5)})
+            details.addView(timeLine,LinearLayout.LayoutParams(-1,dp(25)))
+            val status=text("",10f,0xFFA5C4AA.toInt(),true).apply { textDirection=View.TEXT_DIRECTION_FIRST_STRONG }
+            resultCountdowns[r.id]=status
+            details.addView(status,LinearLayout.LayoutParams(-1,dp(19)))
+            if(r.isRally)details.addView(text(t("ينطلق ","Departs ")+utcTime(r.departAt),10f,0xFFA5C4AA.toInt()).apply{textDirection=View.TEXT_DIRECTION_LTR},LinearLayout.LayoutParams(-1,dp(16)))
+            else details.addView(Space(uiContext),LinearLayout.LayoutParams(-1,dp(16)))
             if(index<results.lastIndex) {
                 val next=results[index+1]
                 val gap=((next.actionAt-r.actionAt)/1000L).coerceAtLeast(0L)
-                c.addView(text(String.format(Locale.US,uiContext.getString(R.string.after_player_by),r.name,countdown(gap*1000)),9f,0xFFA5C4AA.toInt()))
-                c.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
+                details.addView(text(String.format(Locale.US,uiContext.getString(R.string.after_player_by),r.name,countdown(gap*1000)),9f,0xFFA5C4AA.toInt()))
             }
+            item.addView(details,LinearLayout.LayoutParams(0,dp(78),1f))
+            item.addView(button(t("نسخ","Copy"),0xFF2A3A2F.toInt(),Color.WHITE){copyRow(r)},LinearLayout.LayoutParams(dp(48),dp(30)))
+            resultRowsViews[r.id]=item
+            c.addView(item,LinearLayout.LayoutParams(-1,dp(78)))
         }
         errors.forEach{c.addView(text(it,10f,0xFFE57373.toInt()))}
-        results.firstOrNull()?.let { r ->
-            c.addView(text(String.format(Locale.US,uiContext.getString(R.string.everyone_arrives),utcTime(r.arrivalAt)),11f,0xFF4CAF50.toInt(),true))
+        val arrival=results.firstOrNull()?.arrivalAt
+        if(arrival!=null) {
+            val finalRow=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
+            finalRow.addView(timelineRail(0xFF9BE7B0.toInt()),LinearLayout.LayoutParams(dp(18),dp(52)))
+            val finalInfo=LinearLayout(uiContext).apply { orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER_VERTICAL }
+            finalInfo.addView(text(t("وصول الجميع","Everyone arrives"),12f,0xFF9BE7B0.toInt(),true))
+            val finalTime=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; layoutDirection=View.LAYOUT_DIRECTION_LTR }
+            finalTime.addView(text(utcTime(arrival),18f,Color.WHITE,true).apply{textDirection=View.TEXT_DIRECTION_LTR})
+            finalTime.addView(text("UTC",9f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(5)})
+            finalInfo.addView(finalTime)
+            finalRow.addView(finalInfo,LinearLayout.LayoutParams(0,dp(52),1f))
+            c.addView(finalRow,LinearLayout.LayoutParams(-1,dp(52)))
         }
-        c.addView(button(t("نسخ الكل","Copy all"),0xFF2A3A2F.toInt(),Color.WHITE){copy(results.joinToString("\n"){r->copyRowText(r)})})
-        c.addView(button(uiContext.getString(R.string.recalculate_now),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()})
-        c.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()})
+        c.addView(button(t("نسخ الكل","Copy all"),0xFF4CAF50.toInt(),0xFF102014.toInt()){copy(results.joinToString("\n"){r->copyRowText(r)})},LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(8)})
+        val actions=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER; direction(this) }
+        actions.addView(button(uiContext.getString(R.string.recalculate_now),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()},LinearLayout.LayoutParams(0,dp(36),1f))
+        actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(6),1))
+        actions.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(36),1f))
+        c.addView(actions,LinearLayout.LayoutParams(-1,dp(36)).apply{topMargin=dp(6)})
         updateResultCountdowns()
-        val now=RallyTime.nowMillis()
         results.forEach { r ->
-            val wait=(r.actionAt-now).coerceAtLeast(0L)
+            val wait=(r.actionAt-UtcClockTicker.currentTimeMillis()).coerceAtLeast(0L)
             handler.postDelayed({updateResultCountdowns()},wait)
         }
     }
@@ -784,7 +789,7 @@ class RallyOverlayService : Service() {
             if(p.name.isBlank()){errors.add(t("أدخل اسم اللاعب للمشارك ","Enter a player name for participant ")+(i+1));return@forEachIndexed}
             val march=parse(p.duration)
             if(march==null){errors.add(t("مدة المسيرة غير صالحة للمشارك: ","Invalid march duration for: ")+p.name);return@forEachIndexed}
-            valid.add(RallyInput(p.id,p.name.trim(),march,if(p.kind=="rally")p.rallyMinutes*60 else 0))
+            valid.add(RallyInput(p.id,p.name.trim(),march,if(p.kind=="rally")rallyDurationMinutes*60 else 0))
         }
         if(valid.isEmpty()){resultsMode=false;renderMenu();return}
         val now=RallyTime.nowMillis()
