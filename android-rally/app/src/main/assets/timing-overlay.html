@@ -145,6 +145,7 @@ function parseT(s){var d=String(s).replace(/\D/g,"");if(!d)return null;
   return d.length>2?parseInt(d.slice(0,-2),10)*60+parseInt(d.slice(-2),10):parseInt(d,10)}
 function fmtT(t){return Math.floor(t/60)+":"+pad(t%60)}
 function nowMs(){try{if(window.RallyBridge&&RallyBridge.getUtcTimeMillis)return Number(RallyBridge.getUtcTimeMillis())}catch(e){}return Date.now()}
+function clockMs(){try{if(window.RallyBridge&&RallyBridge.getUtcDisplayTimeMillis)return Number(RallyBridge.getUtcDisplayTimeMillis())}catch(e){}return Date.now()}
 function utc(ms){var d=new Date(ms);return pad(d.getUTCHours())+":"+pad(d.getUTCMinutes())+":"+pad(d.getUTCSeconds())}
 function save(){try{localStorage.setItem("rp4",JSON.stringify({cur:cur,pages:pages.map(function(x){return{n:x.n,defaultRallyName:x.defaultRallyName,eta:x.eta,em:x.em,pl:x.pl.map(function(p){return{n:p.n,defaultName:p.defaultName,m:p.m}})}})}))}catch(e){}}
 function bindTime(el,cb){
@@ -176,7 +177,7 @@ function draw(){
     box.appendChild(d)})}
 function atOf(g,p){var m=parseT(p.m);return m===null||!g.ref?null:g.ref-m*1000}
 function tick(epochMillis){
-  var now=typeof epochMillis==="number"&&isFinite(epochMillis)?epochMillis:nowMs();
+  var now=typeof epochMillis==="number"&&isFinite(epochMillis)?epochMillis:clockMs();
   $("clk").textContent=utc(now);
   var g=pg();if(!g.ref||$("p").hidden)return;
   var rows=$("pls").children;
