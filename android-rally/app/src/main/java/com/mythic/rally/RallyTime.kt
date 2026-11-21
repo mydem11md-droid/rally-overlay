@@ -54,7 +54,7 @@ object RallyTime {
     }
 
     private fun runOnMain(action: () -> Unit) {
-        if (Looper.myLooper() == Looper.getMainLooper()) action() else mainHandler.post(action)
+        if (Looper.myLooper() == Looper.getMainLooper()) action() else mainHandler.post { action() }
     }
 
     private val utcTimeZone: TimeZone
