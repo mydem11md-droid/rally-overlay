@@ -352,12 +352,10 @@ class RallyOverlayService : Service() {
         }
         f.addView(orb,FrameLayout.LayoutParams(dp(76),dp(76),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(4)})
         if(menuOpen) {
-            val width=dp(280); val sw=resources.displayMetrics.widthPixels
             val desired=dp(bubbleX+42)
-            val expandedLeft=(desired-width/2).coerceIn(0,(sw-width).coerceAtLeast(0))
-            orb.translationX=(desired-(expandedLeft+width/2)).toFloat()
+            orb.translationX=(desired-(dp(panelXdp.coerceAtLeast(0))+panelWidthPx/2)).toFloat()
         }
-        val drag=View.OnTouchListener { _,ev -> when(ev.actionMasked){
+        val drag=View.OnTouchListener { view,ev -> when(ev.actionMasked){
             MotionEvent.ACTION_DOWN->{if(ev.x<dp(4)||ev.x>dp(72)||ev.y<dp(4)||ev.y>dp(72))false else {downX=ev.rawX;downY=ev.rawY;startX=bubbleX;startY=bubbleY;dragged=false;true}}
             MotionEvent.ACTION_MOVE->{
                 val dx=((ev.rawX-downX)/density).roundToInt();val dy=((ev.rawY-downY)/density).roundToInt()
@@ -367,6 +365,7 @@ class RallyOverlayService : Service() {
                     bubbleY=(startY+dy).coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),(resources.displayMetrics.heightPixels/density).roundToInt()-84)
                     panelXdp=((dp(bubbleX+42)-panelWidthPx/2)/density).roundToInt().coerceIn(0,((resources.displayMetrics.widthPixels-panelWidthPx).coerceAtLeast(0)/density).roundToInt())
                     panelYdp=bubbleY.coerceIn(0,((resources.displayMetrics.heightPixels-panelHeightPx).coerceAtLeast(0)/density).roundToInt())
+                    if(menuOpen)view.translationX=(dp(bubbleX+42)-(dp(panelXdp)+panelWidthPx/2)).toFloat()
                     applyLayout();persist();prefs.edit().putInt("panel_x",panelXdp).putInt("panel_y",panelYdp).apply()
                 };true
             }
