@@ -143,7 +143,7 @@ class ReinforcementOverlayService : Service() {
                     super.onPageFinished(view, url)
                     pageLoaded = true
                     view?.evaluateJavascript(
-                        "window.setUtcTime && window.setUtcTime(${RallyTime.nowMillis()})",
+                        "window.setUtcTime && window.setUtcTime(${UtcClockTicker.currentTimeMillis()})",
                         null
                     )
                 }
@@ -348,6 +348,9 @@ class ReinforcementOverlayService : Service() {
     private inner class RallyBridge {
         @JavascriptInterface
         fun getUtcTimeMillis(): Long = RallyTime.nowMillis()
+
+        @JavascriptInterface
+        fun getUtcDisplayTimeMillis(): Long = UtcClockTicker.currentTimeMillis()
 
         @JavascriptInterface
         fun getAppLanguage(): String = getSharedPreferences("rally_native", MODE_PRIVATE).getString("language", null)
