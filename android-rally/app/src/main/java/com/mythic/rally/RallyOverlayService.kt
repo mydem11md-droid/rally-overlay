@@ -484,7 +484,7 @@ class RallyOverlayService : Service() {
         menuView=panel
         val header=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL;orientation=LinearLayout.HORIZONTAL;direction(this)}
         header.addView(text(if(settingsMode)t("الإعدادات","Settings")else if(resultsMode)t("نتائج التنسيق","Rally results")else t("أداة تنسيق الحشود","Rally Coordinator"),14f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(34),1f))
-        header.addView(button("ع | EN",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){changeLanguage()},LinearLayout.LayoutParams(dp(58),dp(32)))
+        header.addView(button("EN | ع",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){changeLanguage()}.apply{textDirection=View.TEXT_DIRECTION_LTR},LinearLayout.LayoutParams(dp(58),dp(32)))
         header.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
         header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(dp(34),dp(32)))
         panel.addView(header)
@@ -698,17 +698,17 @@ class RallyOverlayService : Service() {
             bindTimeInput(duration) { value -> p.duration=value; persist() }
             row.addView(name,LinearLayout.LayoutParams(0,dp(36),1f))
             row.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
-            row.addView(duration,LinearLayout.LayoutParams(dp(70),dp(36)))
+            row.addView(duration,LinearLayout.LayoutParams(dp(68),dp(36)))
             row.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
             val kind=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER; direction(this) }
-            kind.addView(fitControl(button(uiContext.getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(34),1f))
-            kind.addView(fitControl(button(uiContext.getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(34),1f))
-            row.addView(kind,LinearLayout.LayoutParams(dp(92),dp(36)))
+            kind.addView(button(uiContext.getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()}.apply{textSize=10f;setPadding(0,dp(4),0,dp(4));minHeight=dp(30)},LinearLayout.LayoutParams(0,dp(34),1f))
+            kind.addView(button(uiContext.getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()}.apply{textSize=10f;setPadding(0,dp(4),0,dp(4));minHeight=dp(30)},LinearLayout.LayoutParams(0,dp(34),1f))
+            row.addView(kind,LinearLayout.LayoutParams(dp(86),dp(36)))
             row.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
             val actions=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER }
-            actions.addView(miniIconButton("✎") { name.requestFocus(); name.setSelection(name.text.length); setFocus(true) },LinearLayout.LayoutParams(dp(24),dp(34)))
+            actions.addView(miniIconButton("✎") { name.requestFocus(); name.setSelection(name.text.length); setFocus(true) },LinearLayout.LayoutParams(dp(22),dp(34)))
             actions.addView(miniIconButton("×") { people.removeAll{it.id==p.id}; if(people.isEmpty())people.add(Person(nextId++,"","")); persist(); renderMenu() },LinearLayout.LayoutParams(dp(24),dp(34)))
-            row.addView(actions,LinearLayout.LayoutParams(dp(52),dp(36)))
+            row.addView(actions,LinearLayout.LayoutParams(dp(44),dp(36)))
             c.addView(row,LinearLayout.LayoutParams(-1,dp(40)))
             if(index<people.lastIndex)c.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
         }
