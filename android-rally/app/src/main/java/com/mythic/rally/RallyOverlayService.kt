@@ -707,7 +707,7 @@ class RallyOverlayService : Service() {
             row.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
             val actions=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER }
             actions.addView(miniIconButton("✎") { name.requestFocus(); name.setSelection(name.text.length); setFocus(true) },LinearLayout.LayoutParams(dp(22),dp(34)))
-            actions.addView(miniIconButton("×") { people.removeAll{it.id==p.id}; if(people.isEmpty())people.add(Person(nextId++,"","")); persist(); renderMenu() },LinearLayout.LayoutParams(dp(24),dp(34)))
+            actions.addView(miniIconButton("×") { people.removeAll{it.id==p.id}; if(people.isEmpty())people.add(Person(nextId++,"","")); persist(); renderMenu() },LinearLayout.LayoutParams(dp(22),dp(34)))
             row.addView(actions,LinearLayout.LayoutParams(dp(44),dp(36)))
             c.addView(row,LinearLayout.LayoutParams(-1,dp(40)))
             if(index<people.lastIndex)c.addView(View(uiContext).apply{setBackgroundColor(0xFF405447.toInt())},LinearLayout.LayoutParams(-1,dp(1)))
