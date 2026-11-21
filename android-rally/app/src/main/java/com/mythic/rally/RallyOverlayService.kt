@@ -242,7 +242,7 @@ class RallyOverlayService : Service() {
         val screenH=resources.displayMetrics.heightPixels
         panelWidthPx=panelWidthPx.takeIf{it>0} ?: dp(320)
         panelHeightPx=panelHeightPx.takeIf{it>0} ?: dp(520)
-        panelWidthPx=panelWidthPx.coerceIn(dp(240),screenW.coerceAtLeast(dp(240)))
+        panelWidthPx=panelWidthPx.coerceAtLeast(dp(360)).coerceAtMost(screenW.coerceAtLeast(dp(240)))
         panelHeightPx=panelHeightPx.coerceIn(dp(280),screenH.coerceAtLeast(dp(280)))
         bubbleX=bubbleX.coerceIn(0,((screenW-dp(84))/density).roundToInt().coerceAtLeast(0))
         bubbleY=bubbleY.coerceAtLeast(((statusInsetPx+dp(8))/density).roundToInt())
@@ -761,13 +761,13 @@ class RallyOverlayService : Service() {
             name.addTextChangedListener(SimpleWatcher{p.name=it;persist();if(focusedField===name)miniEditorValue?.text=it})
             bindTimeInput(duration) { value -> p.duration=value; persist() }
             row.addView(name,LinearLayout.LayoutParams(0,dp(36),1f))
-            row.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
-            row.addView(duration,LinearLayout.LayoutParams(dp(68),dp(36)))
+            row.addView(Space(uiContext),LinearLayout.LayoutParams(dp(3),1))
+            row.addView(duration,LinearLayout.LayoutParams(dp(60),dp(36)))
             row.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
             val kind=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER; direction(this) }
             kind.addView(button(uiContext.getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()}.apply{textSize=10f;setPadding(0,dp(4),0,dp(4));minHeight=dp(30)},LinearLayout.LayoutParams(0,dp(34),1f))
             kind.addView(button(uiContext.getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()}.apply{textSize=10f;setPadding(0,dp(4),0,dp(4));minHeight=dp(30)},LinearLayout.LayoutParams(0,dp(34),1f))
-            row.addView(kind,LinearLayout.LayoutParams(dp(76),dp(36)))
+            row.addView(kind,LinearLayout.LayoutParams(dp(68),dp(36)))
             row.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
             val actions=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER }
             actions.addView(miniIconButton("✎", { name.requestFocus(); name.setSelection(name.text.length); setFocus(true) }),LinearLayout.LayoutParams(dp(44),dp(44)))
