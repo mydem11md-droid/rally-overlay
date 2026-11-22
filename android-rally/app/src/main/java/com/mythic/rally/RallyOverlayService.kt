@@ -705,8 +705,6 @@ class RallyOverlayService : Service() {
         if(normalized!=null) { if(raw!=normalized){field.setText(normalized);field.setSelection(normalized.length)};changed(normalized) }
         else changed(RallyTime.preview(raw))
     }
-    private fun buildEditor(c:LinearLayout) {
-
     private fun buildAppearanceSelector(parent:LinearLayout) {
         label(parent,t("المظهر","Appearance"))
         val names=listOf(
@@ -733,6 +731,7 @@ class RallyOverlayService : Service() {
         }
         parent.addView(grid,LinearLayout.LayoutParams(-1,-2).apply { topMargin=dp(3) })
     }
+    private fun buildEditor(c:LinearLayout) {
         if(settingsMode) {
             label(c,t("الإعدادات","Settings"))
             c.addView(button(if(vibrationEnabled)uiContext.getString(R.string.vibration_on)else uiContext.getString(R.string.vibration_off),0xFF2A3A2F.toInt(),Color.WHITE){vibrationEnabled=!vibrationEnabled;persist();renderMenu()})
