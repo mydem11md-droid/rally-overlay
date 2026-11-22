@@ -473,7 +473,7 @@ class RallyOverlayService : Service() {
         capsule.addView(clock);capsule.addView(utc,LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(4)})
         f.addView(capsule,FrameLayout.LayoutParams(-2,-2,Gravity.TOP or Gravity.CENTER_HORIZONTAL))
         val orb=FrameLayout(uiContext).apply { background=bg(0xFF2E7D32.toInt(),50f);addView(iconCircle(),FrameLayout.LayoutParams(dp(24),dp(24),Gravity.CENTER)) }
-        f.addView(orb,FrameLayout.LayoutParams(dp(48),dp(48),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(34)})
+        f.addView(orb,FrameLayout.LayoutParams(dp(46),dp(46),Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply{topMargin=dp(34)})
         val close=object:View(uiContext) {
             private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
             override fun onDraw(canvas:Canvas) { super.onDraw(canvas);val cx=width/2f;val cy=height/2f;paint.style=Paint.Style.FILL;paint.color=if(activeTheme==null)0xFF1E2A22.toInt() else activeTheme!!.panelTop;canvas.drawCircle(cx,cy,dp(10).toFloat(),paint);paint.color=if(isPressed)themedTextColor(0xFFE57373.toInt()) else if(activeTheme==null)0xFF2A3A2F.toInt() else activeTheme!!.fieldTop;canvas.drawCircle(cx,cy,dp(8).toFloat(),paint);paint.color=themedTextColor(Color.WHITE);paint.style=Paint.Style.STROKE;paint.strokeWidth=dp(1.5f).toFloat();paint.strokeCap=Paint.Cap.ROUND;val d=dp(3).toFloat();canvas.drawLine(cx-d,cy-d,cx+d,cy+d,paint);canvas.drawLine(cx+d,cy-d,cx-d,cy+d,paint) }
@@ -782,7 +782,7 @@ class RallyOverlayService : Service() {
             kindRow.addView(fitControl(button(uiContext.getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(48),1f))
             kindRow.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
             kindRow.addView(fitControl(button(uiContext.getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(48),1f))
-            row.addView(kindRow,LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(4)})
+            row.addView(kindRow,LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(4)})
             if(p.kind=="rally") {
                 duration.hint="MM:SS";duration.contentDescription=uiContext.getString(R.string.rally_march_arrival)
                 label(row,uiContext.getString(R.string.rally_march_arrival));label(row,uiContext.getString(R.string.rally_duration))
@@ -793,7 +793,7 @@ class RallyOverlayService : Service() {
                         durations.addView(fitControl(button(if(ar())"${mins}د" else "${mins}m",if(p.rallyMinutes==mins)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes==mins)0xFF102014.toInt() else Color.WHITE){p.rallyMinutes=mins;persist();renderMenu()}),LinearLayout.LayoutParams(0,dp(48),1f))
                         if(mins!=group.last())durations.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
                     }
-                    row.addView(durations,LinearLayout.LayoutParams(-1,dp(40)).apply{topMargin=dp(3)})
+                    row.addView(durations,LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(3)})
                 }
                 val custom=input(uiContext.getString(R.string.minutes),if(p.rallyMinutes !in presets)p.rallyMinutes.toString() else "",true)
                 if(index==people.lastIndex)custom.imeOptions=EditorInfo.IME_ACTION_DONE
