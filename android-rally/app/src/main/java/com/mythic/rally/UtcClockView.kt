@@ -43,6 +43,19 @@ object UtcClockTicker {
 
     fun currentTimeMillis(): Long = currentTimestamp
 
+    /** Apply a calibration change once on the main thread, refresh every clock with one sample, then realign. */
+    fun setCalibrationOffsetMillis(value: Long) {
+        onMain {
+            RallyTime.setCalibrationOffsetMillis(value)
+            handler.removeCallbacks(tick)
+            scheduled = false
+            val now = RallyTime.nowMillis()
+            currentTimestamp = now
+            listeners.toList().forEach { listener -> runCatching { listener(now) } }
+            schedule(now)
+        }
+    }
+
     fun removeListener(listener: (Long) -> Unit) {
         onMain {
             listeners.remove(listener)

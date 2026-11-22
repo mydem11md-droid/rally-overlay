@@ -18,11 +18,11 @@ object RallyPlanner {
         }.sortedBy { it.actionAtMillis }
         return RallyPlan(rows,arrival,base)
     }
-    fun planTarget(targetMillis:Long,people:List<RallyInput>,nowMillis:Long=UtcClockTicker.currentTimeMillis()):Pair<RallyPlan,List<String>> {
+    fun planTarget(targetMillis:Long,people:List<RallyInput>):Pair<RallyPlan,List<String>> {
         val errors=mutableListOf<String>()
         val rows=people.mapNotNull { p ->
             val action=targetMillis-p.totalSeconds*1000L
-            if(action<nowMillis-1000L)errors.add(p.name)
+            if(action<System.currentTimeMillis()-1000L)errors.add(p.name)
             RallyPlanRow(p.id,p.name,p.isRally,p.rallySeconds,p.marchSeconds,action,targetMillis-p.marchSeconds*1000L,targetMillis)
         }.sortedBy { it.actionAtMillis }
         return RallyPlan(rows,targetMillis,targetMillis) to errors

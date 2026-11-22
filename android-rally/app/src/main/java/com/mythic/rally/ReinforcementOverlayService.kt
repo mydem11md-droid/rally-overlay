@@ -353,6 +353,17 @@ class ReinforcementOverlayService : Service() {
         fun getUtcDisplayTimeMillis(): Long = UtcClockTicker.currentTimeMillis()
 
         @JavascriptInterface
+        fun getGameClockCalibrationMillis(): Long = RallyTime.calibrationOffsetMillis()
+
+        @JavascriptInterface
+        fun getGameClockCalibrationStepMillis(): Long = RallyTime.CALIBRATION_STEP_MILLIS
+
+        @JavascriptInterface
+        fun setGameClockCalibrationMillis(value: Long) {
+            UtcClockTicker.setCalibrationOffsetMillis(value)
+        }
+
+        @JavascriptInterface
         fun getAppLanguage(): String = getSharedPreferences("rally_native", MODE_PRIVATE).getString("language", null)
             ?: if (java.util.Locale.getDefault().language.equals("ar", true)) "ar" else "en"
 

@@ -877,7 +877,10 @@ class RallyOverlayService : Service() {
         actions.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(36),1f))
         c.addView(actions,LinearLayout.LayoutParams(-1,dp(36)).apply{topMargin=dp(6)})
         updateResultCountdowns()
-        // Countdown refreshes come only from the shared second-boundary UTC ticker.
+        results.forEach { r ->
+            val wait=(r.actionAt-UtcClockTicker.currentTimeMillis()).coerceAtLeast(0L)
+            handler.postDelayed({updateResultCountdowns()},wait)
+        }
     }
     private fun calculate() {
         errors.clear()
@@ -889,7 +892,7 @@ class RallyOverlayService : Service() {
             valid.add(RallyInput(p.id,p.name.trim(),march,if(p.kind=="rally")rallyDurationMinutes*60 else 0))
         }
         if(valid.isEmpty()){resultsMode=false;renderMenu();return}
-        val now=UtcClockTicker.currentTimeMillis()
+        val now=RallyTime.nowMillis()
         val rows:List<RallyPlanRow>
         val arrival:Long
         if(calculationMode=="now") {
