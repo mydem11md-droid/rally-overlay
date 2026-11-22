@@ -4,6 +4,7 @@ on:
     branches:
       - feature/rally-overlay
       - feature/reinforcement-overlay
+      - verification-base/389d49e
     paths:
       - 'android-rally/**'
       - '.github/workflows/android-rally.yml'
@@ -71,16 +72,15 @@ jobs:
           retention-days: 30
 
       - name: Publish pre-release APK
-        if: false # Temporarily disabled for a non-publishing verification build
-        continue-on-error: true
+        if: steps.build.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          RELEASE_TAG: rally-overlay-fix-${{ github.event.pull_request.head.sha }}
+          TARGET_SHA: ${{ github.sha }}
+          RELEASE_TAG: rally-overlay-389d49e-${{ github.sha }}
         run: |
           gh release create "$RELEASE_TAG" android-rally/app/build/outputs/apk/debug/app-debug.apk \
             --repo "$GITHUB_REPOSITORY" \
-            --target "$PR_HEAD_SHA" \
-            --title "Rally Overlay fixes · PR #5" \
-            --notes "Pre-release build for PR #5. Built by GitHub Actions from $PR_HEAD_SHA." \
+            --target "$TARGET_SHA" \
+            --title "Rally Overlay · PR #33" \
+            --notes "Verified APK build from commit $TARGET_SHA on verification-base/389d49e." \
             --prerelease
