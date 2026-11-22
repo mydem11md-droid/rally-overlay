@@ -15,6 +15,11 @@ class RallyTimeTest {
         assertEquals(1L, RallyTime.millisUntilNextSecond(1999L))
         assertEquals(1000L, RallyTime.millisUntilNextSecond(2000L))
     }
+    @Test fun gameClockCorrectionIsAppliedBeforeSecondBoundaryScheduling() {
+        val corrected = RallyTime.correctedEpochMillis(1234L)
+        assertEquals(1234L + RallyTime.GAME_CLOCK_OFFSET_MILLIS, corrected)
+        assertEquals(1000L - Math.floorMod(corrected, 1000L), RallyTime.millisUntilNextSecond(corrected))
+    }
     @Test fun insertsColonDuringTyping() {
         assertEquals("1:01",RallyTime.preview("101"))
         assertEquals("1:02",RallyTime.preview("102"))
