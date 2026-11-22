@@ -27,6 +27,7 @@ object RallyTime {
      * game-vs-device offset justifies a correction.
      */
     const val DEFAULT_GAME_CLOCK_OFFSET_MILLIS: Long = 0L
+    private const val OBSERVED_GAME_CLOCK_ALIGNMENT_MILLIS: Long = -1_000L
     private val LEGACY_DEFAULT_OFFSETS_MILLIS = setOf(-110L, 50L)
     const val CALIBRATION_STEP_MILLIS: Long = 10L
     private const val MAX_CALIBRATION_OFFSET_MILLIS: Long = 10_000L
@@ -92,9 +93,9 @@ object RallyTime {
      * or restore the anchor; all running-time progression uses elapsedRealtime.
      */
     fun nowMillis(): Long {
-        if (!initialized) return correctedEpochMillis(System.currentTimeMillis())
+        if (!initialized) return correctedEpochMillis(System.currentTimeMillis()) + OBSERVED_GAME_CLOCK_ALIGNMENT_MILLIS
         val anchor = clockAnchor
-        return anchor.utcMs + (SystemClock.elapsedRealtime() - anchor.elapsedMs) + calibrationOffsetMillis
+        return anchor.utcMs + (SystemClock.elapsedRealtime() - anchor.elapsedMs) + calibrationOffsetMillis + OBSERVED_GAME_CLOCK_ALIGNMENT_MILLIS
     }
 
     fun requestSync() {
