@@ -5,6 +5,7 @@ on:
       - feature/rally-overlay
       - feature/reinforcement-overlay
       - verification-base/389d49e
+      - fix/game-clock-unification
     paths:
       - 'android-rally/**'
       - '.github/workflows/android-rally.yml'
@@ -72,7 +73,7 @@ jobs:
           retention-days: 30
 
       - name: Publish pre-release APK
-        if: steps.build.outcome == 'success'
+        if: steps.build.outcome == 'success' && github.ref_name != 'fix/game-clock-unification'
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ github.sha }}
