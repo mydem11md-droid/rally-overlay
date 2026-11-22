@@ -12,8 +12,8 @@ object RallyTime {
     private const val CALIBRATION_PREFERENCES = "game_clock_calibration"
     private const val CALIBRATION_KEY = "offset_millis"
 
-    /** First-run calibration: previous +350 ms, plus the additional +460 ms measured against the game. */
-    const val DEFAULT_GAME_CLOCK_OFFSET_MILLIS: Long = 810L
+    /** Video comparison shows the old +350 ms correction was about 460 ms too far ahead. */
+    const val DEFAULT_GAME_CLOCK_OFFSET_MILLIS: Long = -110L
     const val CALIBRATION_STEP_MILLIS: Long = 50L
     private const val MAX_CALIBRATION_OFFSET_MILLIS: Long = 10_000L
 
