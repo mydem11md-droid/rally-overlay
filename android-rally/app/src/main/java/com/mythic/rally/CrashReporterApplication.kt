@@ -10,6 +10,7 @@ import java.util.Locale
 class CrashReporterApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        RallyTime.initialize(this)
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             runCatching {
