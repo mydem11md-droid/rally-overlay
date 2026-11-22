@@ -239,9 +239,9 @@ function tick(epochMillis){
     var a=r.querySelector(".at"),c=r.querySelector(".cd");
     if(at===null){a.textContent="--";c.textContent="";return}
     a.textContent=utc(at);
-    var left=(at-now)/1000;
-    if(left<=0){c.textContent=left>-2?tr("الآن","Now"):tr("فات","Passed");c.className="cd late"}
-    else{c.textContent=fmtT(Math.ceil(left));c.className="cd "+(left<=10?"soon":"ok")}})}
+    var left=Math.floor(at/1000)-Math.floor(now/1000);
+    if(left<=0){c.textContent=left===0?tr("الآن","Now"):tr("فات","Passed");c.className="cd late"}
+    else{c.textContent=fmtT(left);c.className="cd "+(left<=10?"soon":"ok")}})}
 
 bindTime($("eta"),function(){pg().eta=$("eta").value;save();markChips()});
 bindTime($("em"),function(){pg().em=$("em").value;save()});
