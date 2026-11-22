@@ -42,7 +42,7 @@ object UtcClockTicker {
         }
     }
 
-    fun currentTimeMillis(): Long = currentTimestamp
+    fun currentTimeMillis(): Long = RallyTime.nowMillis()
 
     fun addCalibrationListener(listener: (Long) -> Unit) {
         onMain { calibrationListeners.add(listener) }
