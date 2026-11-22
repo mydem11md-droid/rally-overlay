@@ -195,7 +195,7 @@ class RallyOverlayService : Service() {
     private val activeRallyTheme:RallyTheme? get()=rallyThemes.getOrNull(appearanceTheme-1)
     private fun themeColor(original:Int):Int {
         val v=activeRallyTheme?:return original
-        return when(original){Color.WHITE->v.text;0xFFA5C4AA.toInt(),0xFF78907D.toInt(),0xFFE1F5E8.toInt()->v.muted;0xFF9BE7B0.toInt()->v.text;0xFF102014.toInt()->v.accentText;0xFF4CAF50.toInt(),0xFF2E7D32.toInt()->v.accent;0xFFE57373.toInt(),0xFFFF9100.toInt()->v.warning;else->original}
+        return when(original){Color.WHITE->v.text;0xFFA5C4AA.toInt(),0xFF78907D.toInt(),0xFFE1F5E8.toInt()->v.muted;0xFF9BE7B0.toInt()->v.text;0xFF102014.toInt()->v.accentText;0xFF4CAF50.toInt(),0xFF2E7D32.toInt()->v.accent;0xFFE57373.toInt(),0xFFFF9100.toInt(),0xFFFF7777.toInt()->v.warning;else->original}
     }
     private fun themeTypeface(fallback:android.graphics.Typeface,bold:Boolean=false,numeric:Boolean=false):android.graphics.Typeface {
         val v=activeRallyTheme?:return fallback
@@ -219,7 +219,7 @@ class RallyOverlayService : Service() {
         private var progress=0f
         var ended:(()->Unit)?=null
         init{bounds=area}
-        override fun draw(canvas:Canvas){val out=dp(16f*progress).toFloat();val rect=RectF(bounds).apply{inset(-out,-out)};paint.color=tint;paint.alpha=(Color.alpha(tint)*.70f*(1f-progress)).roundToInt().coerceIn(0,255);canvas.drawRoundRect(rect,radius+out,radius+out,paint)}
+        override fun draw(canvas:Canvas){val out=dp(16f*progress).toFloat();val rect=RectF(bounds).apply{inset(-out,-out)};paint.color=tint;paint.alpha=(255f*.70f*(1f-progress)).roundToInt().coerceIn(0,255);canvas.drawRoundRect(rect,radius+out,radius+out,paint)}
         override fun setAlpha(alpha:Int){paint.alpha=alpha;invalidateSelf()}
         override fun setColorFilter(colorFilter:ColorFilter?){paint.colorFilter=colorFilter;invalidateSelf()}
         @Deprecated("Deprecated in Java") override fun getOpacity()=android.graphics.PixelFormat.TRANSLUCENT
@@ -1003,7 +1003,7 @@ class RallyOverlayService : Service() {
         val arrival=results.firstOrNull()?.arrivalAt
         if(arrival!=null) {
             val finalRow=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
-            finalRow.addView(timelineRail(0xFF9BE7B0.toInt()),LinearLayout.LayoutParams(dp(18),dp(52)))
+            finalRow.addView(timelineRail(themeColor(0xFF9BE7B0.toInt())),LinearLayout.LayoutParams(dp(18),dp(52)))
             val finalInfo=LinearLayout(uiContext).apply { orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER_VERTICAL }
             finalInfo.addView(text(t("وصول الجميع","Everyone arrives"),12f,themeColor(0xFF9BE7B0.toInt()),true))
             val finalTime=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; layoutDirection=View.LAYOUT_DIRECTION_LTR }
