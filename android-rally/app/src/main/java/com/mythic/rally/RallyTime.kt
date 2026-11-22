@@ -12,9 +12,12 @@ object RallyTime {
     private const val CALIBRATION_PREFERENCES = "game_clock_calibration"
     private const val CALIBRATION_KEY = "offset_millis"
 
-    /** Latest video comparison shows the app clocks lag the game by about 150 ms. */
-    const val DEFAULT_GAME_CLOCK_OFFSET_MILLIS: Long = 50L
-    private const val PREVIOUS_DEFAULT_GAME_CLOCK_OFFSET_MILLIS: Long = -110L
+    /**
+     * Neutral baseline: do not advance or delay device time until a measured
+     * game-vs-device offset justifies a correction.
+     */
+    const val DEFAULT_GAME_CLOCK_OFFSET_MILLIS: Long = 0L
+    private val LEGACY_DEFAULT_OFFSETS_MILLIS = setOf(-110L, 50L)
     const val CALIBRATION_STEP_MILLIS: Long = 50L
     private const val MAX_CALIBRATION_OFFSET_MILLIS: Long = 10_000L
 
@@ -26,8 +29,8 @@ object RallyTime {
         val preferences = context.applicationContext.getSharedPreferences(CALIBRATION_PREFERENCES, Context.MODE_PRIVATE)
         calibrationPreferences = preferences
         val storedOffset = preferences.getLong(CALIBRATION_KEY, DEFAULT_GAME_CLOCK_OFFSET_MILLIS)
-        // Move installations still on the previous app default to the newly verified calibration.
-        val migratedOffset = if (storedOffset == PREVIOUS_DEFAULT_GAME_CLOCK_OFFSET_MILLIS) {
+        // Remove either shipped default correction; preserve user-selected non-default calibration.
+        val migratedOffset = if (storedOffset in LEGACY_DEFAULT_OFFSETS_MILLIS) {
             DEFAULT_GAME_CLOCK_OFFSET_MILLIS
         } else {
             storedOffset
