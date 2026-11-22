@@ -4,7 +4,6 @@ import android.app.*
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
-import android.animation.ValueAnimator
 import android.content.*
 import android.content.res.Configuration
 import android.graphics.*
@@ -196,7 +195,7 @@ class RallyOverlayService : Service() {
     private val activeRallyTheme:RallyTheme? get()=rallyThemes.getOrNull(appearanceTheme-1)
     private fun themeColor(original:Int):Int {
         val v=activeRallyTheme?:return original
-        return when(original){Color.WHITE->v.text;0xFFA5C4AA.toInt(),0xFF78907D.toInt(),0xFFE1F5E8.toInt()->v.muted;0xFF102014.toInt()->v.accentText;0xFF4CAF50.toInt(),0xFF2E7D32.toInt()->v.accent;0xFFE57373.toInt(),0xFFFF9100.toInt()->v.warning;else->original}
+        return when(original){Color.WHITE->v.text;0xFFA5C4AA.toInt(),0xFF78907D.toInt(),0xFFE1F5E8.toInt()->v.muted;0xFF9BE7B0.toInt()->v.text;0xFF102014.toInt()->v.accentText;0xFF4CAF50.toInt(),0xFF2E7D32.toInt()->v.accent;0xFFE57373.toInt(),0xFFFF9100.toInt()->v.warning;else->original}
     }
     private fun themeTypeface(fallback:android.graphics.Typeface,bold:Boolean=false,numeric:Boolean=false):android.graphics.Typeface {
         val v=activeRallyTheme?:return fallback
@@ -211,7 +210,7 @@ class RallyOverlayService : Service() {
     private fun bg(color:Int,radius:Float):GradientDrawable {
         val v=activeRallyTheme
         if(v==null)return GradientDrawable().apply{setColor(color);cornerRadius=dp(radius).toFloat()}
-        val pair=when(color){0xFF1E2A22.toInt()->v.top to v.bottom;0xFF2A3A2F.toInt()->v.field to v.fieldBottom;0xFF2E7D32.toInt(),0xFF4CAF50.toInt(),0xFF347B4A.toInt()->v.accent to v.accentBottom;0xFFE57373.toInt()->v.warning to v.warning;else->color to color}
+        val pair=when(color){0xFF1E2A22.toInt()->v.top to v.bottom;0xFF2A3A2F.toInt(),0xFF26382C.toInt()->v.field to v.fieldBottom;0xFF2E7D32.toInt(),0xFF4CAF50.toInt(),0xFF347B4A.toInt()->v.accent to v.accentBottom;0xFFE57373.toInt()->v.warning to v.warning;else->color to color}
         return GradientDrawable().apply{if(pair.first==pair.second)setColor(pair.first)else setColors(intArrayOf(pair.first,pair.second));cornerRadius=dp(if(radius>=40f)radius else v.radius*.6f).toFloat();if(color==0xFF1E2A22.toInt()&&v.borderWidth>0f)setStroke(dp(v.borderWidth),v.border)else if(color==0xFF2A3A2F.toInt()&&v.fieldBorderWidth>0f)setStroke(dp(v.fieldBorderWidth),v.fieldBorder)}
     }
     private fun reduceMotion():Boolean=runCatching{Settings.Global.getFloat(contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)<=0f}.getOrDefault(false)
@@ -876,18 +875,18 @@ class RallyOverlayService : Service() {
         selectors.addView(dropdown(if(calculationMode=="now")modeNow else modeTarget,listOf(
             modeNow to { calculationMode="now"; persist(); renderMenu() },
             modeTarget to { calculationMode="target"; persist(); renderMenu() }
-        ),c),LinearLayout.LayoutParams(0,dp(42),1f))
+        ),c),LinearLayout.LayoutParams(0,dp(48),1f))
         selectors.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
         selectors.addView(dropdown(prepLabels[prepSeconds] ?: (if(ar())"تجهيز ${prepSeconds}ث" else "Prep ${prepSeconds}s"),prepOptions.map { value ->
             prepLabels.getValue(value) to { prepSeconds=value; persist(); renderMenu() }
-        },c),LinearLayout.LayoutParams(0,dp(42),1f))
+        },c),LinearLayout.LayoutParams(0,dp(48),1f))
         selectors.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
         val customLabel=if(ar())"مخصص" else "Custom"
         val selectedRally=rallyLabels[rallyDurationMinutes] ?: (if(ar())"مخصص · ${rallyDurationMinutes}د" else "Custom · ${rallyDurationMinutes}m")
         val rallyOptions=rallyPresets.map { value ->
             rallyLabels.getValue(value) to { rallyDurationMinutes=value; persist(); renderMenu() }
         } + (customLabel to { editRallyDuration() })
-        selectors.addView(dropdown(selectedRally,rallyOptions,c),LinearLayout.LayoutParams(0,dp(42),1f))
+        selectors.addView(dropdown(selectedRally,rallyOptions,c),LinearLayout.LayoutParams(0,dp(48),1f))
         c.addView(selectors)
         if(calculationMode=="target") {
             val targetRow=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
@@ -1001,7 +1000,7 @@ class RallyOverlayService : Service() {
             val finalRow=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
             finalRow.addView(timelineRail(0xFF9BE7B0.toInt()),LinearLayout.LayoutParams(dp(18),dp(52)))
             val finalInfo=LinearLayout(uiContext).apply { orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER_VERTICAL }
-            finalInfo.addView(text(t("وصول الجميع","Everyone arrives"),12f,0xFF9BE7B0.toInt(),true))
+            finalInfo.addView(text(t("وصول الجميع","Everyone arrives"),12f,themeColor(0xFF9BE7B0.toInt()),true))
             val finalTime=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; layoutDirection=View.LAYOUT_DIRECTION_LTR }
             val arrivalTimeView=text(utcTime(arrival),18f,Color.WHITE,true).apply{textDirection=View.TEXT_DIRECTION_LTR}
             resultArrivalTimeView=arrivalTimeView
@@ -1011,7 +1010,7 @@ class RallyOverlayService : Service() {
             finalRow.addView(finalInfo,LinearLayout.LayoutParams(0,dp(52),1f))
             c.addView(finalRow,LinearLayout.LayoutParams(-1,dp(52)))
         }
-        c.addView(button(t("نسخ الكل","Copy all"),0xFF4CAF50.toInt(),0xFF102014.toInt()){copy(results.joinToString("\n"){r->copyRowText(r)})},LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(8)})
+        c.addView(button(t("نسخ الكل","Copy all"),0xFF4CAF50.toInt(),0xFF102014.toInt()){copy(results.joinToString("\n"){r->copyRowText(r)})},LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(8)})
         val actions=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER; direction(this) }
         actions.addView(button(t("حساب من جديد","Calculate again"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()},LinearLayout.LayoutParams(0,dp(48),1f))
         actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(6),1))
