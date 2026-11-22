@@ -144,8 +144,8 @@ function pad(x){return String(x).padStart(2,"0")}
 function parseT(s){var d=String(s).replace(/\D/g,"");if(!d)return null;
   return d.length>2?parseInt(d.slice(0,-2),10)*60+parseInt(d.slice(-2),10):parseInt(d,10)}
 function fmtT(t){return Math.floor(t/60)+":"+pad(t%60)}
-function nowMs(){try{if(window.RallyBridge&&RallyBridge.getUtcTimeMillis)return Number(RallyBridge.getUtcTimeMillis())}catch(e){}return Date.now()}
-function clockMs(){try{if(window.RallyBridge&&RallyBridge.getUtcDisplayTimeMillis)return Number(RallyBridge.getUtcDisplayTimeMillis())}catch(e){}return Date.now()}
+function nowMs(){return Number(RallyBridge.getUtcTimeMillis())}
+function clockMs(){return Number(RallyBridge.getUtcDisplayTimeMillis())}
 function utc(ms){var d=new Date(ms);return pad(d.getUTCHours())+":"+pad(d.getUTCMinutes())+":"+pad(d.getUTCSeconds())}
 function save(){try{localStorage.setItem("rp4",JSON.stringify({cur:cur,pages:pages.map(function(x){return{n:x.n,defaultRallyName:x.defaultRallyName,eta:x.eta,em:x.em,pl:x.pl.map(function(p){return{n:p.n,defaultName:p.defaultName,m:p.m}})}})}))}catch(e){}}
 function bindTime(el,cb){
@@ -289,14 +289,6 @@ if(!OV){
 c.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle()}});
 window.setUtcTime=function(epochMillis){tick(Number(epochMillis))};
 render();
-if(!window.RallyBridge){
-  function scheduleClockTick(){
-    var now=nowMs();
-    tick(now);
-    setTimeout(scheduleClockTick,Math.max(1,1000-(now%1000)));
-  }
-  scheduleClockTick();
-}
 if(OV)report();
 </script>
 </body>

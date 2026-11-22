@@ -347,7 +347,7 @@ class ReinforcementOverlayService : Service() {
 
     private inner class RallyBridge {
         @JavascriptInterface
-        fun getUtcTimeMillis(): Long = RallyTime.nowMillis()
+        fun getUtcTimeMillis(): Long = UtcClockTicker.currentTimeMillis()
 
         @JavascriptInterface
         fun getUtcDisplayTimeMillis(): Long = UtcClockTicker.currentTimeMillis()

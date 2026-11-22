@@ -7,8 +7,14 @@ import java.util.Locale
 import java.util.TimeZone
 
 object RallyTime {
-    /** The single wall-clock epoch source used by every UTC display and calculation. */
-    fun nowMillis(): Long = System.currentTimeMillis()
+    /** Single adjustable calibration against the game's UTC+8 clock. */
+    const val GAME_CLOCK_OFFSET_MILLIS: Long = 350L
+
+    /** Convert device epoch time to the calibrated game epoch before display or calculation. */
+    fun correctedEpochMillis(deviceEpochMillis: Long): Long = deviceEpochMillis + GAME_CLOCK_OFFSET_MILLIS
+
+    /** The only device wall-clock read used by the shared UTC ticker. */
+    fun nowMillis(): Long = correctedEpochMillis(System.currentTimeMillis())
 
     /** Milliseconds until the next exact epoch-second boundary. */
     fun millisUntilNextSecond(epochMillis: Long = nowMillis()): Long =
