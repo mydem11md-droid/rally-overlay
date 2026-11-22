@@ -71,7 +71,7 @@ jobs:
           retention-days: 30
 
       - name: Publish pre-release APK
-        if: success() && github.event_name == 'pull_request'
+        if: false # Temporarily disabled for a non-publishing verification build
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
