@@ -1,15 +1,19 @@
 package com.mythic.rally
 
 import android.app.*
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.*
 import android.content.res.Configuration
 import android.graphics.*
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.*
 import android.util.Log
 import android.provider.Settings
 import android.view.*
+import android.view.animation.LinearInterpolator
 import android.view.inputmethod.*
 import android.widget.*
 import org.json.JSONArray
@@ -90,6 +94,7 @@ class RallyOverlayService : Service() {
     private var prepSeconds = 10
     private var rallyDurationMinutes = 5
     private var vibrationEnabled = true
+    private var appearanceTheme = 0
     private var targetHourInput: EditText? = null
     private var resultCountdowns = mutableMapOf<Int,TextView>()
     private var resultRowsViews = mutableMapOf<Int,View>()
@@ -168,15 +173,79 @@ class RallyOverlayService : Service() {
     private fun direction(view: View) {
         view.layoutDirection = if (ar()) View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR
     }
-    private fun bg(color: Int, radius: Float): GradientDrawable =
-        GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
-    private fun text(value: String, size: Float, color: Int, bold: Boolean = false) =
-        TextView(uiContext).apply { text=value; textSize=size; setTextColor(color); gravity=Gravity.CENTER_VERTICAL; direction(this)
-            if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD) }
-    private fun button(value: String, color: Int, fg: Int, action: () -> Unit) =
-        TextView(uiContext).apply { text=value; textSize=13f; gravity=Gravity.CENTER; setTextColor(fg); direction(this)
-            background=bg(color,9f); setPadding(dp(10),dp(7),dp(10),dp(7)); setOnClickListener { action() } }
-    private fun fitControl(v: TextView) = v.apply { includeFontPadding=false; isSingleLine=true; gravity=Gravity.CENTER; minHeight=dp(40); setPadding(paddingLeft,dp(5),paddingRight,dp(5)) }
+
+    private data class RallyTheme(val top:Int,val bottom:Int,val text:Int,val muted:Int,val accent:Int,val accentBottom:Int,val accentText:Int,val warning:Int,val line:Int,val field:Int,val fieldBottom:Int,val radius:Float,val font:String,val numberFont:String,val border:Int=Color.TRANSPARENT,val borderWidth:Float=0f,val fieldBorder:Int=Color.TRANSPARENT,val fieldBorderWidth:Float=0f,val elevation:Float=0f)
+    private fun c(hex:String)=Color.parseColor(hex)
+    private val rallyThemes=listOf(
+        RallyTheme(c("#1e2b22"),c("#1e2b22"),c("#eaf4ed"),c("#a9bfb0"),c("#4caf50"),c("#4caf50"),c("#06210c"),c("#ffb020"),c("#35503d"),c("#14201a"),c("#14201a"),12f,"Tajawal","Tajawal",elevation=8f),
+        RallyTheme(Color.argb(33,255,255,255),Color.argb(33,255,255,255),Color.WHITE,c("#d9e8df"),Color.argb(224,255,255,255),Color.argb(224,255,255,255),c("#0b3a1f"),c("#ffd36b"),Color.argb(102,255,255,255),Color.argb(36,255,255,255),Color.argb(36,255,255,255),22f,"Tajawal","Tajawal",Color.argb(85,255,255,255),1f,Color.argb(51,255,255,255),1f),
+        RallyTheme(c("#2b3035"),c("#2b3035"),c("#e4eae6"),c("#98a39c"),c("#2b3035"),c("#2b3035"),c("#6fe39a"),c("#ff9b73"),c("#3b434a"),c("#2b3035"),c("#2b3035"),18f,"Tajawal","Tajawal",elevation=6f),
+        RallyTheme(c("#4b5157"),c("#2c3035"),c("#f1f3f2"),c("#b3bab6"),c("#5fd37e"),c("#2c9a4b"),c("#04210d"),c("#ffc24a"),c("#1a1d20"),c("#1c1f22"),c("#2a2e32"),12f,"Tajawal","Share Tech Mono",c("#6a7076"),1f,elevation=8f),
+        RallyTheme(c("#161a10"),c("#161a10"),c("#dfe2c8"),c("#a0a583"),c("#d9a21b"),c("#d9a21b"),c("#161a10"),c("#ff6a3d"),c("#4d5433"),c("#0f120a"),c("#0f120a"),3f,"Changa","Share Tech Mono",c("#5d6440"),1f,c("#3d4329"),1f),
+        RallyTheme(c("#0a0716"),c("#0a0716"),c("#f0eaff"),c("#a79bd0"),c("#00f0ff"),c("#00f0ff"),c("#001a1f"),c("#ff2bd6"),Color.argb(102,0,240,255),c("#140d2b"),c("#140d2b"),10f,"Tajawal","Share Tech Mono",c("#00f0ff"),1f,c("#3b2a78"),1f,elevation=8f),
+        RallyTheme(c("#3d2815"),c("#22130a"),c("#f9e9c3"),c("#c5a878"),c("#f7d067"),c("#b9821a"),c("#2a1604"),c("#ff8a5c"),c("#7a5a22"),c("#1a0e05"),c("#1a0e05"),10f,"Reem Kufi","Reem Kufi",c("#c89b3c"),2f,c("#6b4d1e"),1f,elevation=8f),
+        RallyTheme(Color.BLACK,Color.BLACK,Color.WHITE,c("#8d8d8d"),c("#3ddc84"),c("#3ddc84"),c("#00200e"),c("#ffb454"),c("#2a2a2a"),c("#0e0e0e"),c("#0e0e0e"),16f,"Tajawal","Tajawal",c("#262626"),1f,c("#1f1f1f"),1f),
+        RallyTheme(c("#f3ead2"),c("#f3ead2"),c("#3b2f1c"),c("#7d6c4d"),c("#2f6f4e"),c("#2f6f4e"),Color.WHITE,c("#c2410c"),c("#b9a572"),c("#fbf6e6"),c("#fbf6e6"),6f,"Tajawal","Tajawal",c("#c9b88c"),1f,c("#d6c79b"),1f,elevation=3f),
+        RallyTheme(c("#031a0a"),c("#031a0a"),c("#4dff7c"),c("#2fae52"),c("#4dff7c"),c("#4dff7c"),c("#031a0a"),c("#ffd23f"),c("#1f7a39"),c("#02100a"),c("#02100a"),0f,"Share Tech Mono","Share Tech Mono",c("#4dff7c"),1f,c("#1f7a39"),1f),
+        RallyTheme(c("#fff2a8"),c("#fff2a8"),Color.BLACK,c("#333333"),c("#ff5a36"),c("#ff5a36"),Color.BLACK,c("#c40000"),Color.BLACK,Color.WHITE,Color.WHITE,0f,"Changa","Share Tech Mono",Color.BLACK,3f,Color.BLACK,2f,elevation=7f),
+        RallyTheme(c("#3a2a7a"),c("#3a2a7a"),Color.WHITE,c("#cbbff5"),c("#ff9f1c"),c("#ff9f1c"),c("#3a1c00"),c("#ffd0a0"),c("#6e5bc4"),c("#2c1f63"),c("#2c1f63"),20f,"Cairo,Tajawal","Tajawal",c("#5a46a8"),2f,elevation=8f),
+        RallyTheme(c("#2a1a3d"),c("#5a1e4a"),Color.WHITE,c("#e7c3da"),c("#ff7a45"),c("#ff3d77"),Color.WHITE,c("#ffd27a"),Color.argb(102,255,122,154),Color.argb(28,255,255,255),Color.argb(28,255,255,255),24f,"Tajawal","Tajawal",elevation=8f),
+        RallyTheme(c("#e6efe2"),c("#e6efe2"),c("#1b2b1e"),c("#4f6554"),c("#b6e3b0"),c("#b6e3b0"),c("#0c2d12"),c("#b45309"),c("#a9c4a7"),c("#f6faf4"),c("#f6faf4"),28f,"Tajawal","Tajawal",elevation=6f)
+    )
+    private val activeRallyTheme:RallyTheme? get()=rallyThemes.getOrNull(appearanceTheme-1)
+    private fun themeColor(original:Int):Int {
+        val v=activeRallyTheme?:return original
+        return when(original){Color.WHITE->v.text;0xFFA5C4AA.toInt(),0xFF78907D.toInt(),0xFFE1F5E8.toInt()->v.muted;0xFF9BE7B0.toInt()->v.text;0xFF102014.toInt()->v.accentText;0xFF4CAF50.toInt(),0xFF2E7D32.toInt()->v.accent;0xFFE57373.toInt(),0xFFFF9100.toInt(),0xFFFF7777.toInt()->v.warning;else->original}
+    }
+    private fun themeTypeface(fallback:android.graphics.Typeface,bold:Boolean=false,numeric:Boolean=false):android.graphics.Typeface {
+        val v=activeRallyTheme?:return fallback
+        val family=if(numeric)v.numberFont else v.font
+        val system=when(family){"Share Tech Mono"->"monospace";"Changa"->"sans-serif-condensed";"Reem Kufi"->"sans-serif-medium";"Tajawal","Cairo,Tajawal"->"sans-serif";else->family}
+        return android.graphics.Typeface.create(system,if(bold)android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+    }
+    private fun panelBackground():GradientDrawable {
+        val v=activeRallyTheme?:return GradientDrawable().apply{setColor(0xFF1E2A22.toInt());cornerRadius=dp(12).toFloat()}
+        return GradientDrawable().apply{if(v.top==v.bottom)setColor(v.top)else setColors(intArrayOf(v.top,v.bottom));cornerRadius=dp(v.radius).toFloat();if(v.borderWidth>0f)setStroke(dp(v.borderWidth),v.border)}
+    }
+    private fun bg(color:Int,radius:Float):GradientDrawable {
+        val v=activeRallyTheme
+        if(v==null)return GradientDrawable().apply{setColor(color);cornerRadius=dp(radius).toFloat()}
+        val pair=when(color){0xFF1E2A22.toInt()->v.top to v.bottom;0xFF2A3A2F.toInt(),0xFF26382C.toInt()->v.field to v.fieldBottom;0xFF2E7D32.toInt(),0xFF4CAF50.toInt(),0xFF347B4A.toInt()->v.accent to v.accentBottom;0xFFE57373.toInt()->v.warning to v.warning;else->color to color}
+        return GradientDrawable().apply{if(pair.first==pair.second)setColor(pair.first)else setColors(intArrayOf(pair.first,pair.second));cornerRadius=dp(if(radius>=40f)radius else v.radius*.6f).toFloat();if(color==0xFF1E2A22.toInt()&&v.borderWidth>0f)setStroke(dp(v.borderWidth),v.border)else if(color==0xFF2A3A2F.toInt()&&v.fieldBorderWidth>0f)setStroke(dp(v.fieldBorderWidth),v.fieldBorder)}
+    }
+    private fun reduceMotion():Boolean=runCatching{Settings.Global.getFloat(contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)<=0f}.getOrDefault(false)
+    private inner class RallyRingDrawable(area:Rect,private val radius:Float,private val tint:Int):Drawable(){
+        private val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{style=Paint.Style.STROKE;strokeWidth=dp(2f).toFloat()}
+        private var progress=0f
+        var ended:(()->Unit)?=null
+        init{bounds=area}
+        override fun draw(canvas:Canvas){val out=dp(16f*progress).toFloat();val rect=RectF(bounds).apply{inset(-out,-out)};paint.color=tint;paint.alpha=(255f*.70f*(1f-progress)).roundToInt().coerceIn(0,255);canvas.drawRoundRect(rect,radius+out,radius+out,paint)}
+        override fun setAlpha(alpha:Int){paint.alpha=alpha;invalidateSelf()}
+        override fun setColorFilter(colorFilter:ColorFilter?){paint.colorFilter=colorFilter;invalidateSelf()}
+        @Deprecated("Deprecated in Java") override fun getOpacity()=android.graphics.PixelFormat.TRANSLUCENT
+        fun run(){ValueAnimator.ofFloat(0f,1f).apply{duration=500L;interpolator=LinearInterpolator();addUpdateListener{progress=it.animatedValue as Float;invalidateSelf()};addListener(object:AnimatorListenerAdapter(){override fun onAnimationEnd(animation:Animator){ended?.invoke()}});start()}}
+    }
+    private fun pressButton(view:View){
+        if(reduceMotion())return
+        (view.rootView as? ViewGroup)?.takeIf{view.isAttachedToWindow&&view.width>0&&view.height>0}?.let{host->
+            val p=IntArray(2);val o=IntArray(2);view.getLocationOnScreen(p);host.getLocationOnScreen(o)
+            val bounds=Rect(p[0]-o[0],p[1]-o[1],p[0]-o[0]+view.width,p[1]-o[1]+view.height)
+            val v=activeRallyTheme;val ring=RallyRingDrawable(bounds,dp((v?.radius?:12f)*.6f).toFloat(),v?.accent?:0xFF4CAF50.toInt())
+            ring.ended={host.overlay.remove(ring)};host.overlay.add(ring);ring.run()
+        }
+        view.animate().cancel();view.animate().scaleX(.97f).scaleY(.97f).setDuration(120L).start()
+    }
+    private fun releaseButton(view:View){if(!reduceMotion()){view.animate().cancel();view.animate().scaleX(1f).scaleY(1f).setDuration(120L).start()}}
+    private fun attachButtonFeedback(view:View,shape:GradientDrawable?=null){
+        view.minimumWidth=dp(48);view.minimumHeight=dp(48);view.isFocusable=true;view.isLongClickable=false;(view as? TextView)?.setTextIsSelectable(false)
+        view.setOnTouchListener{v,event->when(event.actionMasked){MotionEvent.ACTION_DOWN->if(v.isEnabled)pressButton(v);MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL->releaseButton(v)};false}
+        if(shape!=null)view.setOnFocusChangeListener{_,focused->if(focused)shape.setStroke(dp(2f),activeRallyTheme?.accent?:0xFF6FD3F2.toInt())else if((activeRallyTheme?.fieldBorderWidth?:0f)>0f)shape.setStroke(dp(activeRallyTheme!!.fieldBorderWidth),activeRallyTheme!!.fieldBorder)else shape.setStroke(0,Color.TRANSPARENT)}
+        view.alpha=if(view.isEnabled)1f else .42f
+    }
+
+    private fun text(value:String,size:Float,color:Int,bold:Boolean=false)=TextView(uiContext).apply{text=value;textSize=size;setTextColor(themeColor(color));gravity=Gravity.CENTER_VERTICAL;direction(this);if(activeRallyTheme!=null)setTypeface(themeTypeface(typeface,bold))else if(bold)setTypeface(typeface,android.graphics.Typeface.BOLD)}
+    private fun button(value:String,color:Int,fg:Int,action:()->Unit)=TextView(uiContext).apply{text=value;textSize=13f;gravity=Gravity.CENTER;direction(this);setTextColor(if(activeRallyTheme==null)fg else when(color){0xFF4CAF50.toInt(),0xFF2E7D32.toInt()->activeRallyTheme!!.accentText;0xFFE57373.toInt()->activeRallyTheme!!.text;else->if(fg==0xFFA5C4AA.toInt())activeRallyTheme!!.muted else activeRallyTheme!!.text});val shape=bg(color,9f);background=shape;setPadding(dp(10),dp(7),dp(10),dp(7));if(activeRallyTheme!=null)setTypeface(themeTypeface(typeface,fg==0xFF102014.toInt()));elevation=dp(activeRallyTheme?.let{if(color==0xFF4CAF50.toInt()||color==0xFF2E7D32.toInt())it.elevation.coerceAtMost(8f)else it.elevation*.45f}?:0f).toFloat();setOnClickListener{action()};attachButtonFeedback(this,shape)}
+    private fun fitControl(v:TextView)=v.apply{includeFontPadding=false;isSingleLine=true;gravity=Gravity.CENTER;minHeight=dp(48);minimumHeight=dp(48);setPadding(paddingLeft,dp(5),paddingRight,dp(5))}
     private data class Person(val id:Int,var name:String,var duration:String,var kind:String="solo",var rallyMinutes:Int=5)
     private data class ResultRow(val id:Int,val name:String,val isRally:Boolean,val rallySeconds:Int,val marchSeconds:Int,val actionAt:Long,val departAt:Long,val arrivalAt:Long)
     private val localeReceiver = object: BroadcastReceiver() {
@@ -219,6 +288,7 @@ class RallyOverlayService : Service() {
         prepSeconds=prefs.getInt("prep_seconds",10)
         rallyDurationMinutes=prefs.getInt("rally_duration_minutes",5).coerceAtLeast(1)
         vibrationEnabled=prefs.getBoolean("vibration_enabled",true)
+        appearanceTheme=prefs.getInt("appearance_theme",0).coerceIn(0,14)
         bubbleX=prefs.getInt("x",24); bubbleY=prefs.getInt("y",180)
         panelWidthPx=dp(prefs.getInt("panel_w",320)).coerceAtLeast(dp(240))
         panelHeightPx=dp(prefs.getInt("panel_h",520)).coerceAtLeast(dp(280))
@@ -277,7 +347,7 @@ class RallyOverlayService : Service() {
         val r=JSONArray(); results.forEach { r.put(JSONObject().put("id",it.id).put("name",it.name).put("is_rally",it.isRally).put("rally_seconds",it.rallySeconds).put("march_seconds",it.marchSeconds).put("action_at",it.actionAt).put("depart_at",it.departAt).put("arrival_at",it.arrivalAt)) }
         prefs.edit().putString("target",target).putString("target_hour",targetHour).putString("calculation_mode",calculationMode).putInt("prep_seconds",prepSeconds).putInt("rally_duration_minutes",rallyDurationMinutes).putBoolean("vibration_enabled",vibrationEnabled).putString("people",a.toString()).putString("result_rows",r.toString())
             .putInt("next",nextId).putInt("x",bubbleX).putInt("y",bubbleY)
-            .putBoolean("open",menuOpen).putBoolean("results",resultsMode).putBoolean("settings",settingsMode)
+            .putBoolean("open",menuOpen).putBoolean("results",resultsMode).putBoolean("settings",settingsMode).putInt("appearance_theme",appearanceTheme)
             .putLong("results_calibration_offset_millis",RallyTime.calibrationOffsetMillis()).apply()
     }
     private fun notification():Notification {
@@ -344,8 +414,8 @@ class RallyOverlayService : Service() {
         runCatching { wm.updateViewLayout(r,p) }
     }
     private fun addPinnedControls(f: FrameLayout) {
-        val clock=TextView(uiContext).apply{tag="utc_time";text=RallyTime.utcClock(UtcClockTicker.currentTimeMillis());textSize=12f;setTextColor(Color.WHITE);setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR}
-        val utc=TextView(uiContext).apply{text="UTC";textSize=8f;setTextColor(0xFFE1F5E8.toInt());includeFontPadding=false;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR}
+        val clock=TextView(uiContext).apply{tag="utc_time";text=RallyTime.utcClock(UtcClockTicker.currentTimeMillis());textSize=12f;setTextColor(themeColor(Color.WHITE));setTypeface(themeTypeface(android.graphics.Typeface.DEFAULT,true,true));fontFeatureSettings="tnum";includeFontPadding=false;isSingleLine=true;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR}
+        val utc=TextView(uiContext).apply{text="UTC";textSize=8f;setTextColor(themeColor(0xFFE1F5E8.toInt()));includeFontPadding=false;gravity=Gravity.CENTER;textDirection=View.TEXT_DIRECTION_LTR}
         val clockStack=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER;addView(clock,LinearLayout.LayoutParams(-1,dp(19)));addView(utc,LinearLayout.LayoutParams(-1,dp(12)))}
         val orb=object:FrameLayout(uiContext){
             private val fill=Paint(Paint.ANTI_ALIAS_FLAG)
@@ -369,11 +439,11 @@ class RallyOverlayService : Service() {
     private val dragFrameCallback=Choreographer.FrameCallback{dragFramePending=false;applyLayout()}
     private fun handleCircleTouch(event:MotionEvent):Boolean{
         when(event.actionMasked){
-            MotionEvent.ACTION_DOWN->{trackingCircle=true;draggingCircle=false;downX=event.rawX;downY=event.rawY;val p=params?:return false;startWindowX=p.x;startWindowY=p.y;return true}
+            MotionEvent.ACTION_DOWN->{trackingCircle=true;draggingCircle=false;root?.findViewWithTag<View>("rally_orb")?.let{pressButton(it)};downX=event.rawX;downY=event.rawY;val p=params?:return false;startWindowX=p.x;startWindowY=p.y;return true}
             MotionEvent.ACTION_MOVE->{
                 if(!trackingCircle)return false
                 val dx=(event.rawX-downX).roundToInt();val dy=(event.rawY-downY).roundToInt()
-                if(!draggingCircle&&(abs(dx)>touchSlop||abs(dy)>touchSlop))draggingCircle=true
+                if(!draggingCircle&&(abs(dx)>touchSlop||abs(dy)>touchSlop)){draggingCircle=true;root?.findViewWithTag<View>("rally_orb")?.let{releaseButton(it)}}
                 if(draggingCircle){
                     val screen=resources.displayMetrics;val p=params?:return true
                     val height=dp(84)
@@ -384,8 +454,8 @@ class RallyOverlayService : Service() {
                     if(!dragFramePending){dragFramePending=true;Choreographer.getInstance().postFrameCallback(dragFrameCallback)}
                 };return true
             }
-            MotionEvent.ACTION_UP->{if(!trackingCircle)return false;val moved=draggingCircle;trackingCircle=false;draggingCircle=false;if(moved){flushDragLayout();persist()}else{if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};return true}
-            MotionEvent.ACTION_CANCEL->{val was=trackingCircle;if(draggingCircle)flushDragLayout();trackingCircle=false;draggingCircle=false;return was}
+            MotionEvent.ACTION_UP->{if(!trackingCircle)return false;root?.findViewWithTag<View>("rally_orb")?.let{releaseButton(it)};val moved=draggingCircle;trackingCircle=false;draggingCircle=false;if(moved){flushDragLayout();persist()}else{if(menuOpen)collapse()else{menuOpen=true;persist();showMenu()}};return true}
+            MotionEvent.ACTION_CANCEL->{val was=trackingCircle;root?.findViewWithTag<View>("rally_orb")?.let{releaseButton(it)};if(draggingCircle)flushDragLayout();trackingCircle=false;draggingCircle=false;return was}
         };return trackingCircle
     }
     private fun flushDragLayout(){if(dragFramePending){Choreographer.getInstance().removeFrameCallback(dragFrameCallback);dragFramePending=false};applyLayout()}
@@ -529,14 +599,14 @@ class RallyOverlayService : Service() {
         val maxPanel=(screen.heightPixels*.65f).roundToInt().coerceAtLeast(dp(180))
         val below=(screen.heightPixels-dp(bubbleY)-dp(88)-navInsetPx-dp(8)).coerceAtLeast(dp(160))
         val panelCap=min(maxPanel,below)
-        val panel=DropdownPanelLayout(uiContext,::onPanelTouchDown).apply{orientation=LinearLayout.VERTICAL;background=bg(0xFF1E2A22.toInt(),12f);setPadding(dp(10),dp(9),dp(10),dp(9));clipChildren=true;clipToPadding=true;direction(this);isFocusable=true;isFocusableInTouchMode=true}
+        val panel=DropdownPanelLayout(uiContext,::onPanelTouchDown).apply{orientation=LinearLayout.VERTICAL;background=panelBackground();elevation=dp(activeRallyTheme?.elevation?:0f).toFloat();setPadding(dp(10),dp(9),dp(10),dp(9));clipChildren=true;clipToPadding=true;direction(this);isFocusable=true;isFocusableInTouchMode=true}
         menuView=panel
         panel.setOnKeyListener{_,code,event->if(code==KeyEvent.KEYCODE_BACK&&event.action==KeyEvent.ACTION_UP&&focusable){focusedField?.let{dismissIme(it)}?:dismissIme(null);true}else false}
         val header=LinearLayout(uiContext).apply{gravity=Gravity.CENTER_VERTICAL;orientation=LinearLayout.HORIZONTAL;direction(this)}
         header.addView(text(if(settingsMode)t("الإعدادات","Settings")else if(resultsMode)t("نتائج التنسيق","Rally results")else t("أداة تنسيق الحشود","Rally Coordinator"),13f,Color.WHITE,true),LinearLayout.LayoutParams(0,dp(32),1f))
-        header.addView(button("EN | ع",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){changeLanguage()}.apply{textDirection=View.TEXT_DIRECTION_LTR;textSize=10f},LinearLayout.LayoutParams(dp(54),dp(30)))
+        header.addView(button("EN | ع",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){changeLanguage()}.apply{textDirection=View.TEXT_DIRECTION_LTR;textSize=10f},LinearLayout.LayoutParams(dp(58),dp(48)))
         header.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
-        header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()}.apply{textSize=12f},LinearLayout.LayoutParams(dp(32),dp(30)))
+        header.addView(button("⚙",0xFF2A3A2F.toInt(),0xFFA5C4AA.toInt()){settingsMode=!settingsMode;if(settingsMode)resultsMode=false;persist();renderMenu()}.apply{textSize=12f},LinearLayout.LayoutParams(dp(48),dp(48)))
         panel.addView(header)
         miniEditor=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;visibility=View.GONE;background=bg(0xFF2A3A2F.toInt(),9f);setPadding(dp(8),dp(4),dp(8),dp(4))}
         miniEditorTitle=text("",9f,0xFFA5C4AA.toInt(),true);miniEditorValue=text("",16f,Color.WHITE,true)
@@ -546,7 +616,7 @@ class RallyOverlayService : Service() {
         val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=true;clipToPadding=true;direction(this);maxHeightPx=(panelCap-dp(32+18+42)).coerceAtLeast(dp(64))}
         scroll=sc;participantRowsScroll=null;sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,-2))
         if(resultsMode)buildResults(content)else buildEditor(content)
-        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()}.apply{textSize=12f},LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(5)})
+        if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()}.apply{textSize=12f},LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(5)})
         panel.measure(View.MeasureSpec.makeMeasureSpec(panelWidthPx,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(panelCap,View.MeasureSpec.AT_MOST))
         panelContentHeightPx=panel.measuredHeight.coerceAtMost(panelCap).coerceAtLeast(min(dp(100),panelCap));panelHeightPx=panelContentHeightPx
         bubbleY=bubbleY.coerceIn(((statusInsetPx+dp(8))/density).roundToInt(),((screen.heightPixels-panelHeightPx-dp(88)-navInsetPx)/density).roundToInt().coerceAtLeast(0))
@@ -606,13 +676,11 @@ class RallyOverlayService : Service() {
                 val(title,action)=entry;val chosen=index==selectedIndex
                 rows.addView(TextView(uiContext).apply{
                     text=if(chosen)"$title   ✓" else title;textSize=12f;gravity=Gravity.CENTER_VERTICAL
-                    setTextColor(Color.WHITE);includeFontPadding=false;setPadding(dp(12),dp(5),dp(12),dp(5))
-                    background=bg(if(chosen)0xFF347B4A.toInt() else Color.TRANSPARENT,8f);minHeight=dp(42);isSingleLine=true
-                    setOnClickListener{dismissDropdown();action()}
-                },LinearLayout.LayoutParams(-1,dp(42)))
-                if(index<options.lastIndex)rows.addView(View(uiContext).apply{setBackgroundColor(0xFF39483E.toInt())},LinearLayout.LayoutParams(-1,dp(1)).apply{topMargin=dp(2);bottomMargin=dp(2)})
+                    setTextColor(if(chosen)activeRallyTheme?.accentText?:Color.WHITE else themeColor(Color.WHITE));includeFontPadding=false;setPadding(dp(12),dp(5),dp(12),dp(5));val shape=bg(if(chosen)0xFF347B4A.toInt()else 0xFF2A3A2F.toInt(),8f);background=shape;minHeight=dp(48);isSingleLine=true;setOnClickListener{dismissDropdown();action()};attachButtonFeedback(this,shape)
+                },LinearLayout.LayoutParams(-1,dp(48)))
+                if(index<options.lastIndex)rows.addView(View(uiContext).apply{setBackgroundColor(activeRallyTheme?.line?:0xFF39483E.toInt())},LinearLayout.LayoutParams(-1,dp(1)).apply{topMargin=dp(2);bottomMargin=dp(2)})
             }
-            val desiredHeight=min(dp(options.size*46+10),dp(260))
+            val desiredHeight=min(dp(options.size*52+10),dp(260))
             val scroller=CappedScrollView(uiContext).apply{
                 isFillViewport=false;clipChildren=true;clipToPadding=true
                 maxHeightPx=dp(260)
@@ -645,26 +713,19 @@ class RallyOverlayService : Service() {
     }
     private fun miniIconButton(symbol:String, action:()->Unit, tint:Int=0xFFE7F0EA.toInt()):TextView =
         TextView(uiContext).apply {
-            text=symbol; textSize=16f; gravity=Gravity.CENTER; setTextColor(tint)
-            background=bg(0xFF2A3A2F.toInt(),8f); includeFontPadding=false
-            setPadding(0,0,0,0); minWidth=dp(44); minHeight=dp(44)
-            setOnClickListener { action() }
+            text=symbol;textSize=16f;gravity=Gravity.CENTER;setTextColor(themeColor(tint));val shape=bg(0xFF2A3A2F.toInt(),8f);background=shape;includeFontPadding=false;setPadding(0,0,0,0);minWidth=dp(48);minHeight=dp(48);setOnClickListener{action()};attachButtonFeedback(this,shape)
         }
     private fun dottedButton(value:String, action:()->Unit):TextView =
         TextView(uiContext).apply {
-            text=value; textSize=12f; gravity=Gravity.CENTER; setTextColor(0xFFA5C4AA.toInt())
-            background=GradientDrawable().apply {
-                setColor(Color.TRANSPARENT); cornerRadius=dp(8).toFloat()
-                setStroke(dp(1),0xFF78907D.toInt(),dp(3).toFloat(),dp(3).toFloat())
-            }
-            setPadding(dp(8),dp(5),dp(8),dp(5)); minHeight=dp(36)
-            setOnClickListener { action() }
+            text=value;textSize=12f;gravity=Gravity.CENTER;setTextColor(themeColor(0xFFA5C4AA.toInt()));val shape=if(activeRallyTheme==null)GradientDrawable().apply{setColor(Color.TRANSPARENT);cornerRadius=dp(8).toFloat();setStroke(dp(1),0xFF78907D.toInt(),dp(3).toFloat(),dp(3).toFloat())}else bg(0xFF2A3A2F.toInt(),8f);background=shape;setPadding(dp(8),dp(5),dp(8),dp(5));minHeight=dp(48);setOnClickListener{action()};attachButtonFeedback(this,shape)
         }
     private fun editRallyDuration() {
         val field=EditText(uiContext).apply {
             inputType=android.text.InputType.TYPE_CLASS_NUMBER
-            setSingleLine(true); setText(rallyDurationMinutes.toString())
-            setSelection(text.length); textDirection=View.TEXT_DIRECTION_LTR
+            setSingleLine(true);setText(rallyDurationMinutes.toString());setTextColor(themeColor(Color.WHITE))
+            background=bg(0xFF2A3A2F.toInt(),9f);setPadding(dp(10),dp(8),dp(10),dp(8))
+            if(activeRallyTheme!=null)setTypeface(themeTypeface(typeface,true,true))
+            setSelection(text.length);textDirection=View.TEXT_DIRECTION_LTR
         }
         val dialog=AlertDialog.Builder(uiContext)
             .setTitle(t("مدة حشد مخصصة بالدقائق","Custom rally duration in minutes"))
@@ -677,10 +738,13 @@ class RallyOverlayService : Service() {
             }.create()
         dialog.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
         dialog.show()
+        arrayOf(AlertDialog.BUTTON_POSITIVE,AlertDialog.BUTTON_NEGATIVE).forEach{which->
+            dialog.getButton(which)?.let{attachButtonFeedback(it,it.background as? GradientDrawable)}
+        }
     }
-    private fun timelineRail(dotColor:Int=0xFF4CAF50.toInt()):View = object:View(uiContext) {
-        private val line=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=0xFF42634B.toInt(); strokeWidth=dp(1.5f).toFloat() }
-        private val dot=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=dotColor; style=Paint.Style.FILL }
+    private fun timelineRail(dotColor:Int=activeRallyTheme?.accent?:0xFF4CAF50.toInt()):View = object:View(uiContext) {
+        private val line=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=activeRallyTheme?.line?:0xFF42634B.toInt(); strokeWidth=dp(1.5f).toFloat() }
+        private val dot=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=dotColor; style=Paint.Style.FILL;activeRallyTheme?.let{setShadowLayer(dp(it.elevation).toFloat(),0f,0f,it.accent)} }
         override fun onDraw(canvas:Canvas) {
             super.onDraw(canvas)
             val x=width/2f
@@ -715,8 +779,8 @@ class RallyOverlayService : Service() {
     }
     private fun input(hint:String,value:String,numeric:Boolean=false):EditText {
         return OverlayEditText(uiContext).apply {
-            setSingleLine(true); textSize=13f; setTextColor(Color.WHITE); setHintTextColor(0xFFA5C4AA.toInt()); setHint(hint); setText(value); contentDescription=hint
-            background=bg(0xFF2A3A2F.toInt(),9f); setPadding(dp(9),0,dp(9),0)
+            setSingleLine(true);textSize=13f;setTextColor(themeColor(Color.WHITE));setHintTextColor(themeColor(0xFFA5C4AA.toInt()));setHint(hint);setText(value);contentDescription=hint
+            background=bg(0xFF2A3A2F.toInt(),9f);setPadding(dp(9),0,dp(9),0);if(activeRallyTheme!=null)setTypeface(themeTypeface(typeface,numeric))
             if(numeric) { inputType=android.text.InputType.TYPE_CLASS_NUMBER; keyListener=android.text.method.DigitsKeyListener.getInstance("0123456789"); imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=View.TEXT_DIRECTION_LTR; textAlignment=View.TEXT_ALIGNMENT_CENTER }
             else { inputType=android.text.InputType.TYPE_CLASS_TEXT; imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=if(ar())View.TEXT_DIRECTION_RTL else View.TEXT_DIRECTION_LTR }
             setOnTouchListener { v,event ->
@@ -771,23 +835,36 @@ class RallyOverlayService : Service() {
         if(normalized!=null) { if(raw!=normalized){field.setText(normalized);field.setSelection(normalized.length)};changed(normalized) }
         else changed(RallyTime.preview(raw))
     }
+
+    private fun buildAppearanceSelector(parent:LinearLayout){
+        label(parent,t("المظهر","Appearance"))
+        val names=listOf(t("الحالي","Current"),t("1 · مسطّح محسّن","1 · Enhanced flat"),t("2 · زجاجي","2 · Glass"),t("3 · ناعم بارز","3 · Neumorphism"),t("4 · لوحة مجسّمة","4 · 3D Panel"),t("5 · عسكري تكتيكي","5 · Tactical"),t("6 · نيون سايبر","6 · Cyber Neon"),t("7 · ذهبي للألعاب","7 · Game gold"),t("8 · AMOLED بسيط","8 · AMOLED"),t("9 · ورق خرائط","9 · Map Paper"),t("10 · شاشة طرفية","10 · Terminal"),t("11 · بروتاليست","11 · Brutalist"),t("12 · حلوى 3D","12 · 3D Candy"),t("13 · غروب متدرّج","13 · Sunset"),t("14 · Material You","14 · Material You"))
+        val grid=GridLayout(uiContext).apply{columnCount=3;useDefaultMargins=false;alignmentMode=GridLayout.ALIGN_MARGINS}
+        names.forEachIndexed{index,name->
+            val selected=appearanceTheme==index
+            val item=button(name,if(selected)0xFF4CAF50.toInt()else 0xFF2A3A2F.toInt(),if(selected)0xFF102014.toInt()else Color.WHITE){appearanceTheme=index;persist();renderMenu()}.apply{textSize=10f}
+            grid.addView(item,GridLayout.LayoutParams().apply{width=0;height=dp(48);columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);setMargins(dp(2),dp(2),dp(2),dp(2))})
+        }
+        parent.addView(grid,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(3)})
+    }
     private fun buildEditor(c:LinearLayout) {
         if(settingsMode) {
             calibrationValueView = null
             label(c,t("الإعدادات","Settings"))
+            buildAppearanceSelector(c)
             label(c,t("معايرة التوقيت","Time calibration"))
             val calibrationRow = LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
             calibrationRow.addView(button("−",0xFF2A3A2F.toInt(),Color.WHITE){
                 UtcClockTicker.setCalibrationOffsetMillis(RallyTime.calibrationOffsetMillis()-RallyTime.CALIBRATION_STEP_MILLIS)
                 refreshCalibrationValue()
-            },LinearLayout.LayoutParams(dp(44),dp(36)))
+            },LinearLayout.LayoutParams(dp(48),dp(48)))
             calibrationValueView = text(calibrationValueText(),13f,Color.WHITE,true).apply { gravity=Gravity.CENTER; textDirection=View.TEXT_DIRECTION_LTR }
-            calibrationRow.addView(calibrationValueView,LinearLayout.LayoutParams(0,dp(36),1f))
+            calibrationRow.addView(calibrationValueView,LinearLayout.LayoutParams(0,dp(48),1f))
             calibrationRow.addView(button("+",0xFF2A3A2F.toInt(),Color.WHITE){
                 UtcClockTicker.setCalibrationOffsetMillis(RallyTime.calibrationOffsetMillis()+RallyTime.CALIBRATION_STEP_MILLIS)
                 refreshCalibrationValue()
-            },LinearLayout.LayoutParams(dp(44),dp(36)))
-            c.addView(calibrationRow,LinearLayout.LayoutParams(-1,dp(40)).apply{bottomMargin=dp(6)})
+            },LinearLayout.LayoutParams(dp(48),dp(48)))
+            c.addView(calibrationRow,LinearLayout.LayoutParams(-1,dp(48)).apply{bottomMargin=dp(6)})
             c.addView(button(if(vibrationEnabled)uiContext.getString(R.string.vibration_on)else uiContext.getString(R.string.vibration_off),0xFF2A3A2F.toInt(),Color.WHITE){vibrationEnabled=!vibrationEnabled;persist();renderMenu()})
             c.addView(button(uiContext.getString(R.string.back),0xFF4CAF50.toInt(),0xFF102014.toInt()){settingsMode=false;persist();renderMenu()})
             return
@@ -803,18 +880,18 @@ class RallyOverlayService : Service() {
         selectors.addView(dropdown(if(calculationMode=="now")modeNow else modeTarget,listOf(
             modeNow to { calculationMode="now"; persist(); renderMenu() },
             modeTarget to { calculationMode="target"; persist(); renderMenu() }
-        ),c),LinearLayout.LayoutParams(0,dp(42),1f))
+        ),c),LinearLayout.LayoutParams(0,dp(48),1f))
         selectors.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
         selectors.addView(dropdown(prepLabels[prepSeconds] ?: (if(ar())"تجهيز ${prepSeconds}ث" else "Prep ${prepSeconds}s"),prepOptions.map { value ->
             prepLabels.getValue(value) to { prepSeconds=value; persist(); renderMenu() }
-        },c),LinearLayout.LayoutParams(0,dp(42),1f))
+        },c),LinearLayout.LayoutParams(0,dp(48),1f))
         selectors.addView(Space(uiContext),LinearLayout.LayoutParams(dp(4),1))
         val customLabel=if(ar())"مخصص" else "Custom"
         val selectedRally=rallyLabels[rallyDurationMinutes] ?: (if(ar())"مخصص · ${rallyDurationMinutes}د" else "Custom · ${rallyDurationMinutes}m")
         val rallyOptions=rallyPresets.map { value ->
             rallyLabels.getValue(value) to { rallyDurationMinutes=value; persist(); renderMenu() }
         } + (customLabel to { editRallyDuration() })
-        selectors.addView(dropdown(selectedRally,rallyOptions,c),LinearLayout.LayoutParams(0,dp(42),1f))
+        selectors.addView(dropdown(selectedRally,rallyOptions,c),LinearLayout.LayoutParams(0,dp(48),1f))
         c.addView(selectors)
         if(calculationMode=="target") {
             val targetRow=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
@@ -845,19 +922,19 @@ class RallyOverlayService : Service() {
             card.addView(first)
             val second=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL;direction(this)}
             val kind=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER;direction(this)}
-            kind.addView(button(uiContext.getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()}.apply{textSize=10f;setPadding(dp(3),0,dp(3),0);minHeight=dp(44)},LinearLayout.LayoutParams(0,dp(44),1f))
+            kind.addView(button(uiContext.getString(R.string.rally),if(p.kind=="rally")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="rally")0xFF102014.toInt() else Color.WHITE){p.kind="rally";persist();renderMenu()}.apply{textSize=10f;setPadding(dp(3),0,dp(3),0);minHeight=dp(44)},LinearLayout.LayoutParams(0,dp(48),1f))
             kind.addView(Space(uiContext),LinearLayout.LayoutParams(dp(5),1))
-            kind.addView(button(uiContext.getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()}.apply{textSize=10f;setPadding(dp(3),0,dp(3),0);minHeight=dp(44)},LinearLayout.LayoutParams(0,dp(44),1f))
-            second.addView(kind,LinearLayout.LayoutParams(0,dp(44),1f));second.addView(Space(uiContext),LinearLayout.LayoutParams(dp(8),1))
+            kind.addView(button(uiContext.getString(R.string.solo),if(p.kind=="solo")0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.kind=="solo")0xFF102014.toInt() else Color.WHITE){p.kind="solo";persist();renderMenu()}.apply{textSize=10f;setPadding(dp(3),0,dp(3),0);minHeight=dp(44)},LinearLayout.LayoutParams(0,dp(48),1f))
+            second.addView(kind,LinearLayout.LayoutParams(0,dp(48),1f));second.addView(Space(uiContext),LinearLayout.LayoutParams(dp(8),1))
             val actions=LinearLayout(uiContext).apply{orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER}
-            actions.addView(miniIconButton("✎",{name.requestFocus();name.setSelection(name.text.length);setFocus(true)}),LinearLayout.LayoutParams(dp(44),dp(44)))
+            actions.addView(miniIconButton("✎",{name.requestFocus();name.setSelection(name.text.length);setFocus(true)}),LinearLayout.LayoutParams(dp(48),dp(48)))
             actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(8),1))
-            actions.addView(miniIconButton("×",{people.removeAll{it.id==p.id};if(people.isEmpty())people.add(Person(nextId++,"",""));persist();renderMenu()},0xFFFF7777.toInt()),LinearLayout.LayoutParams(dp(44),dp(44)))
-            second.addView(actions,LinearLayout.LayoutParams(dp(96),dp(44)));card.addView(second,LinearLayout.LayoutParams(-1,dp(44)).apply{topMargin=dp(4)})
+            actions.addView(miniIconButton("×",{people.removeAll{it.id==p.id};if(people.isEmpty())people.add(Person(nextId++,"",""));persist();renderMenu()},0xFFFF7777.toInt()),LinearLayout.LayoutParams(dp(48),dp(48)))
+            second.addView(actions,LinearLayout.LayoutParams(dp(104),dp(48)));card.addView(second,LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(4)})
             participantRows.addView(card,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(5)})
         }
         c.addView(participantRows,LinearLayout.LayoutParams(-1,-2))
-        c.addView(dottedButton(t("+ إضافة مشارك","+ Add participant")){people.add(Person(nextId++,"",""));persist();renderMenu()},LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(3)})
+        c.addView(dottedButton(t("+ إضافة مشارك","+ Add participant")){people.add(Person(nextId++,"",""));persist();renderMenu()},LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(3)})
         errors.forEach{c.addView(text(it,10f,0xFFE57373.toInt()))}
     }
     private fun utcTime(epoch:Long):String = RallyTime.utcClock(epoch)
@@ -874,11 +951,11 @@ class RallyOverlayService : Service() {
             val label=resultCountdowns[r.id]?:return@forEach
             val remaining=r.actionAt-now
             val status=if(remaining>0) {
-                label.setTextColor(if(remaining<=10_000L)0xFFFF9100.toInt() else 0xFFA5C4AA.toInt())
+                label.setTextColor(themeColor(if(remaining<=10_000L)0xFFFF9100.toInt() else 0xFFA5C4AA.toInt()))
                 if(ar())"بعد ${countdown(remaining)}" else "In ${countdown(remaining)}"
             } else {
                 val zeroAt=resultZeroAt.getOrPut(r.id){now}
-                label.setTextColor(if(now-zeroAt<3000L)0xFF4CAF50.toInt() else 0xFF78907D.toInt())
+                label.setTextColor(themeColor(if(now-zeroAt<3000L)0xFF4CAF50.toInt() else 0xFF78907D.toInt()))
                 uiContext.getString(R.string.now_label)
             }
             label.text="${r.name} · ${uiContext.getString(R.string.start_rally)} · $status"
@@ -918,7 +995,7 @@ class RallyOverlayService : Service() {
                 details.addView(text(String.format(Locale.US,uiContext.getString(R.string.after_player_by),r.name,countdown(gap*1000)),9f,0xFFA5C4AA.toInt()))
             }
             item.addView(details,LinearLayout.LayoutParams(0,dp(78),1f))
-            item.addView(button(t("نسخ","Copy"),0xFF2A3A2F.toInt(),Color.WHITE){copyRow(r)},LinearLayout.LayoutParams(dp(48),dp(30)))
+            item.addView(button(t("نسخ","Copy"),0xFF2A3A2F.toInt(),Color.WHITE){copyRow(r)},LinearLayout.LayoutParams(dp(48),dp(48)))
             resultRowsViews[r.id]=item
             c.addView(item,LinearLayout.LayoutParams(-1,dp(78)))
         }
@@ -926,9 +1003,9 @@ class RallyOverlayService : Service() {
         val arrival=results.firstOrNull()?.arrivalAt
         if(arrival!=null) {
             val finalRow=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
-            finalRow.addView(timelineRail(0xFF9BE7B0.toInt()),LinearLayout.LayoutParams(dp(18),dp(52)))
+            finalRow.addView(timelineRail(themeColor(0xFF9BE7B0.toInt())),LinearLayout.LayoutParams(dp(18),dp(52)))
             val finalInfo=LinearLayout(uiContext).apply { orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER_VERTICAL }
-            finalInfo.addView(text(t("وصول الجميع","Everyone arrives"),12f,0xFF9BE7B0.toInt(),true))
+            finalInfo.addView(text(t("وصول الجميع","Everyone arrives"),12f,themeColor(0xFF9BE7B0.toInt()),true))
             val finalTime=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; layoutDirection=View.LAYOUT_DIRECTION_LTR }
             val arrivalTimeView=text(utcTime(arrival),18f,Color.WHITE,true).apply{textDirection=View.TEXT_DIRECTION_LTR}
             resultArrivalTimeView=arrivalTimeView
@@ -938,12 +1015,12 @@ class RallyOverlayService : Service() {
             finalRow.addView(finalInfo,LinearLayout.LayoutParams(0,dp(52),1f))
             c.addView(finalRow,LinearLayout.LayoutParams(-1,dp(52)))
         }
-        c.addView(button(t("نسخ الكل","Copy all"),0xFF4CAF50.toInt(),0xFF102014.toInt()){copy(results.joinToString("\n"){r->copyRowText(r)})},LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(8)})
+        c.addView(button(t("نسخ الكل","Copy all"),0xFF4CAF50.toInt(),0xFF102014.toInt()){copy(results.joinToString("\n"){r->copyRowText(r)})},LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(8)})
         val actions=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER; direction(this) }
-        actions.addView(button(t("حساب من جديد","Calculate again"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()},LinearLayout.LayoutParams(0,dp(36),1f))
+        actions.addView(button(t("حساب من جديد","Calculate again"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculationMode="now";resultsMode=false;calculate()},LinearLayout.LayoutParams(0,dp(48),1f))
         actions.addView(Space(uiContext),LinearLayout.LayoutParams(dp(6),1))
-        actions.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(36),1f))
-        c.addView(actions,LinearLayout.LayoutParams(-1,dp(36)).apply{topMargin=dp(6)})
+        actions.addView(button(t("رجوع للتعديل","Back to edit"),0xFF2A3A2F.toInt(),Color.WHITE){resultsMode=false;persist();renderMenu()},LinearLayout.LayoutParams(0,dp(48),1f))
+        c.addView(actions,LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(6)})
         updateResultCountdowns()
         // Countdown refreshes come only from the shared second-boundary UTC ticker.
     }
@@ -986,7 +1063,7 @@ class RallyOverlayService : Service() {
                     target=String.format(Locale.US,"%d:%02d",shifted.get(Calendar.MINUTE),shifted.get(Calendar.SECOND))
                     persist();calculate()
                 }
-                (scroll?.getChildAt(0) as? LinearLayout)?.addView(postpone,LinearLayout.LayoutParams(-1,dp(42)).apply{topMargin=dp(5)})
+                (scroll?.getChildAt(0) as? LinearLayout)?.addView(postpone,LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(5)})
                 return
             }
         }
