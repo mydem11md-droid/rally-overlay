@@ -41,6 +41,7 @@ class ClockOverlayService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        RallyTime.requestSync()
         startAsForeground()
         running = true
         showClock()
