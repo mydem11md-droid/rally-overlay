@@ -279,6 +279,7 @@ class RallyOverlayService : Service() {
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
         if(intent?.action==ACTION_STOP){stopSelf();return START_NOT_STICKY}
         if(!Settings.canDrawOverlays(this)){stopSelf();return START_NOT_STICKY}
+        RallyTime.requestSync()
         startForeground(27,notification())
         if(root==null) createOverlay()
         running=true;sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName))
