@@ -943,8 +943,8 @@ class RallyOverlayService : Service() {
         errors.forEach{c.addView(text(it,10f,0xFFE57373.toInt()))}
     }
     private fun utcTime(epoch:Long):String = RallyTime.utcClock(epoch)
-    private fun countdown(ms:Long):String {
-        val sec=((ms+999L)/1000L).coerceAtLeast(0L)
+    private fun countdownSeconds(seconds:Long):String {
+        val sec=seconds.coerceAtLeast(0L)
         return String.format(Locale.US,"%02d:%02d",sec/60,sec%60)
     }
     private fun copyRowText(r:ResultRow):String =
@@ -955,9 +955,10 @@ class RallyOverlayService : Service() {
         results.forEach { r ->
             val label=resultCountdowns[r.id]?:return@forEach
             val remaining=r.actionAt-now
-            val status=if(remaining>0) {
+            val displayedSeconds=Math.floorDiv(r.actionAt,1000L)-Math.floorDiv(now,1000L)
+            val status=if(displayedSeconds>0L) {
                 label.setTextColor(themeColor(if(remaining<=10_000L)0xFFFF9100.toInt() else 0xFFA5C4AA.toInt()))
-                if(ar())"بعد ${countdown(remaining)}" else "In ${countdown(remaining)}"
+                if(ar())"بعد ${countdownSeconds(displayedSeconds)}" else "In ${countdownSeconds(displayedSeconds)}"
             } else {
                 val zeroAt=resultZeroAt.getOrPut(r.id){now}
                 label.setTextColor(themeColor(if(now-zeroAt<3000L)0xFF4CAF50.toInt() else 0xFF78907D.toInt()))
@@ -997,7 +998,7 @@ class RallyOverlayService : Service() {
             if(index<results.lastIndex) {
                 val next=results[index+1]
                 val gap=((next.actionAt-r.actionAt)/1000L).coerceAtLeast(0L)
-                details.addView(text(String.format(Locale.US,uiContext.getString(R.string.after_player_by),r.name,countdown(gap*1000)),9f,0xFFA5C4AA.toInt()))
+                details.addView(text(String.format(Locale.US,uiContext.getString(R.string.after_player_by),r.name,countdownSeconds(Math.floorDiv(gap*1000L,1000L))),9f,0xFFA5C4AA.toInt()))
             }
             item.addView(details,LinearLayout.LayoutParams(0,dp(78),1f))
             item.addView(button(t("نسخ","Copy"),0xFF2A3A2F.toInt(),Color.WHITE){copyRow(r)},LinearLayout.LayoutParams(dp(48),dp(48)))
