@@ -33,8 +33,8 @@ object RallyTime {
 
     @Volatile private var calibrationOffsetMillis = DEFAULT_GAME_CLOCK_OFFSET_MILLIS
     @Volatile private var calibrationPreferences: SharedPreferences? = null
-    @Volatile private var anchorUtcMs = 0L
-    @Volatile private var anchorElapsed = 0L
+    private data class ClockAnchor(val utcMs: Long, val elapsedMs: Long)
+    @Volatile private var clockAnchor = ClockAnchor(0L, 0L)
     private val syncExecutor = Executors.newSingleThreadScheduledExecutor { task ->
         Thread(task, "game-clock-sntp").apply { isDaemon = true }
     }
@@ -54,8 +54,7 @@ object RallyTime {
         } else {
             savedAnchor.takeIf { it > 0L } ?: wallNow
         }
-        anchorUtcMs = restoredAnchor
-        anchorElapsed = SystemClock.elapsedRealtime()
+        clockAnchor = ClockAnchor(restoredAnchor, SystemClock.elapsedRealtime())
         initialized = true
         // Remove either shipped default correction; preserve user-selected non-default calibration.
         val migratedOffset = if (storedOffset in LEGACY_DEFAULT_OFFSETS_MILLIS) {
@@ -94,7 +93,8 @@ object RallyTime {
      */
     fun nowMillis(): Long {
         if (!initialized) return correctedEpochMillis(System.currentTimeMillis())
-        return anchorUtcMs + (SystemClock.elapsedRealtime() - anchorElapsed) + calibrationOffsetMillis
+        val anchor = clockAnchor
+        return anchor.utcMs + (SystemClock.elapsedRealtime() - anchor.elapsedMs) + calibrationOffsetMillis
     }
 
     private fun synchronizeReference() {
@@ -105,8 +105,7 @@ object RallyTime {
             }
         }
         val best = samples.minByOrNull { it.roundTripMs } ?: return
-        anchorUtcMs = best.utcAtReceiveMs
-        anchorElapsed = best.elapsedAtReceiveMs
+        clockAnchor = ClockAnchor(best.utcAtReceiveMs, best.elapsedAtReceiveMs)
         calibrationPreferences?.edit()
             ?.putLong(ANCHOR_UTC_KEY, best.utcAtReceiveMs)
             ?.putLong(ANCHOR_WALL_KEY, System.currentTimeMillis())
