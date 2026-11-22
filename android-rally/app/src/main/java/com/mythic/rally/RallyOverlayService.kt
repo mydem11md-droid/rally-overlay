@@ -618,7 +618,7 @@ class RallyOverlayService : Service() {
         miniEditor?.addView(miniEditorTitle);miniEditor?.addView(miniEditorValue)
         panel.addView(miniEditor,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(4)})
         val content=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=appearanceTheme!=3;clipToPadding=appearanceTheme!=3;setPadding(0,0,0,dp(16));direction(this)}
-        val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=appearanceTheme!=3;clipToPadding=false;isVerticalScrollBarEnabled=true;scrollBarStyle=View.SCROLLBARS_OUTSIDE_OVERLAY;scrollbarSize=dp(2);if(Build.VERSION.SDK_INT>=29){setVerticalScrollbarThumbDrawable(GradientDrawable().apply{setColor(activeRallyTheme?.muted?.let{Color.argb(125,Color.red(it),Color.green(it),Color.blue(it))}?:0x66808080);cornerRadius=dp(2).toFloat()});setVerticalScrollbarTrackDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))};direction(this);maxHeightPx=(panelCap-dp(48+18+48)).coerceAtLeast(dp(64))}
+        val sc=CappedScrollView(uiContext).apply{isFillViewport=false;clipChildren=appearanceTheme!=3;clipToPadding=false;isVerticalScrollBarEnabled=true;scrollBarStyle=View.SCROLLBARS_OUTSIDE_OVERLAY;if(Build.VERSION.SDK_INT>=29){setVerticalScrollbarThumbDrawable(GradientDrawable().apply{setColor(activeRallyTheme?.muted?.let{Color.argb(125,Color.red(it),Color.green(it),Color.blue(it))}?:0x66808080);cornerRadius=dp(2).toFloat()});setVerticalScrollbarTrackDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))};direction(this);maxHeightPx=(panelCap-dp(48+18+48)).coerceAtLeast(dp(64))}
         scroll=sc;participantRowsScroll=null;sc.addView(content);panel.addView(sc,LinearLayout.LayoutParams(-1,-2))
         if(resultsMode)buildResults(content)else buildEditor(content)
         if(!resultsMode)panel.addView(button(t("حساب","Calculate"),0xFF4CAF50.toInt(),0xFF102014.toInt()){calculate()}.apply{textSize=12f},LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(5)})
@@ -681,7 +681,7 @@ class RallyOverlayService : Service() {
                 val(title,action)=entry;val chosen=index==selectedIndex
                 rows.addView(TextView(uiContext).apply{
                     text=if(chosen)"$title   ✓" else title;textSize=12f;gravity=Gravity.CENTER_VERTICAL
-                    setTextColor(if(chosen)activeRallyTheme?.accentText?:Color.WHITE);includeFontPadding=false;setPadding(dp(12),dp(5),dp(12),dp(5));val shape=if(chosen)bg(0xFF347B4A.toInt(),8f)else secondaryButtonBackground(8f);background=shape;elevation=dp(if(appearanceTheme==14)1f else if(appearanceTheme==3)4f else 0f).toFloat();minHeight=dp(48);isSingleLine=true;setOnClickListener{dismissDropdown();action()};attachButtonFeedback(this,shape)
+                    setTextColor(if(chosen) activeRallyTheme?.accentText ?: Color.WHITE else themeColor(0xFFE7F0EA.toInt()));includeFontPadding=false;setPadding(dp(12),dp(5),dp(12),dp(5));val shape=if(chosen)bg(0xFF347B4A.toInt(),8f)else secondaryButtonBackground(8f);background=shape;elevation=dp(if(appearanceTheme==14)1f else if(appearanceTheme==3)4f else 0f).toFloat();minHeight=dp(48);isSingleLine=true;setOnClickListener{dismissDropdown();action()};attachButtonFeedback(this,shape)
                 },LinearLayout.LayoutParams(-1,dp(48)))
                 if(index<options.lastIndex)rows.addView(View(uiContext).apply{setBackgroundColor(activeRallyTheme?.line?:0xFF39483E.toInt())},LinearLayout.LayoutParams(-1,dp(1)).apply{topMargin=dp(2);bottomMargin=dp(2)})
             }
