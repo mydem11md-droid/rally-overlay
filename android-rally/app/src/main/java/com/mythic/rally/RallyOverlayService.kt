@@ -722,8 +722,10 @@ class RallyOverlayService : Service() {
     private fun editRallyDuration() {
         val field=EditText(uiContext).apply {
             inputType=android.text.InputType.TYPE_CLASS_NUMBER
-            setSingleLine(true); setText(rallyDurationMinutes.toString())
-            setSelection(text.length); textDirection=View.TEXT_DIRECTION_LTR
+            setSingleLine(true);setText(rallyDurationMinutes.toString());setTextColor(themeColor(Color.WHITE))
+            background=bg(0xFF2A3A2F.toInt(),9f);setPadding(dp(10),dp(8),dp(10),dp(8))
+            if(activeRallyTheme!=null)setTypeface(themeTypeface(typeface,true,true))
+            setSelection(text.length);textDirection=View.TEXT_DIRECTION_LTR
         }
         val dialog=AlertDialog.Builder(uiContext)
             .setTitle(t("مدة حشد مخصصة بالدقائق","Custom rally duration in minutes"))
@@ -736,6 +738,9 @@ class RallyOverlayService : Service() {
             }.create()
         dialog.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
         dialog.show()
+        arrayOf(AlertDialog.BUTTON_POSITIVE,AlertDialog.BUTTON_NEGATIVE).forEach{which->
+            dialog.getButton(which)?.let{attachButtonFeedback(it,it.background as? GradientDrawable)}
+        }
     }
     private fun timelineRail(dotColor:Int=activeRallyTheme?.accent?:0xFF4CAF50.toInt()):View = object:View(uiContext) {
         private val line=Paint(Paint.ANTI_ALIAS_FLAG).apply { color=activeRallyTheme?.line?:0xFF42634B.toInt(); strokeWidth=dp(1.5f).toFloat() }
