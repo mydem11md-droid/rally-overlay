@@ -93,6 +93,10 @@ class RallyOverlayService : Service() {
     private var targetHourInput: EditText? = null
     private var resultCountdowns = mutableMapOf<Int,TextView>()
     private var resultRowsViews = mutableMapOf<Int,View>()
+    private var resultActionTimesViews = mutableMapOf<Int,TextView>()
+    private var resultDepartureTimesViews = mutableMapOf<Int,TextView>()
+    private var resultArrivalTimeView: TextView? = null
+    private var calibrationValueView: TextView? = null
     private var resultZeroAt = mutableMapOf<Int,Long>()
     private var vibratedIds = mutableSetOf<Int>()
     private var people = mutableListOf<Person>()
@@ -185,6 +189,10 @@ class RallyOverlayService : Service() {
         updateClock(epochMillis)
         updateResultCountdowns(epochMillis)
     }
+    private val calibrationListener: (Long) -> Unit = { deltaMillis ->
+        shiftCalculatedResults(deltaMillis)
+        persist()
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -228,13 +236,49 @@ class RallyOverlayService : Service() {
             val a=JSONArray(prefs.getString("result_rows","[]"))
             for(i in 0 until a.length()){val o=a.getJSONObject(i);results.add(ResultRow(o.getInt("id"),o.optString("name"),o.optBoolean("is_rally"),o.optInt("rally_seconds"),o.optInt("march_seconds"),o.optLong("action_at"),o.optLong("depart_at"),o.optLong("arrival_at")))}
         }
+        // Results saved before calibration became adjustable were based on the previous +350 ms default.
+        val savedCalibration = prefs.getLong("results_calibration_offset_millis", 350L)
+        val calibrationDelta = RallyTime.calibrationOffsetMillis() - savedCalibration
+        if (calibrationDelta != 0L) {
+            shiftCalculatedResults(calibrationDelta)
+            persist()
+        }
+    }
+    private fun calibrationValueText(): String =
+        String.format(Locale.US, "%+.2f %s", RallyTime.calibrationOffsetMillis() / 1000.0, t("ثانية", "s"))
+
+    private fun shiftCalculatedResults(deltaMillis: Long) {
+        refreshCalibrationValue()
+        if (deltaMillis == 0L) return
+        results.indices.forEach { index ->
+            val row = results[index]
+            results[index] = row.copy(
+                actionAt = row.actionAt + deltaMillis,
+                departAt = row.departAt + deltaMillis,
+                arrivalAt = row.arrivalAt + deltaMillis
+            )
+        }
+        resultZeroAt.keys.toList().forEach { id ->
+            resultZeroAt[id] = (resultZeroAt[id] ?: 0L) + deltaMillis
+        }
+        results.forEach { row ->
+            resultActionTimesViews[row.id]?.text = utcTime(row.actionAt)
+            resultDepartureTimesViews[row.id]?.text = t("ينطلق ", "Departs ") + utcTime(row.departAt)
+        }
+        resultArrivalTimeView?.let { view ->
+            results.firstOrNull()?.arrivalAt?.let { view.text = utcTime(it) }
+        }
+    }
+    private fun refreshCalibrationValue() {
+        calibrationValueView?.text = calibrationValueText()
     }
     private fun persist() {
         val a=JSONArray(); people.forEach { a.put(JSONObject().put("id",it.id).put("name",it.name).put("duration",it.duration).put("kind",it.kind).put("rally_minutes",it.rallyMinutes)) }
         val r=JSONArray(); results.forEach { r.put(JSONObject().put("id",it.id).put("name",it.name).put("is_rally",it.isRally).put("rally_seconds",it.rallySeconds).put("march_seconds",it.marchSeconds).put("action_at",it.actionAt).put("depart_at",it.departAt).put("arrival_at",it.arrivalAt)) }
         prefs.edit().putString("target",target).putString("target_hour",targetHour).putString("calculation_mode",calculationMode).putInt("prep_seconds",prepSeconds).putInt("rally_duration_minutes",rallyDurationMinutes).putBoolean("vibration_enabled",vibrationEnabled).putString("people",a.toString()).putString("result_rows",r.toString())
             .putInt("next",nextId).putInt("x",bubbleX).putInt("y",bubbleY)
-            .putBoolean("open",menuOpen).putBoolean("results",resultsMode).putBoolean("settings",settingsMode).apply()
+            .putBoolean("open",menuOpen).putBoolean("results",resultsMode).putBoolean("settings",settingsMode)
+            .putLong("results_calibration_offset_millis",RallyTime.calibrationOffsetMillis()).apply()
     }
     private fun notification():Notification {
         val channel="rally_native"
@@ -268,6 +312,7 @@ class RallyOverlayService : Service() {
         wm.addView(frame,p);buildCollapsed()
         if(menuOpen)showMenu()
         UtcClockTicker.addListener(clockListener)
+        UtcClockTicker.addCalibrationListener(calibrationListener)
     }
     private fun resizePanelBy(dx:Int,dy:Int,edges:Int) {
         val r=root?:return
@@ -728,11 +773,26 @@ class RallyOverlayService : Service() {
     }
     private fun buildEditor(c:LinearLayout) {
         if(settingsMode) {
+            calibrationValueView = null
             label(c,t("الإعدادات","Settings"))
+            label(c,t("معايرة التوقيت","Time calibration"))
+            val calibrationRow = LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
+            calibrationRow.addView(button("−",0xFF2A3A2F.toInt(),Color.WHITE){
+                UtcClockTicker.setCalibrationOffsetMillis(RallyTime.calibrationOffsetMillis()-RallyTime.CALIBRATION_STEP_MILLIS)
+                refreshCalibrationValue()
+            },LinearLayout.LayoutParams(dp(44),dp(36)))
+            calibrationValueView = text(calibrationValueText(),13f,Color.WHITE,true).apply { gravity=Gravity.CENTER; textDirection=View.TEXT_DIRECTION_LTR }
+            calibrationRow.addView(calibrationValueView,LinearLayout.LayoutParams(0,dp(36),1f))
+            calibrationRow.addView(button("+",0xFF2A3A2F.toInt(),Color.WHITE){
+                UtcClockTicker.setCalibrationOffsetMillis(RallyTime.calibrationOffsetMillis()+RallyTime.CALIBRATION_STEP_MILLIS)
+                refreshCalibrationValue()
+            },LinearLayout.LayoutParams(dp(44),dp(36)))
+            c.addView(calibrationRow,LinearLayout.LayoutParams(-1,dp(40)).apply{bottomMargin=dp(6)})
             c.addView(button(if(vibrationEnabled)uiContext.getString(R.string.vibration_on)else uiContext.getString(R.string.vibration_off),0xFF2A3A2F.toInt(),Color.WHITE){vibrationEnabled=!vibrationEnabled;persist();renderMenu()})
             c.addView(button(uiContext.getString(R.string.back),0xFF4CAF50.toInt(),0xFF102014.toInt()){settingsMode=false;persist();renderMenu()})
             return
         }
+        calibrationValueView = null
         val modeNow=uiContext.getString(R.string.mode_now)
         val modeTarget=uiContext.getString(R.string.mode_target)
         val prepOptions=listOf(5,10,20,30)
@@ -833,19 +893,25 @@ class RallyOverlayService : Service() {
     }
     private fun buildResults(c:LinearLayout) {
         resultCountdowns.clear();resultRowsViews.clear()
+        resultActionTimesViews.clear();resultDepartureTimesViews.clear();resultArrivalTimeView=null
         results.forEachIndexed { index,r ->
             val item=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
             item.addView(timelineRail(),LinearLayout.LayoutParams(dp(18),dp(78)))
             val details=LinearLayout(uiContext).apply { orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
             val timeLine=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; layoutDirection=View.LAYOUT_DIRECTION_LTR }
-            timeLine.addView(text(utcTime(r.actionAt),19f,Color.WHITE,true).apply { textDirection=View.TEXT_DIRECTION_LTR })
+            val actionTimeView=text(utcTime(r.actionAt),19f,Color.WHITE,true).apply { textDirection=View.TEXT_DIRECTION_LTR }
+            resultActionTimesViews[r.id]=actionTimeView
+            timeLine.addView(actionTimeView)
             timeLine.addView(text("UTC",9f,0xFFA5C4AA.toInt(),true).apply { textDirection=View.TEXT_DIRECTION_LTR },LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(5)})
             details.addView(timeLine,LinearLayout.LayoutParams(-1,dp(25)))
             val status=text("",10f,0xFFA5C4AA.toInt(),true).apply { textDirection=View.TEXT_DIRECTION_FIRST_STRONG }
             resultCountdowns[r.id]=status
             details.addView(status,LinearLayout.LayoutParams(-1,dp(19)))
-            if(r.isRally)details.addView(text(t("ينطلق ","Departs ")+utcTime(r.departAt),10f,0xFFA5C4AA.toInt()).apply{textDirection=View.TEXT_DIRECTION_LTR},LinearLayout.LayoutParams(-1,dp(16)))
-            else details.addView(Space(uiContext),LinearLayout.LayoutParams(-1,dp(16)))
+            if(r.isRally) {
+                val departureView=text(t("ينطلق ","Departs ")+utcTime(r.departAt),10f,0xFFA5C4AA.toInt()).apply{textDirection=View.TEXT_DIRECTION_LTR}
+                resultDepartureTimesViews[r.id]=departureView
+                details.addView(departureView,LinearLayout.LayoutParams(-1,dp(16)))
+            } else details.addView(Space(uiContext),LinearLayout.LayoutParams(-1,dp(16)))
             if(index<results.lastIndex) {
                 val next=results[index+1]
                 val gap=((next.actionAt-r.actionAt)/1000L).coerceAtLeast(0L)
@@ -864,7 +930,9 @@ class RallyOverlayService : Service() {
             val finalInfo=LinearLayout(uiContext).apply { orientation=LinearLayout.VERTICAL; gravity=Gravity.CENTER_VERTICAL }
             finalInfo.addView(text(t("وصول الجميع","Everyone arrives"),12f,0xFF9BE7B0.toInt(),true))
             val finalTime=LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; layoutDirection=View.LAYOUT_DIRECTION_LTR }
-            finalTime.addView(text(utcTime(arrival),18f,Color.WHITE,true).apply{textDirection=View.TEXT_DIRECTION_LTR})
+            val arrivalTimeView=text(utcTime(arrival),18f,Color.WHITE,true).apply{textDirection=View.TEXT_DIRECTION_LTR}
+            resultArrivalTimeView=arrivalTimeView
+            finalTime.addView(arrivalTimeView)
             finalTime.addView(text("UTC",9f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-2,-2).apply{marginStart=dp(5)})
             finalInfo.addView(finalTime)
             finalRow.addView(finalInfo,LinearLayout.LayoutParams(0,dp(52),1f))
@@ -939,7 +1007,7 @@ class RallyOverlayService : Service() {
         runCatching { wm.updateViewLayout(panel,p) }
         if(on)focusedField?.let { field -> field.post { if(field.hasFocus())imm.showSoftInput(field,InputMethodManager.SHOW_IMPLICIT) } }
     }
-    override fun onDestroy(){running=false;sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName));Choreographer.getInstance().removeFrameCallback(dragFrameCallback);UtcClockTicker.removeListener(clockListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);removePanelWindow();root?.let{runCatching{wm.removeView(it)}};root=null
+    override fun onDestroy(){running=false;sendBroadcast(Intent(ACTION_STATE_CHANGED).setPackage(packageName));Choreographer.getInstance().removeFrameCallback(dragFrameCallback);UtcClockTicker.removeListener(clockListener);UtcClockTicker.removeCalibrationListener(calibrationListener);runCatching{unregisterReceiver(localeReceiver)};handler.removeCallbacksAndMessages(null);removePanelWindow();root?.let{runCatching{wm.removeView(it)}};root=null
         if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE)else @Suppress("DEPRECATION") stopForeground(true);super.onDestroy()}
     companion object { @Volatile var running:Boolean=false; private set; const val ACTION_STATE_CHANGED="com.mythic.rally.STATE_CHANGED"; const val ACTION_STOP="com.mythic.rally.STOP"; const val ACTION_LANGUAGE_CHANGED="com.mythic.rally.LANGUAGE_CHANGED"; private const val TAG="RallyOverlay" }
     private class SimpleWatcher(val changed:(String)->Unit):android.text.TextWatcher{
