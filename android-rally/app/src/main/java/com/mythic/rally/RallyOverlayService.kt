@@ -226,7 +226,7 @@ class RallyOverlayService : Service() {
         var finished:(()->Unit)?=null
         init { bounds=area }
         override fun draw(canvas:Canvas) {
-            val expansion=dp(16f*progress)
+            val expansion=dp(16f*progress).toFloat()
             val rect=RectF(bounds).apply { inset(-expansion,-expansion) }
             paint.color=tint
             paint.alpha=(Color.alpha(tint)*0.70f*(1f-progress)).roundToInt().coerceIn(0,255)
