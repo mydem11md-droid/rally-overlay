@@ -97,6 +97,10 @@ object RallyTime {
         return anchor.utcMs + (SystemClock.elapsedRealtime() - anchor.elapsedMs) + calibrationOffsetMillis
     }
 
+    fun requestSync() {
+        if (initialized) syncExecutor.execute { synchronizeReference() }
+    }
+
     private fun synchronizeReference() {
         val samples = ArrayList<SntpSample>()
         NTP_SERVERS.forEach { host ->
