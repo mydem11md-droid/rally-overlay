@@ -15,9 +15,9 @@ class RallyTimeTest {
         assertEquals(1L, RallyTime.millisUntilNextSecond(1999L))
         assertEquals(1000L, RallyTime.millisUntilNextSecond(2000L))
     }
-    @Test fun defaultCalibrationIncludesTheAdditionalGameClockCorrection() {
-        assertEquals(50L, RallyTime.DEFAULT_GAME_CLOCK_OFFSET_MILLIS)
-        assertEquals(1284L, RallyTime.correctedEpochMillis(1234L, RallyTime.DEFAULT_GAME_CLOCK_OFFSET_MILLIS))
+    @Test fun defaultCalibrationUsesNeutralDeviceClockBaseline() {
+        assertEquals(0L, RallyTime.DEFAULT_GAME_CLOCK_OFFSET_MILLIS)
+        assertEquals(1234L, RallyTime.correctedEpochMillis(1234L, RallyTime.DEFAULT_GAME_CLOCK_OFFSET_MILLIS))
     }
     @Test fun correctedTimeIsUsedToScheduleTheNextSecondBoundary() {
         val corrected = RallyTime.correctedEpochMillis(1234L, RallyTime.DEFAULT_GAME_CLOCK_OFFSET_MILLIS)
