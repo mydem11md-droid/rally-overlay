@@ -299,7 +299,10 @@ if(!OV){
   c.addEventListener("pointerup",function(){if(drag&&!drag.moved)toggle();drag=null});
   c.addEventListener("pointercancel",function(){drag=null})}
 c.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle()}});
-window.setUtcTime=function(epochMillis){tick(Number(epochMillis))};
+window.setUtcTime=function(epochMillis){
+  tick(Number(epochMillis));
+  if(!$("set").hidden){calibrationOffsetMillis=Number(RallyBridge.getGameClockCalibrationMillis());renderCalibration()}
+};
 window.applyGameClockCalibrationDelta=function(deltaMillis){
   var delta=Number(deltaMillis)||0;
   pages.forEach(function(g){if(typeof g.ref==="number"&&isFinite(g.ref))g.ref+=delta});

@@ -96,6 +96,7 @@ class RallyOverlayService : Service() {
     private var resultActionTimesViews = mutableMapOf<Int,TextView>()
     private var resultDepartureTimesViews = mutableMapOf<Int,TextView>()
     private var resultArrivalTimeView: TextView? = null
+    private var calibrationValueView: TextView? = null
     private var resultZeroAt = mutableMapOf<Int,Long>()
     private var vibratedIds = mutableSetOf<Int>()
     private var people = mutableListOf<Person>()
@@ -243,7 +244,11 @@ class RallyOverlayService : Service() {
             persist()
         }
     }
+    private fun calibrationValueText(): String =
+        String.format(Locale.US, "%+.2f %s", RallyTime.calibrationOffsetMillis() / 1000.0, t("ثانية", "s"))
+
     private fun shiftCalculatedResults(deltaMillis: Long) {
+        refreshCalibrationValue()
         if (deltaMillis == 0L) return
         results.indices.forEach { index ->
             val row = results[index]
@@ -263,6 +268,9 @@ class RallyOverlayService : Service() {
         resultArrivalTimeView?.let { view ->
             results.firstOrNull()?.arrivalAt?.let { view.text = utcTime(it) }
         }
+    }
+    private fun refreshCalibrationValue() {
+        calibrationValueView?.text = calibrationValueText()
     }
     private fun persist() {
         val a=JSONArray(); people.forEach { a.put(JSONObject().put("id",it.id).put("name",it.name).put("duration",it.duration).put("kind",it.kind).put("rally_minutes",it.rallyMinutes)) }
@@ -765,11 +773,26 @@ class RallyOverlayService : Service() {
     }
     private fun buildEditor(c:LinearLayout) {
         if(settingsMode) {
+            calibrationValueView = null
             label(c,t("الإعدادات","Settings"))
+            label(c,t("معايرة التوقيت","Time calibration"))
+            val calibrationRow = LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
+            calibrationRow.addView(button("−",0xFF2A3A2F.toInt(),Color.WHITE){
+                UtcClockTicker.setCalibrationOffsetMillis(RallyTime.calibrationOffsetMillis()-RallyTime.CALIBRATION_STEP_MILLIS)
+                refreshCalibrationValue()
+            },LinearLayout.LayoutParams(dp(44),dp(36)))
+            calibrationValueView = text(calibrationValueText(),13f,Color.WHITE,true).apply { gravity=Gravity.CENTER; textDirection=View.TEXT_DIRECTION_LTR }
+            calibrationRow.addView(calibrationValueView,LinearLayout.LayoutParams(0,dp(36),1f))
+            calibrationRow.addView(button("+",0xFF2A3A2F.toInt(),Color.WHITE){
+                UtcClockTicker.setCalibrationOffsetMillis(RallyTime.calibrationOffsetMillis()+RallyTime.CALIBRATION_STEP_MILLIS)
+                refreshCalibrationValue()
+            },LinearLayout.LayoutParams(dp(44),dp(36)))
+            c.addView(calibrationRow,LinearLayout.LayoutParams(-1,dp(40)).apply{bottomMargin=dp(6)})
             c.addView(button(if(vibrationEnabled)uiContext.getString(R.string.vibration_on)else uiContext.getString(R.string.vibration_off),0xFF2A3A2F.toInt(),Color.WHITE){vibrationEnabled=!vibrationEnabled;persist();renderMenu()})
             c.addView(button(uiContext.getString(R.string.back),0xFF4CAF50.toInt(),0xFF102014.toInt()){settingsMode=false;persist();renderMenu()})
             return
         }
+        calibrationValueView = null
         val modeNow=uiContext.getString(R.string.mode_now)
         val modeTarget=uiContext.getString(R.string.mode_target)
         val prepOptions=listOf(5,10,20,30)
