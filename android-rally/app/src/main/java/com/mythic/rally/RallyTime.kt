@@ -1,5 +1,7 @@
 package com.mythic.rally
 
+import android.content.Context
+import android.content.SharedPreferences
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -7,11 +9,44 @@ import java.util.Locale
 import java.util.TimeZone
 
 object RallyTime {
-    /** Single adjustable calibration against the game's UTC+8 clock. */
-    const val GAME_CLOCK_OFFSET_MILLIS: Long = 350L
+    private const val CALIBRATION_PREFERENCES = "game_clock_calibration"
+    private const val CALIBRATION_KEY = "offset_millis"
+
+    /** First-run calibration: previous +350 ms, plus the additional +460 ms measured against the game. */
+    const val DEFAULT_GAME_CLOCK_OFFSET_MILLIS: Long = 810L
+    const val CALIBRATION_STEP_MILLIS: Long = 50L
+    private const val MAX_CALIBRATION_OFFSET_MILLIS: Long = 10_000L
+
+    @Volatile private var calibrationOffsetMillis = DEFAULT_GAME_CLOCK_OFFSET_MILLIS
+    @Volatile private var calibrationPreferences: SharedPreferences? = null
+
+    /** Load the persistent calibration before any overlay or shared ticker starts. */
+    fun initialize(context: Context) {
+        val preferences = context.applicationContext.getSharedPreferences(CALIBRATION_PREFERENCES, Context.MODE_PRIVATE)
+        calibrationPreferences = preferences
+        calibrationOffsetMillis = preferences.getLong(CALIBRATION_KEY, DEFAULT_GAME_CLOCK_OFFSET_MILLIS)
+            .coerceIn(-MAX_CALIBRATION_OFFSET_MILLIS, MAX_CALIBRATION_OFFSET_MILLIS)
+        if (!preferences.contains(CALIBRATION_KEY)) {
+            preferences.edit().putLong(CALIBRATION_KEY, calibrationOffsetMillis).apply()
+        }
+    }
+
+    fun calibrationOffsetMillis(): Long = calibrationOffsetMillis
+
+    /** The only setter for the shared, persisted correction. */
+    fun setCalibrationOffsetMillis(value: Long): Long {
+        val normalized = value.coerceIn(-MAX_CALIBRATION_OFFSET_MILLIS, MAX_CALIBRATION_OFFSET_MILLIS)
+        calibrationOffsetMillis = normalized
+        calibrationPreferences?.edit()?.putLong(CALIBRATION_KEY, normalized)?.apply()
+        return normalized
+    }
 
     /** Convert device epoch time to the calibrated game epoch before display or calculation. */
-    fun correctedEpochMillis(deviceEpochMillis: Long): Long = deviceEpochMillis + GAME_CLOCK_OFFSET_MILLIS
+    fun correctedEpochMillis(deviceEpochMillis: Long): Long =
+        correctedEpochMillis(deviceEpochMillis, calibrationOffsetMillis)
+
+    internal fun correctedEpochMillis(deviceEpochMillis: Long, offsetMillis: Long): Long =
+        deviceEpochMillis + offsetMillis
 
     /** The only device wall-clock read used by the shared UTC ticker. */
     fun nowMillis(): Long = correctedEpochMillis(System.currentTimeMillis())
