@@ -227,7 +227,7 @@ class RallyOverlayService : Service() {
     }
     private fun pressButton(view:View){
         if(reduceMotion())return
-        root?.takeIf{view.isAttachedToWindow&&view.width>0&&view.height>0}?.let{host->
+        (view.rootView as? ViewGroup)?.takeIf{view.isAttachedToWindow&&view.width>0&&view.height>0}?.let{host->
             val p=IntArray(2);val o=IntArray(2);view.getLocationOnScreen(p);host.getLocationOnScreen(o)
             val bounds=Rect(p[0]-o[0],p[1]-o[1],p[0]-o[0]+view.width,p[1]-o[1]+view.height)
             val v=activeRallyTheme;val ring=RallyRingDrawable(bounds,dp((v?.radius?:12f)*.6f).toFloat(),v?.accent?:0xFF4CAF50.toInt())
