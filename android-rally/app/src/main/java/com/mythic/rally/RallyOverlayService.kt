@@ -646,7 +646,7 @@ class RallyOverlayService : Service() {
         updateClock()
     }
     private fun renderMenu(){showMenu()}
-    private fun label(parent:LinearLayout,s:String,top:Int=0){parent.addView(text(s,10f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(21)).apply{topMargin=dp(if(appearanceTheme==3)max(top,8)else top)})
+    private fun label(parent:LinearLayout,s:String,top:Int=0){parent.addView(text(s,10f,0xFFA5C4AA.toInt(),true),LinearLayout.LayoutParams(-1,dp(21)).apply{topMargin=dp(if(appearanceTheme==3)max(top,8)else top)})}
     private fun onPanelTouchDown(event: MotionEvent) {
         val anchor = activeDropdownAnchor ?: return
         val menu = activeDropdownView
