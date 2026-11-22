@@ -464,6 +464,7 @@ class ReinforcementOverlayService : Service() {
         (value * resources.displayMetrics.density).toInt()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        RallyTime.requestSync()
         when (intent?.action) {
             ACTION_STOP -> stopSelf()
             ACTION_TOGGLE, null -> {
