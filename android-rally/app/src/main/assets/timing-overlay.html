@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>حاسبة توقيت التعزيز</title>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Tajawal:wght@400;600;700;800&family=Changa:wght@400;600;700&family=Reem+Kufi:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#eef2f7;--card:#fff;--ink:#1b2735;--mute:#6b7c8f;--line:#dde4ec;--acc:#1f5fff;--accink:#fff;--gbg:#e3f6ec;--g:#0b7a43;--bad:#c0392b;--warn:#a66b00;--orb1:#2f7bff;--orb2:#0a3fd1;--orbink:#fff;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -97,6 +97,48 @@ html.ov #p .at,html.ov #p .cd{font-size:10px}
 html.ov #p .bar{gap:4px;margin-top:5px}
 html.ov #p button.b{padding:4px 8px;font-size:.72rem}
 html.ov #p .st{font-size:.66rem}
+
+[data-theme]{--bd:0;--sh:none;--bf:none;--cp:none;--ibd:0;--ish:none;--csh:none;--bs:none;--abd:0;--dg:none}
+[data-theme="1"]{--p:#1e2b22;--t:#eaf4ed;--m:#a9bfb0;--a:#4caf50;--at:#06210c;--w:#ffb020;--l:#35503d;--r:12px;--f:Tajawal;--nf:Tajawal;--sh:0 8px 24px #0007;--ib:#14201a}
+[data-theme="2"]{--p:rgba(255,255,255,.13);--t:#fff;--m:#d9e8df;--a:rgba(255,255,255,.88);--at:#0b3a1f;--w:#ffd36b;--l:#ffffff66;--r:22px;--f:Tajawal;--nf:Tajawal;--bd:1px solid #ffffff55;--bf:blur(16px);--ib:rgba(255,255,255,.14);--ibd:1px solid #ffffff33}
+[data-theme="3"]{--p:#2b3035;--t:#e4eae6;--m:#98a39c;--a:#2b3035;--at:#6fe39a;--w:#ff9b73;--l:#3b434a;--r:18px;--f:Tajawal;--nf:Tajawal;--sh:10px 10px 22px #15181a,-8px -8px 20px #3d444b;--ib:#2b3035;--ish:inset 3px 3px 7px #1b1f22,inset -3px -3px 7px #383f45;--csh:4px 4px 9px #1b1f22,-3px -3px 8px #3b4248;--bs:5px 5px 11px #1b1f22,-4px -4px 10px #3b4248}
+[data-theme="4"]{--p:linear-gradient(#4b5157,#2c3035);--t:#f1f3f2;--m:#b3bab6;--a:linear-gradient(#5fd37e,#2c9a4b);--at:#04210d;--w:#ffc24a;--l:#1a1d20;--r:12px;--f:Tajawal;--nf:Share Tech Mono;--bd:1px solid #6a7076;--sh:0 10px 22px #000a;--ib:linear-gradient(#1c1f22,#2a2e32);--ish:inset 0 2px 5px #000;--csh:inset 0 1px 0 #fff4,0 2px 0 #14161a;--bs:inset 0 1px 0 #fff7,0 3px 0 #0b4a1d,0 7px 9px #0009}
+[data-theme="5"]{--p:#161a10;--t:#dfe2c8;--m:#a0a583;--a:#d9a21b;--at:#161a10;--w:#ff6a3d;--l:#4d5433;--r:3px;--f:Changa;--nf:Share Tech Mono;--bd:1px solid #5d6440;--cp:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px));--ib:#0f120a;--ibd:1px solid #3d4329}
+[data-theme="6"]{--p:#0a0716;--t:#f0eaff;--m:#a79bd0;--a:#00f0ff;--at:#001a1f;--w:#ff2bd6;--l:#00f0ff66;--r:10px;--f:Tajawal;--nf:Share Tech Mono;--bd:1px solid #00f0ff;--sh:0 0 22px #00f0ff55;--ib:#140d2b;--ibd:1px solid #3b2a78;--bs:0 0 14px #00f0ff99;--dg:0 0 10px #00f0ff}
+[data-theme="7"]{--p:linear-gradient(#3d2815,#22130a);--t:#f9e9c3;--m:#c5a878;--a:linear-gradient(#f7d067,#b9821a);--at:#2a1604;--w:#ff8a5c;--l:#7a5a22;--r:10px;--f:Reem Kufi;--nf:Reem Kufi;--bd:2px solid #c89b3c;--sh:0 0 0 2px #1a0e05,0 10px 24px #000a;--ib:#1a0e05;--ibd:1px solid #6b4d1e;--bs:inset 0 1px 0 #fff8,0 3px 0 #6e4a0b;--abd:1px solid #6e4a0b}
+[data-theme="8"]{--p:#000;--t:#fff;--m:#8d8d8d;--a:#3ddc84;--at:#00200e;--w:#ffb454;--l:#2a2a2a;--r:16px;--f:Tajawal;--nf:Tajawal;--bd:1px solid #262626;--ib:#0e0e0e;--ibd:1px solid #1f1f1f}
+[data-theme="9"]{--p:#f3ead2;--t:#3b2f1c;--m:#7d6c4d;--a:#2f6f4e;--at:#fff;--w:#c2410c;--l:#b9a572;--r:6px;--f:Tajawal;--nf:Tajawal;--bd:1px solid #c9b88c;--sh:3px 4px 0 #0005;--ib:#fbf6e6;--ibd:1px solid #d6c79b}
+[data-theme="10"]{--p:#031a0a;--t:#4dff7c;--m:#2fae52;--a:#4dff7c;--at:#031a0a;--w:#ffd23f;--l:#1f7a39;--r:0px;--f:Share Tech Mono;--nf:Share Tech Mono;--bd:1px solid #4dff7c;--ib:#02100a;--ibd:1px solid #1f7a39}
+[data-theme="11"]{--p:#fff2a8;--t:#000;--m:#333;--a:#ff5a36;--at:#000;--w:#c40000;--l:#000;--r:0px;--f:Changa;--nf:Share Tech Mono;--bd:3px solid #000;--sh:7px 7px 0 #000;--ib:#fff;--ibd:2px solid #000;--csh:2px 2px 0 #000;--bs:3px 3px 0 #000;--abd:2px solid #000}
+[data-theme="12"]{--p:#3a2a7a;--t:#fff;--m:#cbbff5;--a:#ff9f1c;--at:#3a1c00;--w:#ffd0a0;--l:#6e5bc4;--r:20px;--f:Cairo,Tajawal;--nf:Tajawal;--bd:2px solid #5a46a8;--sh:0 8px 0 #251a55;--ib:#2c1f63;--csh:0 3px 0 #1d1448;--bs:0 6px 0 #b86b00}
+[data-theme="13"]{--p:linear-gradient(160deg,#2a1a3d,#5a1e4a);--t:#fff;--m:#e7c3da;--a:linear-gradient(90deg,#ff7a45,#ff3d77);--at:#fff;--w:#ffd27a;--l:#ff7a9a66;--r:24px;--f:Tajawal;--nf:Tajawal;--sh:0 12px 30px #0008;--ib:#ffffff1c}
+[data-theme="14"]{--p:#e6efe2;--t:#1b2b1e;--m:#4f6554;--a:#b6e3b0;--at:#0c2d12;--w:#b45309;--l:#a9c4a7;--r:28px;--f:Tajawal;--nf:Tajawal;--sh:0 6px 18px #0006;--ib:#f6faf4}
+#w[data-theme]{color:var(--t,var(--ink));font-family:var(--f,Cairo,Tahoma,Arial,sans-serif)}
+#w[data-theme] #p{background:var(--p,var(--card));color:var(--t,var(--ink));border:var(--bd,1px solid var(--line));border-radius:var(--r,12px);box-shadow:var(--sh,0 10px 30px rgba(0,0,0,.25));backdrop-filter:var(--bf,none);-webkit-backdrop-filter:var(--bf,none);clip-path:var(--cp,none)}
+#w[data-theme] label,#w[data-theme] .h,#w[data-theme] .st{color:var(--m,var(--mute))}
+#w[data-theme] input{background:var(--ib,var(--bg));color:var(--t,var(--ink));border:var(--ibd,1px solid var(--line));box-shadow:var(--ish,none);font-family:var(--f,Cairo,Tahoma,Arial,sans-serif)}
+#w[data-theme] .b{background:var(--a,var(--acc));color:var(--at,var(--accink));border:var(--abd,1px solid var(--acc));box-shadow:var(--bs,none)}
+#w[data-theme] .g,#w[data-theme] .calibration strong{color:var(--a,var(--acc))}
+#w[data-theme] .x{color:var(--w,var(--mute))}
+#w[data-theme] .tab,#w[data-theme] .chip,#w[data-theme] .md button,#w[data-theme] .calibration button{background:var(--ib,var(--bg));border:var(--ibd,1px solid var(--line));color:var(--t,var(--ink));box-shadow:var(--csh,none)}
+#w[data-theme] .tab.on,#w[data-theme] .chip.on{background:var(--a,var(--acc));color:var(--at,var(--accink));border-color:var(--a,var(--acc))}
+#w[data-theme] .r{border-color:var(--l,var(--line))}
+#w[data-theme] .ban{background:color-mix(in srgb,var(--g) 14%,transparent);border-color:var(--g)}
+#w[data-theme] .ban b,#w[data-theme] .ban small{color:var(--g)}
+#w[data-theme] .at,#w[data-theme] .cd{font-family:var(--nf,var(--f,Cairo,Tahoma,Arial,sans-serif))}
+#w[data-theme] #clk{font-family:var(--nf,var(--f,Cairo,Tahoma,Arial,sans-serif))}
+
+#w button{position:relative;isolation:isolate;min-width:48px;min-height:48px;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;transition:transform 120ms ease}
+#w button::after{content:"";position:absolute;inset:-2px;border-radius:inherit;padding:2px;background:var(--a,var(--acc,#1f5fff));pointer-events:none;opacity:0;transform:scale(.82);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude}
+#w button.ring-pressed{transform:scale(.97)}
+#w button.ring-active::after{animation:buttonRing 500ms ease-out both}
+@keyframes buttonRing{0%{opacity:.7;transform:scale(.82)}100%{opacity:0;transform:scale(1.18)}}
+#w button:focus-visible{outline:2px solid var(--a,var(--acc));outline-offset:3px}
+#w button:disabled,#w button[aria-disabled="true"]{opacity:.42;cursor:not-allowed;filter:grayscale(.45);transform:none}
+@media(prefers-reduced-motion:reduce){#w button{transition:none!important}#w button.ring-pressed{transform:none}#w button.ring-active::after{animation:none;opacity:.7;transform:scale(1)}}
+.theme-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:4px 0 8px}
+.theme-options button{min-width:0!important;min-height:48px;padding:3px 2px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font-size:.68rem;line-height:1.15}
+.theme-options button[aria-pressed=true]{border-color:var(--a,var(--acc));background:var(--ib,var(--bg));color:var(--t,var(--ink));box-shadow:inset 0 0 0 1px var(--a,var(--acc))}
 </style>
 </head>
 <body>
@@ -109,8 +151,9 @@ html.ov #p .st{font-size:.66rem}
     <div id="set" hidden>
       <label data-i18n="color">لون الأداة</label>
       <div class="sw" id="sw"></div>
-      <label data-i18n="appearance">المظهر</label>
+      <label data-i18n="appearance">نمط الألوان</label>
       <div class="md" id="md"><button data-m="auto" data-i18n="auto">تلقائي</button><button data-m="light" data-i18n="light">فاتح</button><button data-m="dark" data-i18n="dark">داكن</button></div>
+      <label data-i18n="theme">المظهر</label><div class="theme-options" id="themes"></div>
       <label data-i18n="calibration">معايرة التوقيت</label>
       <div class="calibration"><button id="calMinus" type="button" aria-label="تقليل التصحيح">−</button><strong id="calValue" aria-live="polite">—</strong><button id="calPlus" type="button" aria-label="زيادة التصحيح">+</button></div>
     </div>
@@ -141,7 +184,7 @@ var appLanguage="en",toolLanguageMode="app",language="en";
 try{appLanguage=window.RallyBridge?RallyBridge.getAppLanguage():(localStorage.getItem("rally-app-language")||"en")}catch(e){}
 try{localStorage.removeItem("rp4-language-mode");if(window.RallyBridge)RallyBridge.setToolLanguage("app")}catch(e){}
 function tr(ar,en){return language==="en"?en:ar}
-var I18N={note:["اضغط الدائرة لفتح الأداة، واسحبها لتغيير مكانها","Tap the circle to open the tool, and drag it to move"],title:["حاسبة التعزيز","Reinforcement Calculator"],color:["لون الأداة","Tool color"],appearance:["المظهر","Appearance"],auto:["تلقائي","Auto"],light:["فاتح","Light"],dark:["داكن","Dark"],languageLabel:["لغة الأداة","Tool language"],eta:["عدّاد يحشد (د:ث)","Rally countdown (m:ss)"],enemyMarch:["مسيرة الخصم (د:ث)","Enemy march (m:ss)"],start:["ابدأ","Start"],allArrival:["وصول الجميع UTC","Everyone arrives UTC"],player:["اللاعب","Player"],march:["مسيرة","March"],sendUtc:["أرسل UTC","Send UTC"],after:["بعد","In"],copy:["نسخ","Copy"],copyAll:["نسخ الكل","Copy all"],calibration:["معايرة التوقيت","Time calibration"]};
+var I18N={note:["اضغط الدائرة لفتح الأداة، واسحبها لتغيير مكانها","Tap the circle to open the tool, and drag it to move"],title:["حاسبة التعزيز","Reinforcement Calculator"],color:["لون الأداة","Tool color"],appearance:["نمط الألوان","Color mode"],theme:["المظهر","Theme"],themeCurrent:["الحالي","Current"],auto:["تلقائي","Auto"],light:["فاتح","Light"],dark:["داكن","Dark"],languageLabel:["لغة الأداة","Tool language"],eta:["عدّاد يحشد (د:ث)","Rally countdown (m:ss)"],enemyMarch:["مسيرة الخصم (د:ث)","Enemy march (m:ss)"],start:["ابدأ","Start"],allArrival:["وصول الجميع UTC","Everyone arrives UTC"],player:["اللاعب","Player"],march:["مسيرة","March"],sendUtc:["أرسل UTC","Send UTC"],after:["بعد","In"],copy:["نسخ","Copy"],copyAll:["نسخ الكل","Copy all"],calibration:["معايرة التوقيت","Time calibration"]};
 function defaultName(name,kind,n,enabled){var s=String(name||""),m;if(enabled===false)return s;if(kind==="rally"&&(m=s.match(/^حشد\s+(\d+)$/)))return tr(s,"Rally "+m[1]);if(kind==="player"&&(m=s.match(/^لاعب\s+(\d+)$/)))return tr(s,"Player "+m[1]);if(kind==="rally"&&(m=s.match(/^Rally\s+(\d+)$/)))return tr("حشد "+m[1],s);if(kind==="player"&&(m=s.match(/^Player\s+(\d+)$/)))return tr("لاعب "+m[1],s);return s}
 function setLanguage(code,persist){language=code==="ar"?"ar":"en";document.documentElement.lang=language;document.documentElement.dir=language==="ar"?"rtl":"ltr";document.body.dir=document.documentElement.dir;document.title=tr("حاسبة توقيت التعزيز","Reinforcement Timer");document.querySelectorAll("[data-i18n]").forEach(function(el){var v=I18N[el.dataset.i18n];if(v)el.textContent=tr(v[0],v[1])});$("c").setAttribute("aria-label",tr("فتح أو إغلاق حاسبة التوقيت","Open or close reinforcement calculator"));$("gear").setAttribute("aria-label",tr("الإعدادات","Settings"));$("calMinus").setAttribute("aria-label",tr("تقليل التصحيح","Decrease calibration"));$("calPlus").setAttribute("aria-label",tr("زيادة التصحيح","Increase calibration"));$("del").setAttribute("aria-label",tr("حذف هذا الحشد","Delete this rally"));$("pname").placeholder=tr("اسم الحشد","Rally name");$("pname").setAttribute("aria-label",tr("اسم الحشد","Rally name"));$("add").textContent=tr("+ لاعب","+ Player");var addRally=document.querySelector(".tab.add");if(addRally)addRally.setAttribute("aria-label",tr("إضافة حشد جديد","Add new rally"));document.querySelectorAll("#sw button[data-color-index]").forEach(function(b){var names=[["أزرق","Blue"],["بنفسجي","Purple"],["فيروزي","Turquoise"],["برتقالي","Orange"],["أحمر","Red"],["وردي","Pink"]],v=names[Number(b.dataset.colorIndex)];if(v)b.setAttribute("aria-label",tr(v[0],v[1]))});if(typeof ci!=="undefined"&&ci)ci.setAttribute("aria-label",tr("لون مخصص","Custom color"));pages.forEach(function(g,i){g.n=defaultName(g.n,"rally",i+1,g.defaultRallyName!==false);if(g.defaultRallyName===undefined)g.defaultRallyName=/^(حشد|Rally)\s+\d+$/.test(String(g.n||""));g.pl.forEach(function(p,j){p.n=defaultName(p.n,"player",j+1,p.defaultName!==false);if(p.defaultName===undefined)p.defaultName=/^(لاعب|Player)\s+\d+$/.test(String(p.n||""))})});if(persist){try{localStorage.removeItem("rp4-language-mode");if(window.RallyBridge)RallyBridge.setToolLanguage("app")}catch(e){}}if(typeof calibrationOffsetMillis!=="undefined")renderCalibration();render()}
 function setAppLanguage(code){appLanguage=code==="ar"?"ar":"en";try{localStorage.setItem("rally-app-language",appLanguage)}catch(e){}toolLanguageMode="app";setLanguage(appLanguage,false)}
@@ -229,7 +272,7 @@ $("cpa").onclick=function(){
   copy(L.join("\n\n"))};
 
 /* settings */
-var S={acc:null,mode:OV?"dark":"auto"};
+var S={acc:null,mode:OV?"dark":"auto",theme:"current"};
 try{S=Object.assign(S,JSON.parse(localStorage.getItem("rp3s")||"{}"))}catch(e){}
 function mix(h,t,to){var n=parseInt(h.slice(1),16),c=[n>>16,n>>8&255,n&255].map(function(x){return Math.round(x+(to-x)*t).toString(16).padStart(2,"0")});return "#"+c.join("")}
 function lum(h){var n=parseInt(h.slice(1),16);return(.299*(n>>16)+.587*(n>>8&255)+.114*(n&255))/255}
@@ -241,6 +284,10 @@ function applyS(){
   else P.forEach(function(k){rs.removeProperty(k)});
   if(S.mode==="auto")document.documentElement.removeAttribute("data-theme");else document.documentElement.setAttribute("data-theme",S.mode);
   [].forEach.call($("md").children,function(b){b.classList.toggle("on",b.dataset.m===S.mode)});
+  if(S.theme==="current"||!/^([1-9]|1[0-4])$/.test(String(S.theme))){S.theme="current";$("w").removeAttribute("data-theme")}
+  else $("w").setAttribute("data-theme",String(S.theme));
+  [].forEach.call($("themes").children,function(b){b.setAttribute("aria-pressed",String(b.dataset.themeChoice===String(S.theme)))});
+
   [].forEach.call($("sw").querySelectorAll("button"),function(b){b.classList.toggle("on",(b.dataset.c||null)===S.acc)});
   try{localStorage.setItem("rp3s",JSON.stringify(S))}catch(e){}}
 [["#1f5fff","أزرق"],["#7c3aed","بنفسجي"],["#0891b2","فيروزي"],["#f97316","برتقالي"],["#e11d48","أحمر"],["#db2777","وردي"]].forEach(function(c,i){
@@ -256,9 +303,24 @@ $("calMinus").onclick=function(){adjustCalibration(-RallyBridge.getGameClockCali
 $("calPlus").onclick=function(){adjustCalibration(RallyBridge.getGameClockCalibrationStepMillis())};
 $("gear").onclick=function(){var o=$("set").hidden;$("set").hidden=!o;$("gear").setAttribute("aria-expanded",String(o));if(o){calibrationOffsetMillis=Number(RallyBridge.getGameClockCalibrationMillis());renderCalibration()}};
 
+var themeNames=[["الحالي","Current"],["مسطّح محسّن","Enhanced flat"],["زجاجي","Glass"],["ناعم بارز","Neumorphism"],["لوحة تحكم مجسّمة","Sculpted control"],["عسكري تكتيكي","Tactical"],["نيون سايبر","Cyber neon"],["ذهبي للألعاب","Game gold"],["AMOLED بسيط","AMOLED"],["ورق خرائط","Map paper"],["طرفية","Terminal"],["بروتاليست","Brutalist"],["حلوى ثلاثية الأبعاد","3D candy"],["غروب متدرّج","Gradient sunset"],["Material You فاتح","Material You light"]];
+themeNames.forEach(function(n,i){var b=document.createElement("button");b.type="button";b.dataset.themeChoice=i?String(i):"current";b.textContent=i?i+". "+(language==="en"?n[1]:n[0]):(language==="en"?n[1]:n[0]);b.onclick=function(){S.theme=b.dataset.themeChoice;applyS()};$("themes").appendChild(b)});
 applyS();
 renderCalibration();
 setLanguage(toolLanguageMode==="app"?appLanguage:toolLanguageMode,false);
+
+
+var ringButtons=$("w");
+function releaseRingButton(b){if(b)b.classList.remove("ring-pressed")}
+ringButtons.addEventListener("pointerdown",function(e){
+  var b=e.target.closest("button");if(!b||!ringButtons.contains(b)||b.disabled)return;
+  b.classList.remove("ring-active");b.classList.add("ring-pressed");
+  void b.offsetWidth;b.classList.add("ring-active");
+  if(b._ringTimer)clearTimeout(b._ringTimer);
+  b._ringTimer=setTimeout(function(){b.classList.remove("ring-active");b._ringTimer=null},500);
+},true);
+["pointerup","pointercancel","lostpointercapture"].forEach(function(type){ringButtons.addEventListener(type,function(e){releaseRingButton(e.target.closest("button"))},true)});
+ringButtons.addEventListener("click",function(e){var b=e.target.closest("button");if(b)releaseRingButton(b)},true);
 
 /* floating orb */
 var w=$("w"),c=$("c"),p=$("p"),W=68,PAD=8,
