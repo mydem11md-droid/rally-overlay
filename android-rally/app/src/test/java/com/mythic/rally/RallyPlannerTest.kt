@@ -19,7 +19,7 @@ class RallyPlannerTest {
     }
     @Test fun targetValidationUsesTheSharedCorrectedTimeSample() {
         val people=listOf(RallyInput(1,"Late",60))
-        val (plan,errors)=RallyPlanner.planTarget(ms(7,20,0),people,ms(7,19,1))
+        val (plan,errors)=RallyPlanner.planTarget(ms(7,20,0),people,ms(7,19,2))
         assertEquals(ms(7,19,0),plan.rows.single().actionAtMillis)
         assertEquals(listOf("Late"),errors)
     }
