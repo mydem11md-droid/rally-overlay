@@ -18,6 +18,7 @@ import java.util.Locale
 object UtcClockTicker {
     private val handler = Handler(Looper.getMainLooper())
     private val listeners = LinkedHashSet<(Long) -> Unit>()
+    private val calibrationListeners = LinkedHashSet<(Long) -> Unit>()
     @Volatile private var currentTimestamp = RallyTime.nowMillis()
     private var scheduled = false
 
@@ -43,14 +44,27 @@ object UtcClockTicker {
 
     fun currentTimeMillis(): Long = currentTimestamp
 
-    /** Apply a calibration change once on the main thread, refresh every clock with one sample, then realign. */
+    fun addCalibrationListener(listener: (Long) -> Unit) {
+        onMain { calibrationListeners.add(listener) }
+    }
+
+    fun removeCalibrationListener(listener: (Long) -> Unit) {
+        onMain { calibrationListeners.remove(listener) }
+    }
+
+    /** Apply the new offset once, shift existing plans by the same delta, refresh every clock, then realign. */
     fun setCalibrationOffsetMillis(value: Long) {
         onMain {
-            RallyTime.setCalibrationOffsetMillis(value)
+            val previous = RallyTime.calibrationOffsetMillis()
+            val updated = RallyTime.setCalibrationOffsetMillis(value)
+            val delta = updated - previous
             handler.removeCallbacks(tick)
             scheduled = false
             val now = RallyTime.nowMillis()
             currentTimestamp = now
+            if (delta != 0L) {
+                calibrationListeners.toList().forEach { listener -> runCatching { listener(delta) } }
+            }
             listeners.toList().forEach { listener -> runCatching { listener(now) } }
             schedule(now)
         }

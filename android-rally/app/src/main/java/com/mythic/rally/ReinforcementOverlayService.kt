@@ -87,6 +87,13 @@ class ReinforcementOverlayService : Service() {
             }
         }
     }
+    private val calibrationListener: (Long) -> Unit = { deltaMillis ->
+        if (pageLoaded && webViewCreated && deltaMillis != 0L) {
+            runCatching {
+                webView.evaluateJavascript("window.applyGameClockCalibrationDelta && window.applyGameClockCalibrationDelta($deltaMillis)", null)
+            }
+        }
+    }
     private val languageReceiver = object : android.content.BroadcastReceiver() {
         override fun onReceive(context: android.content.Context?, intent: Intent?) {
             val code = intent?.getStringExtra("language") ?: return
@@ -117,6 +124,7 @@ class ReinforcementOverlayService : Service() {
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(languageReceiver, languageFilter, android.content.Context.RECEIVER_NOT_EXPORTED)
         else registerReceiver(languageReceiver, languageFilter)
         UtcClockTicker.addListener(utcTimeListener)
+        UtcClockTicker.addCalibrationListener(calibrationListener)
         prefs.edit().remove("language_mode").putBoolean("window_attached", false).apply()
         publishState()
     }
@@ -470,6 +478,7 @@ class ReinforcementOverlayService : Service() {
         overlayFramePending = false
         runCatching { unregisterReceiver(languageReceiver) }
         UtcClockTicker.removeListener(utcTimeListener)
+        UtcClockTicker.removeCalibrationListener(calibrationListener)
         if (isOverlayAttached) {
             runCatching { windowManager.removeView(webView) }
         }
