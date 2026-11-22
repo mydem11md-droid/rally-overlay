@@ -676,9 +676,9 @@ class RallyOverlayService : Service() {
                 val(title,action)=entry;val chosen=index==selectedIndex
                 rows.addView(TextView(uiContext).apply{
                     text=if(chosen)"$title   ✓" else title;textSize=12f;gravity=Gravity.CENTER_VERTICAL
-                    setTextColor(themeColor(Color.WHITE));includeFontPadding=false;setPadding(dp(12),dp(5),dp(12),dp(5));val shape=bg(if(chosen)0xFF347B4A.toInt()else 0xFF2A3A2F.toInt(),8f);background=shape;minHeight=dp(48);isSingleLine=true;setOnClickListener{dismissDropdown();action()};attachButtonFeedback(this,shape)
+                    setTextColor(if(chosen)activeRallyTheme?.accentText?:Color.WHITE else themeColor(Color.WHITE));includeFontPadding=false;setPadding(dp(12),dp(5),dp(12),dp(5));val shape=bg(if(chosen)0xFF347B4A.toInt()else 0xFF2A3A2F.toInt(),8f);background=shape;minHeight=dp(48);isSingleLine=true;setOnClickListener{dismissDropdown();action()};attachButtonFeedback(this,shape)
                 },LinearLayout.LayoutParams(-1,dp(48)))
-                if(index<options.lastIndex)rows.addView(View(uiContext).apply{setBackgroundColor(0xFF39483E.toInt())},LinearLayout.LayoutParams(-1,dp(1)).apply{topMargin=dp(2);bottomMargin=dp(2)})
+                if(index<options.lastIndex)rows.addView(View(uiContext).apply{setBackgroundColor(activeRallyTheme?.line?:0xFF39483E.toInt())},LinearLayout.LayoutParams(-1,dp(1)).apply{topMargin=dp(2);bottomMargin=dp(2)})
             }
             val desiredHeight=min(dp(options.size*52+10),dp(260))
             val scroller=CappedScrollView(uiContext).apply{
