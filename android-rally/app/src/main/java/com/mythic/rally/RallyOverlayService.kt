@@ -675,7 +675,7 @@ class RallyOverlayService : Service() {
                 return@setOnClickListener
             }
             dismissDropdown()
-            val rows=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;setPadding(dp(5),dp(5),dp(5),dp(5))}
+            val rows=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=appearanceTheme!=3;clipToPadding=appearanceTheme!=3;setPadding(dp(5),dp(5),dp(5),dp(5))}
             val selectedIndex=options.indexOfFirst{(title,_)->title==selected||selected.startsWith("$title ·")}
             options.forEachIndexed{index,entry->
                 val(title,action)=entry;val chosen=index==selectedIndex
@@ -844,7 +844,7 @@ class RallyOverlayService : Service() {
     private fun buildAppearanceSelector(parent:LinearLayout){
         label(parent,t("المظهر","Appearance"))
         val names=listOf(t("الحالي","Current"),t("1 · مسطّح محسّن","1 · Enhanced flat"),t("2 · زجاجي","2 · Glass"),t("3 · ناعم بارز","3 · Neumorphism"),t("4 · لوحة مجسّمة","4 · 3D Panel"),t("5 · عسكري تكتيكي","5 · Tactical"),t("6 · نيون سايبر","6 · Cyber Neon"),t("7 · ذهبي للألعاب","7 · Game gold"),t("8 · AMOLED بسيط","8 · AMOLED"),t("9 · ورق خرائط","9 · Map Paper"),t("10 · شاشة طرفية","10 · Terminal"),t("11 · بروتاليست","11 · Brutalist"),t("12 · حلوى 3D","12 · 3D Candy"),t("13 · غروب متدرّج","13 · Sunset"),t("14 · Material You","14 · Material You"))
-        val grid=GridLayout(uiContext).apply{columnCount=3;useDefaultMargins=false;alignmentMode=GridLayout.ALIGN_MARGINS}
+        val grid=GridLayout(uiContext).apply{columnCount=3;useDefaultMargins=false;alignmentMode=GridLayout.ALIGN_MARGINS;clipChildren=appearanceTheme!=3;clipToPadding=appearanceTheme!=3}
         names.forEachIndexed{index,name->
             val selected=appearanceTheme==index
             val item=button(if(selected)"$name  ✓"else name,if(selected)0xFF4CAF50.toInt()else 0xFF2A3A2F.toInt(),if(selected)0xFF102014.toInt()else Color.WHITE){appearanceTheme=index;persist();renderMenu()}.apply{textSize=10f}
@@ -857,7 +857,7 @@ class RallyOverlayService : Service() {
             calibrationValueView = null
             buildAppearanceSelector(c)
             label(c,t("معايرة التوقيت","Time calibration"),16)
-            val calibrationRow = LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; direction(this) }
+            val calibrationRow = LinearLayout(uiContext).apply { orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL;clipChildren=appearanceTheme!=3;clipToPadding=appearanceTheme!=3;direction(this) }
             calibrationRow.addView(button("−",0xFF2A3A2F.toInt(),Color.WHITE){
                 UtcClockTicker.setCalibrationOffsetMillis(RallyTime.calibrationOffsetMillis()-RallyTime.CALIBRATION_STEP_MILLIS)
                 refreshCalibrationValue()
@@ -913,7 +913,7 @@ class RallyOverlayService : Service() {
             c.addView(targetRow,LinearLayout.LayoutParams(-1,-2).apply{bottomMargin=dp(7)})
         }
         label(c,t("المشاركون · الاسم ووقت المسير · النوع","Participants · Name and march time · Type"))
-        val participantRows=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=appearanceTheme!=3;clipToPadding=appearanceTheme!=3;direction(this)}
+        val participantRows=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;clipChildren=appearanceTheme!=3;clipToPadding=appearanceTheme!=3;setPadding(0,0,0,if(appearanceTheme==3)dp(8)else 0);direction(this)}
         participantRowsScroll=null
         people.forEachIndexed { index,p ->
             val card=LinearLayout(uiContext).apply{orientation=LinearLayout.VERTICAL;direction(this);setPadding(dp(6),dp(5),dp(6),dp(5));background=bg(0xFF26382C.toInt(),9f)}
