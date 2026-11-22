@@ -17,6 +17,12 @@ class RallyPlannerTest {
         assertEquals(ms(7,20,10),p.rows.first{it.id==1}.actionAtMillis)
         assertEquals(ms(7,35,3),p.rows.first{it.id==2}.actionAtMillis)
     }
+    @Test fun targetValidationUsesTheSharedCorrectedTimeSample() {
+        val people=listOf(RallyInput(1,"Late",60))
+        val (plan,errors)=RallyPlanner.planTarget(ms(7,20,0),people,ms(7,19,1))
+        assertEquals(ms(7,19,0),plan.rows.single().actionAtMillis)
+        assertEquals(listOf("Late"),errors)
+    }
     @Test fun twoRalliesHaveNineFortyActionGap() {
         val p=RallyPlanner.planNow(ms(7,20,0),10,listOf(RallyInput(1,"Five",40,300),RallyInput(2,"Fifteen",20,900)))
         assertEquals(ms(7,20,10),p.rows.first{it.id==2}.actionAtMillis)
