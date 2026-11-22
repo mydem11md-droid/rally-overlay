@@ -649,8 +649,8 @@ class RallyOverlayService : Service() {
     }
     private fun input(hint:String,value:String,numeric:Boolean=false):EditText {
         return OverlayEditText(uiContext).apply {
-            setSingleLine(true); textSize=13f; setTextColor(Color.WHITE); setHintTextColor(0xFFA5C4AA.toInt()); setHint(hint); setText(value); contentDescription=hint
-            background=bg(0xFF2A3A2F.toInt(),9f); setPadding(dp(9),0,dp(9),0)
+            setSingleLine(true);textSize=13f;setTextColor(themedTextColor(Color.WHITE));setHintTextColor(themedTextColor(0xFFA5C4AA.toInt()));setHint(hint);setText(value);contentDescription=hint
+            background=bg(0xFF2A3A2F.toInt(),9f);setPadding(dp(9),0,dp(9),0);if(activeTheme!=null)setTypeface(themeTypeface(typeface,numbers=numeric))
             if(numeric) { inputType=android.text.InputType.TYPE_CLASS_NUMBER; keyListener=android.text.method.DigitsKeyListener.getInstance("0123456789"); imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=View.TEXT_DIRECTION_LTR; textAlignment=View.TEXT_ALIGNMENT_CENTER }
             else { inputType=android.text.InputType.TYPE_CLASS_TEXT; imeOptions=EditorInfo.IME_ACTION_NEXT; textDirection=if(ar())View.TEXT_DIRECTION_RTL else View.TEXT_DIRECTION_LTR }
             setOnTouchListener { v,event ->
@@ -800,7 +800,7 @@ class RallyOverlayService : Service() {
                 custom.visibility=View.GONE
                 val customToggle=fitControl(button(uiContext.getString(R.string.custom_minutes),if(p.rallyMinutes !in presets)0xFF4CAF50.toInt() else 0xFF2A3A2F.toInt(),if(p.rallyMinutes !in presets)0xFF102014.toInt() else Color.WHITE){custom.visibility=if(custom.visibility==View.VISIBLE)View.GONE else View.VISIBLE})
                 row.addView(customToggle,LinearLayout.LayoutParams(-1,dp(48)).apply{topMargin=dp(8)})
-                custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it > 0 && it <= Int.MAX_VALUE/60}?.let{p.rallyMinutes=it;persist();customToggle.setBackground(bg(0xFF4CAF50.toInt(),9f));customToggle.setTextColor(0xFF102014.toInt())}})
+                custom.addTextChangedListener(SimpleWatcher{v->v.toIntOrNull()?.takeIf{it > 0 && it <= Int.MAX_VALUE/60}?.let{p.rallyMinutes=it;persist();customToggle.setBackground(bg(0xFF4CAF50.toInt(),9f));customToggle.setTextColor(themedTextColor(0xFF102014.toInt()))}})
                 row.addView(custom,LinearLayout.LayoutParams(-1,dp(38)).apply{topMargin=dp(4)})
             }
             val actions=LinearLayout(uiContext).apply{gravity=if(ar())Gravity.END else Gravity.START}
